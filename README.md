@@ -1,6 +1,6 @@
-# BTCDecoded Governance App
+# Bitcoin Commons Governance App
 
-Rust-based GitHub App for enforcing cryptographic governance rules across all BTCDecoded repositories.
+Rust-based GitHub App for enforcing cryptographic governance rules across all Bitcoin Commons repositories.
 
 ## ⚠️ DEPLOYMENT WARNING
 

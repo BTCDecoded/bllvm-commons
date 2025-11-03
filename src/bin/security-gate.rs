@@ -14,7 +14,7 @@ use governance_app::validation::security_controls::{SecurityControlValidator, Se
 
 #[derive(Parser)]
 #[command(name = "security-gate")]
-#[command(about = "BTCDecoded Security Control Management Tool")]
+#[command(about = "Bitcoin Commons Security Control Management Tool")]
 #[command(version = "1.0.0")]
 struct Cli {
     #[command(subcommand)]
@@ -107,7 +107,7 @@ async fn check_status(detailed: bool) -> Result<()> {
     let content = fs::read_to_string(status_file)?;
     let status: serde_yaml::Value = serde_yaml::from_str(&content)?;
 
-    println!("🔒 BTCDecoded Security Control Status");
+    println!("🔒 Bitcoin Commons Security Control Status");
     println!("=====================================");
     println!();
 
@@ -395,7 +395,7 @@ async fn generate_report(output: Option<String>) -> Result<()> {
     let status: serde_yaml::Value = serde_yaml::from_str(&content)?;
 
     let mut report = String::new();
-    report.push_str("# BTCDecoded Security Control Report\n");
+    report.push_str("# Bitcoin Commons Security Control Report\n");
     report.push_str(&format!("Generated: {}\n\n", chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC")));
 
     // Overall status
@@ -523,6 +523,7 @@ struct ProductionReadinessResult {
     blocking_controls: usize,
     blocking_control_ids: Vec<String>,
 }
+
 
 
 

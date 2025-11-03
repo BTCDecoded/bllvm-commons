@@ -202,6 +202,7 @@ impl GitHubClient {
         );
 
         // Create branch protection payload
+        // Phase 1: Admin bypass allowed for rapid development. Phase 2 will enforce admin protection.
         let payload = json!({
             "required_status_checks": {
                 "strict": true,
