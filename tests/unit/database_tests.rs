@@ -19,7 +19,7 @@ async fn test_pull_request_crud() {
     let db = setup_test_db().await;
     
     // Test creating a pull request
-    let repo_name = "BTCDecoded/consensus-proof";
+    let repo_name = "BTCDecoded/bllvm-consensus";
     let pr_number = 123;
     let head_sha = "abc123def456";
     let layer = 2;
@@ -45,7 +45,7 @@ async fn test_signature_storage_and_retrieval() {
     let db = setup_test_db().await;
     
     // Create a pull request first
-    let repo_name = "BTCDecoded/consensus-proof";
+    let repo_name = "BTCDecoded/bllvm-consensus";
     let pr_number = 123;
     let head_sha = "abc123def456";
     let layer = 2;
@@ -75,7 +75,7 @@ async fn test_governance_event_logging() {
     let db = setup_test_db().await;
     
     let event_type = "signature_added";
-    let repo_name = Some("BTCDecoded/consensus-proof");
+    let repo_name = Some("BTCDecoded/bllvm-consensus");
     let pr_number = Some(123);
     let maintainer = Some("alice");
     let details = json!({
@@ -99,7 +99,7 @@ async fn test_concurrent_signature_additions() {
     let db = setup_test_db().await;
     
     // Create a pull request
-    let repo_name = "BTCDecoded/consensus-proof";
+    let repo_name = "BTCDecoded/bllvm-consensus";
     let pr_number = 123;
     let head_sha = "abc123def456";
     let layer = 2;
@@ -135,7 +135,7 @@ async fn test_review_status_updates() {
     let db = setup_test_db().await;
     
     // Create a pull request
-    let repo_name = "BTCDecoded/consensus-proof";
+    let repo_name = "BTCDecoded/bllvm-consensus";
     let pr_number = 123;
     let head_sha = "abc123def456";
     let layer = 2;
@@ -155,7 +155,7 @@ async fn test_emergency_mode_tracking() {
     let db = setup_test_db().await;
     
     // Create a pull request
-    let repo_name = "BTCDecoded/consensus-proof";
+    let repo_name = "BTCDecoded/bllvm-consensus";
     let pr_number = 123;
     let head_sha = "abc123def456";
     let layer = 2;
@@ -186,9 +186,9 @@ async fn test_cross_layer_dependencies() {
     
     // Test cross-layer rule storage and retrieval
     let rule_data = json!({
-        "source_repo": "BTCDecoded/consensus-proof",
+        "source_repo": "BTCDecoded/bllvm-consensus",
         "source_pattern": "src/consensus/**",
-        "target_repo": "BTCDecoded/protocol-engine",
+        "target_repo": "BTCDecoded/bllvm-protocol",
         "target_pattern": "src/validation/**",
         "validation_type": "corresponding_file_exists"
     });
@@ -218,7 +218,7 @@ async fn test_json_serialization_for_signatures() {
     let db = setup_test_db().await;
     
     // Create a pull request
-    let repo_name = "BTCDecoded/consensus-proof";
+    let repo_name = "BTCDecoded/bllvm-consensus";
     let pr_number = 123;
     let head_sha = "abc123def456";
     let layer = 2;
@@ -272,6 +272,11 @@ async fn test_database_connection_pooling() {
         assert!(result.is_ok());
     }
 }
+
+
+
+
+
 
 
 

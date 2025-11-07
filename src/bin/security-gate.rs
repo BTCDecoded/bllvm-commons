@@ -490,7 +490,7 @@ async fn get_pr_changed_files(pr_number: u32) -> Result<Vec<String>> {
     // Simplified implementation - in reality would use GitHub API
     // For now, return some example files
     Ok(vec![
-        "protocol-engine/src/lib.rs".to_string(),
+        "bllvm-protocol/src/lib.rs".to_string(),
         "governance-app/src/validation/emergency.rs".to_string(),
     ])
 }
@@ -498,7 +498,7 @@ async fn get_pr_changed_files(pr_number: u32) -> Result<Vec<String>> {
 async fn get_git_changed_files() -> Result<Vec<String>> {
     // Simplified implementation - in reality would use git diff
     Ok(vec![
-        "protocol-engine/src/lib.rs".to_string(),
+        "bllvm-protocol/src/lib.rs".to_string(),
         "governance-app/src/database/queries.rs".to_string(),
     ])
 }
@@ -523,6 +523,11 @@ struct ProductionReadinessResult {
     blocking_controls: usize,
     blocking_control_ids: Vec<String>,
 }
+
+
+
+
+
 
 
 

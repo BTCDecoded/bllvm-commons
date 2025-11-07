@@ -30,11 +30,11 @@ pub async fn handle_pull_request_event(
 
     // Determine layer based on repository
     let layer = match repo_name {
-        repo if repo.contains("orange-paper") => 1,
-        repo if repo.contains("consensus-proof") => 2,
-        repo if repo.contains("protocol-engine") => 3,
-        repo if repo.contains("reference-node") => 4,
-        repo if repo.contains("developer-sdk") => 5,
+        repo if repo.contains("bllvm-spec") || repo.contains("orange-paper") => 1,
+        repo if repo.contains("bllvm-consensus") || repo.contains("consensus-proof") => 2,
+        repo if repo.contains("bllvm-protocol") || repo.contains("protocol-engine") => 3,
+        repo if repo.contains("bllvm-node") || repo.contains("reference-node") => 4,
+        repo if repo.contains("bllvm-sdk") || repo.contains("developer-sdk") => 5,
         _ => {
             warn!("Unknown repository: {}", repo_name);
             return Ok(axum::response::Json(

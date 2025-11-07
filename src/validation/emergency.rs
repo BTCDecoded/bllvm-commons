@@ -263,7 +263,7 @@ impl EmergencyValidator {
         sig: &KeyholderSignature,
         _activation: &EmergencyActivation,
     ) -> Result<(), GovernanceAppError> {
-        // TODO: Implement actual cryptographic verification using developer-sdk
+        // TODO: Implement actual cryptographic verification using bllvm-sdk
         // For now, just basic validation
 
         if sig.keyholder.is_empty() {

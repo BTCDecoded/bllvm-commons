@@ -1,5 +1,5 @@
 use crate::error::GovernanceError;
-use developer_sdk::governance::{
+use bllvm_sdk::governance::{
     signatures::sign_message, verify_signature, GovernanceKeypair,
     PublicKey as GovernancePublicKey, Signature as GovernanceSignature,
 };
@@ -45,7 +45,7 @@ impl SignatureManager {
         }
     }
 
-    /// Verify signature using developer-sdk governance primitives
+    /// Verify signature using bllvm-sdk governance primitives
     pub fn verify_governance_signature(
         &self,
         message: &str,
@@ -66,19 +66,19 @@ impl SignatureManager {
             GovernanceError::CryptoError(format!("Invalid public key format: {}", e))
         })?;
 
-        // Use developer-sdk's verify_signature function
+        // Use bllvm-sdk's verify_signature function
         verify_signature(&signature, message.as_bytes(), &public_key).map_err(|e| {
             GovernanceError::CryptoError(format!("Signature verification failed: {}", e))
         })
     }
 
-    /// Create signature using developer-sdk governance primitives
+    /// Create signature using bllvm-sdk governance primitives
     pub fn create_governance_signature(
         &self,
         message: &str,
         keypair: &GovernanceKeypair,
     ) -> Result<String, GovernanceError> {
-        // Use developer-sdk's sign_message function
+        // Use bllvm-sdk's sign_message function
         let signature = sign_message(&keypair.secret_key, message.as_bytes()).map_err(|e| {
             GovernanceError::CryptoError(format!("Signature creation failed: {}", e))
         })?;

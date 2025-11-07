@@ -87,7 +87,7 @@ pub async fn handle_comment_event(
                 }
             };
 
-            // Verify signature using developer-sdk
+            // Verify signature using bllvm-sdk
             let signature_manager = SignatureManager::new();
             let message = format!("PR #{} in {}", pr_number, repo_name);
 

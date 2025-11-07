@@ -455,13 +455,13 @@ mod tests {
         let validator = create_test_validator();
         
         // Test exact match
-        assert!(validator.matches_pattern("protocol-engine/src/lib.rs", "protocol-engine/src/lib.rs").unwrap());
+        assert!(validator.matches_pattern("bllvm-protocol/src/lib.rs", "bllvm-protocol/src/lib.rs").unwrap());
         
         // Test wildcard match
-        assert!(validator.matches_pattern("protocol-engine/src/lib.rs", "protocol-engine/**/*.rs").unwrap());
+        assert!(validator.matches_pattern("bllvm-protocol/src/lib.rs", "bllvm-protocol/**/*.rs").unwrap());
         
         // Test no match
-        assert!(!validator.matches_pattern("other/file.rs", "protocol-engine/**/*.rs").unwrap());
+        assert!(!validator.matches_pattern("other/file.rs", "bllvm-protocol/**/*.rs").unwrap());
     }
 
     #[test]
@@ -469,7 +469,7 @@ mod tests {
         let validator = create_test_validator();
         
         // Test P0 control impact
-        let changed_files = vec!["protocol-engine/src/lib.rs".to_string()];
+        let changed_files = vec!["bllvm-protocol/src/lib.rs".to_string()];
         let impact = validator.analyze_security_impact(&changed_files).unwrap();
         
         assert!(matches!(impact.impact_level, ImpactLevel::High));
@@ -505,7 +505,7 @@ mod tests {
                     category: "consensus_integrity".to_string(),
                     priority: "P0".to_string(),
                     description: "Proper genesis blocks".to_string(),
-                    files: vec!["protocol-engine/**/*.rs".to_string()],
+                    files: vec!["bllvm-protocol/**/*.rs".to_string()],
                     required_signatures: "7-of-7".to_string(),
                     review_period_days: 180,
                     requires_security_audit: true,

@@ -127,7 +127,7 @@ async fn check_tool_status(
 /// Load governance configuration from config files
 fn load_governance_config() -> Result<GovernanceConfig> {
     // In a real implementation, this would load from actual config files
-    // For now, we'll return a hardcoded config for consensus-proof
+    // For now, we'll return a hardcoded config for bllvm-consensus
     let mut repos = HashMap::new();
     
     let consensus_proof_config = RepositoryConfig {
@@ -151,7 +151,7 @@ fn load_governance_config() -> Result<GovernanceConfig> {
         }),
     };
     
-    repos.insert("consensus-proof".to_string(), consensus_proof_config);
+    repos.insert("bllvm-consensus".to_string(), consensus_proof_config);
     
     Ok(GovernanceConfig { repos })
 }
@@ -304,7 +304,7 @@ mod tests {
         );
         
         let pr = PullRequest {
-            repository: "consensus-proof".to_string(),
+            repository: "bllvm-consensus".to_string(),
             number: 123,
             head_sha: "abc123".to_string(),
             base_sha: "def456".to_string(),
@@ -336,7 +336,7 @@ mod tests {
         );
         
         let pr = PullRequest {
-            repository: "consensus-proof".to_string(),
+            repository: "bllvm-consensus".to_string(),
             number: 123,
             head_sha: "abc123".to_string(),
             base_sha: "def456".to_string(),
@@ -369,7 +369,7 @@ mod tests {
         );
         
         let pr = PullRequest {
-            repository: "consensus-proof".to_string(),
+            repository: "bllvm-consensus".to_string(),
             number: 123,
             head_sha: "abc123".to_string(),
             base_sha: "def456".to_string(),
@@ -392,7 +392,7 @@ mod tests {
     
     #[test]
     fn test_requires_verification() {
-        let result = requires_verification("consensus-proof").unwrap();
+        let result = requires_verification("bllvm-consensus").unwrap();
         assert!(result);
         
         let result = requires_verification("other-repo").unwrap();
@@ -401,8 +401,8 @@ mod tests {
     
     #[test]
     fn test_can_override_verification() {
-        let result = can_override_verification("consensus-proof").unwrap();
-        assert!(!result); // consensus-proof should not allow override
+        let result = can_override_verification("bllvm-consensus").unwrap();
+        assert!(!result); // bllvm-consensus should not allow override
         
         let result = can_override_verification("other-repo").unwrap();
         assert!(!result); // default should be false
@@ -410,8 +410,8 @@ mod tests {
     
     #[test]
     fn test_is_verification_blocking() {
-        let result = is_verification_blocking("consensus-proof").unwrap();
-        assert!(result); // consensus-proof should be blocking
+        let result = is_verification_blocking("bllvm-consensus").unwrap();
+        assert!(result); // bllvm-consensus should be blocking
         
         let result = is_verification_blocking("other-repo").unwrap();
         assert!(!result); // default should be false
@@ -419,7 +419,7 @@ mod tests {
     
     #[test]
     fn test_get_verification_tools() {
-        let tools = get_verification_tools("consensus-proof").unwrap();
+        let tools = get_verification_tools("bllvm-consensus").unwrap();
         assert_eq!(tools.len(), 2);
         assert_eq!(tools[0].name, "Kani");
         assert_eq!(tools[1].name, "Proptest");
@@ -428,6 +428,11 @@ mod tests {
         assert_eq!(tools.len(), 0);
     }
 }
+
+
+
+
+
 
 
 

@@ -56,7 +56,7 @@ async fn test_database_operations() {
 
 #[tokio::test]
 async fn test_signature_verification() {
-    use developer_sdk::governance::GovernanceKeypair;
+    use bllvm_sdk::governance::GovernanceKeypair;
     use governance_app::crypto::signatures::SignatureManager;
 
     // Generate test keypair
