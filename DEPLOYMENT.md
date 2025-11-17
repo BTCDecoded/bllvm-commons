@@ -1,8 +1,8 @@
-# Governance App Deployment Guide
+# Bitcoin Commons Deployment Guide
 
 ## Overview
 
-This guide covers production deployment of the BTCDecoded Governance App, including environment configuration, database setup, GitHub App installation, and monitoring.
+This guide covers production deployment of the Bitcoin Commons governance system (bllvm-commons), including environment configuration, database setup, GitHub App installation, and monitoring.
 
 ## Prerequisites
 
@@ -151,7 +151,7 @@ SQLite is used for development and testing. No additional setup required.
 1. Go to GitHub Settings → Developer settings → GitHub Apps
 2. Click "New GitHub App"
 3. Fill in app details:
-   - **App name**: BTCDecoded Governance
+   - **App name**: Bitcoin Commons Governance
    - **Homepage URL**: https://btcdecoded.org
    - **Webhook URL**: https://your-domain.com/webhooks/github
    - **Webhook secret**: Generate secure secret
@@ -252,7 +252,7 @@ sudo chown governance:governance /etc/governance/servers
 # Add this server to authorized registry
 bllvm-commons server add \
   --server-id governance-01 \
-  --operator-name "BTCDecoded Foundation" \
+  --operator-name "Bitcoin Commons Foundation" \
   --jurisdiction "United States" \
   --contact "admin@btcdecoded.org" \
   --nostr-npub "npub1..." \

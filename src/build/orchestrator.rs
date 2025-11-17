@@ -203,7 +203,7 @@ impl BuildOrchestrator {
         
         // Build release body with artifact list
         let mut release_body = format!(
-            "BTCDecoded Release {}\n\nThis release was orchestrated by bllvm-commons.\n\n## Artifacts\n\n",
+            "Bitcoin Commons Release {}\n\nThis release was orchestrated by bllvm-commons.\n\n## Artifacts\n\n",
             version
         );
         
@@ -222,7 +222,7 @@ impl BuildOrchestrator {
             .releases()
             .create(&json!({
                 "tag_name": version,
-                "name": format!("BTCDecoded {}", version),
+                "name": format!("Bitcoin Commons {}", version),
                 "body": release_body,
                 "prerelease": prerelease,
                 "draft": false,

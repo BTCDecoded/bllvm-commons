@@ -2,7 +2,7 @@
 
 ## Overview
 
-This guide explains how to verify the integrity and authenticity of the BTCDecoded governance system, including Nostr events, OpenTimestamps proofs, audit logs, and server authorization.
+This guide explains how to verify the integrity and authenticity of the Bitcoin Commons governance system, including Nostr events, OpenTimestamps proofs, audit logs, and server authorization.
 
 ## Nostr Event Verification
 
@@ -328,7 +328,7 @@ async fn verify_server_operations(server_id: &str, log_path: &str) -> Result<(),
 
 set -e
 
-echo "Verifying BTCDecoded Governance System..."
+echo "Verifying Bitcoin Commons Governance System..."
 
 # Configuration
 # Note: btcdecoded.org/governance paths not yet deployed - use GitHub releases
@@ -428,7 +428,7 @@ echo "Server verification completed successfully!"
 <!DOCTYPE html>
 <html>
 <head>
-    <title>BTCDecoded Governance Verification</title>
+    <title>Bitcoin Commons Governance Verification</title>
     <script src="https://unpkg.com/nostr-tools@latest/dist/nostr-tools.js"></script>
 </head>
 <body>

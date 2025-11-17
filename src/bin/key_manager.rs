@@ -1,6 +1,6 @@
 //! Key Management CLI Tool
 //!
-//! Command-line tool for managing keys in the BTCDecoded Governance System
+//! Command-line tool for managing keys in the Bitcoin Commons governance system
 
 use clap::{Parser, Subcommand};
 use bllvm_commons::crypto::key_management::{KeyManagementConfig, KeyManager, KeyStatus, KeyType};
@@ -9,7 +9,7 @@ use std::collections::HashMap;
 
 #[derive(Parser)]
 #[command(name = "key-manager")]
-#[command(about = "BTCDecoded Governance System Key Management Tool")]
+#[command(about = "Bitcoin Commons Governance System Key Management Tool")]
 #[command(version = "0.1.0")]
 struct Cli {
     #[command(subcommand)]

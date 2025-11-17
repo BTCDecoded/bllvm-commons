@@ -8,12 +8,12 @@ use tracing::{info, warn};
 pub struct DependencyGraph {
     /// Map of repository name to its dependencies
     dependencies: HashMap<String, Vec<String>>,
-    /// Organization name (e.g., "BTCDecoded")
+    /// Organization name (e.g., "BTCDecoded" - the GitHub organization)
     organization: String,
 }
 
 impl DependencyGraph {
-    /// Create a new dependency graph with the standard BTCDecoded build order
+    /// Create a new dependency graph with the standard Bitcoin Commons build order
     pub fn new(organization: String) -> Self {
         let mut dependencies = HashMap::new();
         

@@ -13,7 +13,7 @@ async fn main() -> Result<()> {
     // Parse command line arguments
     let matches = Command::new("verify-audit-log")
         .version("1.0.0")
-        .about("Verify BTCDecoded governance audit log integrity")
+        .about("Verify Bitcoin Commons governance audit log integrity")
         .arg(
             Arg::new("log-path")
                 .short('l')

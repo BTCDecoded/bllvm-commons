@@ -1,6 +1,6 @@
 # Troubleshooting Guide
 
-This guide helps you diagnose and resolve common issues with the BTCDecoded governance application.
+This guide helps you diagnose and resolve common issues with the Bitcoin Commons governance application.
 
 ## Common Issues
 
