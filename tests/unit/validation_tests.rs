@@ -215,7 +215,8 @@ async fn test_cross_layer_validation() {
         "BTCDecoded/bllvm-consensus",
         &changed_files,
         &cross_layer_rules,
-    );
+        None, // No GitHub token for test
+    ).await;
     assert!(result.is_ok());
     
     // Test non-matching pattern
@@ -224,7 +225,8 @@ async fn test_cross_layer_validation() {
         "BTCDecoded/bllvm-consensus",
         &non_matching_files,
         &cross_layer_rules,
-    );
+        None, // No GitHub token for test
+    ).await;
     assert!(result.is_ok());
 }
 

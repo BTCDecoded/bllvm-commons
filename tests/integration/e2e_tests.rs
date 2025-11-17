@@ -143,7 +143,8 @@ async fn test_cross_layer_synchronization() {
         consensus_pr.1,
         &changed_files,
         &cross_layer_rules,
-    );
+        None, // No GitHub token for test
+    ).await;
     
     assert!(result.is_ok());
     

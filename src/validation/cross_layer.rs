@@ -11,10 +11,11 @@ use tracing::{info, warn};
 pub struct CrossLayerValidator;
 
 impl CrossLayerValidator {
-    pub fn validate_cross_layer_dependencies(
+    pub async fn validate_cross_layer_dependencies(
         repo_name: &str,
         changed_files: &[String],
         cross_layer_rules: &[Value],
+        github_token: Option<&str>,
     ) -> Result<(), GovernanceError> {
         for rule in cross_layer_rules {
             if let Some(source_repo) = rule.get("source_repo").and_then(|v| v.as_str()) {
@@ -33,7 +34,8 @@ impl CrossLayerValidator {
                                         target_repo,
                                         validation_type,
                                         rule,
-                                    );
+                                        github_token,
+                                    ).await;
                                 }
                             }
                         }
@@ -60,14 +62,15 @@ impl CrossLayerValidator {
         })
     }
 
-    fn validate_dependency(
+    async fn validate_dependency(
         target_repo: &str,
         validation_type: &str,
         rule: &Value,
+        github_token: Option<&str>,
     ) -> Result<(), GovernanceError> {
         match validation_type {
             "corresponding_file_exists" => {
-                Self::verify_file_correspondence(target_repo, rule)
+                Self::verify_file_correspondence(target_repo, rule, github_token).await
             }
             "references_latest_version" => {
                 Self::verify_version_references(target_repo, rule)
@@ -83,17 +86,17 @@ impl CrossLayerValidator {
     }
 
     /// Verify file correspondence between repositories
-    fn verify_file_correspondence(target_repo: &str, rule: &Value) -> Result<(), GovernanceError> {
+    async fn verify_file_correspondence(
+        target_repo: &str,
+        rule: &Value,
+        github_token: Option<&str>,
+    ) -> Result<(), GovernanceError> {
         info!("Verifying file correspondence for target repo: {}", target_repo);
         
-        // For now, we'll implement a basic check
-        // In a real implementation, this would:
-        // 1. Fetch the source file content from GitHub
-        // 2. Look up the corresponding target file
-        // 3. Verify the target file exists and has appropriate content
-        // 4. Check that the target file has been updated to match the source
-        
         // Extract rule parameters
+        let source_repo = rule.get("source_repo")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
         let source_pattern = rule.get("source_pattern")
             .and_then(|v| v.as_str())
             .unwrap_or("");
@@ -101,13 +104,53 @@ impl CrossLayerValidator {
             .and_then(|v| v.as_str())
             .unwrap_or("");
         
-        info!("Checking correspondence: {} -> {}", source_pattern, target_pattern);
+        info!("Checking correspondence: {}:{} -> {}:{}", source_repo, source_pattern, target_repo, target_pattern);
         
-        // For now, we'll just log the check and return success
-        // In a real implementation, this would make GitHub API calls
-        warn!("File correspondence verification not fully implemented - using placeholder");
+        // If no GitHub token provided, we can't verify - return error
+        let github_token = github_token.ok_or_else(|| {
+            GovernanceError::ValidationError(
+                "GitHub token required for file correspondence verification".to_string()
+            )
+        })?;
         
-        Ok(())
+        // Parse repository names (format: owner/repo)
+        let (source_owner, source_repo_name) = Self::parse_repo_name(source_repo)?;
+        let (target_owner, target_repo_name) = Self::parse_repo_name(target_repo)?;
+        
+        // Create GitHub file operations client
+        let file_ops = GitHubFileOperations::new(github_token.to_string())?;
+        
+        // Attempt to fetch target file to verify it exists
+        // Note: This will fail if GitHubFileOperations.fetch_file_content is not fully implemented,
+        // but at least we're attempting the verification rather than just logging a warning
+        match file_ops
+            .fetch_file_content(&target_owner, &target_repo_name, target_pattern, None)
+            .await
+        {
+            Ok(_) => {
+                info!("Target file {} exists in {}", target_pattern, target_repo);
+                Ok(())
+            }
+            Err(e) => {
+                // If file doesn't exist or can't be fetched, return error
+                Err(GovernanceError::ValidationError(format!(
+                    "Failed to verify file correspondence: target file {} not found in {}: {}",
+                    target_pattern, target_repo, e
+                )))
+            }
+        }
+    }
+    
+    /// Parse repository name into owner and repo
+    fn parse_repo_name(repo_name: &str) -> Result<(String, String), GovernanceError> {
+        let parts: Vec<&str> = repo_name.split('/').collect();
+        if parts.len() != 2 {
+            return Err(GovernanceError::ValidationError(format!(
+                "Invalid repository name format (expected owner/repo): {}",
+                repo_name
+            )));
+        }
+        Ok((parts[0].to_string(), parts[1].to_string()))
     }
 
     /// Verify version references are up to date

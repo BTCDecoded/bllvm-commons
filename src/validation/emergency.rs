@@ -261,11 +261,9 @@ impl EmergencyValidator {
     /// Validate individual keyholder signature
     fn validate_keyholder_signature(
         sig: &KeyholderSignature,
-        _activation: &EmergencyActivation,
+        activation: &EmergencyActivation,
     ) -> Result<(), GovernanceAppError> {
-        // TODO: Implement actual cryptographic verification using bllvm-sdk
-        // For now, just basic validation
-
+        // Basic validation
         if sig.keyholder.is_empty() {
             return Err(GovernanceAppError::InvalidSignature(
                 "Empty keyholder name".to_string(),
@@ -281,6 +279,53 @@ impl EmergencyValidator {
         if sig.signature.is_empty() {
             return Err(GovernanceAppError::InvalidSignature(
                 "Empty signature".to_string(),
+            ));
+        }
+
+        // Parse public key from hex string
+        let public_key_bytes = hex::decode(sig.public_key.trim_start_matches("0x"))
+            .map_err(|e| GovernanceAppError::InvalidSignature(
+                format!("Invalid public key hex: {}", e)
+            ))?;
+        
+        let public_key = bllvm_sdk::governance::PublicKey::from_bytes(&public_key_bytes)
+            .map_err(|e| GovernanceAppError::InvalidSignature(
+                format!("Invalid public key format: {}", e)
+            ))?;
+
+        // Parse signature from hex string
+        let signature_bytes = hex::decode(sig.signature.trim_start_matches("0x"))
+            .map_err(|e| GovernanceAppError::InvalidSignature(
+                format!("Invalid signature hex: {}", e)
+            ))?;
+        
+        let signature = bllvm_sdk::governance::Signature::from_bytes(&signature_bytes)
+            .map_err(|e| GovernanceAppError::InvalidSignature(
+                format!("Invalid signature format: {}", e)
+            ))?;
+
+        // Create message to verify: serialize activation data
+        let message = serde_json::to_vec(&serde_json::json!({
+            "tier": activation.tier.to_i32(),
+            "activated_by": activation.activated_by,
+            "reason": activation.reason,
+            "evidence": activation.evidence,
+            "keyholder": sig.keyholder,
+            "timestamp": sig.timestamp.to_rfc3339(),
+        }))
+        .map_err(|e| GovernanceAppError::InvalidSignature(
+            format!("Failed to serialize activation message: {}", e)
+        ))?;
+
+        // Verify signature using bllvm-sdk
+        let verified = bllvm_sdk::governance::verify_signature(&signature, &message, &public_key)
+            .map_err(|e| GovernanceAppError::InvalidSignature(
+                format!("Signature verification error: {}", e)
+            ))?;
+
+        if !verified {
+            return Err(GovernanceAppError::InvalidSignature(
+                format!("Signature verification failed for keyholder: {}", sig.keyholder)
             ));
         }
 
