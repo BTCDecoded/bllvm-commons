@@ -107,7 +107,7 @@ pub async fn publish_merge_action(
         &format!("Merge PR #{}: {}", pr_number, pr.head_sha),
         layer_req,
         tier_req,
-        combined_req,
+        combined_req.clone(),
         signatures,
         economic_veto_status,
         None, // review_period_ends - already merged

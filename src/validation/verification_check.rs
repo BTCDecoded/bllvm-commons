@@ -111,7 +111,7 @@ pub fn requires_verification(repo: &str) -> Result<bool> {
 }
 
 /// Parse repository name into owner and repo
-fn parse_repo_name(repo_name: &str) -> Result<(String, String), GovernanceError> {
+fn parse_repo_name(repo_name: &str) -> crate::error::Result<(String, String)> {
     let parts: Vec<&str> = repo_name.split('/').collect();
     if parts.len() != 2 {
         return Err(GovernanceError::ValidationError(

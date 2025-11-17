@@ -456,7 +456,8 @@ impl GitHubClient {
         let response = self
             .client
             .repos(owner, repo)
-            .create_dispatch_event(event_type)
+            // TODO: Fix octocrab 0.38 API - create_dispatch_event doesn't exist
+            // .create_dispatch_event(event_type)
             .client_payload(client_payload)
             .send()
             .await

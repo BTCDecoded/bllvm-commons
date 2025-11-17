@@ -217,7 +217,7 @@ impl BuildOrchestrator {
         
         // Create release in bllvm repository
         let release = self.github_client
-            .client
+            .client.as_ref()
             .repos(&self.organization, "bllvm")
             .releases()
             .create(&json!({

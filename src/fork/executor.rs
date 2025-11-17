@@ -251,23 +251,25 @@ impl ForkExecutor {
     async fn execute_fork(&mut self, target_ruleset_id: &str) -> Result<(), GovernanceError> {
         info!("Executing governance fork to ruleset: {}", target_ruleset_id);
         
-        // Get target ruleset
+        // Get target ruleset (clone to avoid borrow checker issues)
         let target_ruleset = self.available_rulesets.get(target_ruleset_id)
             .ok_or_else(|| GovernanceError::ConfigError(
                 format!("Target ruleset not found: {}", target_ruleset_id)
-            ))?;
+            ))?
+            .clone();
         
         // Validate target ruleset
-        self.validate_ruleset(target_ruleset)?;
+        self.validate_ruleset(&target_ruleset)?;
         
-        // Create fork event
+        // Create fork event (extract current_ruleset_id first to avoid borrow)
+        let current_ruleset_id = self.current_ruleset.as_ref().map(|r| r.id.clone());
         let fork_event = ForkEvent {
             event_id: uuid::Uuid::new_v4().to_string(),
             event_type: ForkEventType::GovernanceFork,
             ruleset_id: target_ruleset_id.to_string(),
             node_id: "bllvm-commons".to_string(),
             details: serde_json::json!({
-                "from_ruleset": self.current_ruleset.as_ref().map(|r| &r.id),
+                "from_ruleset": current_ruleset_id,
                 "to_ruleset": target_ruleset_id,
                 "reason": "Adoption threshold met"
             }),
