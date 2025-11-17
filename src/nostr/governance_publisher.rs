@@ -111,7 +111,7 @@ impl GovernanceActionPublisher {
         let content = action_event.to_json()
             .map_err(|e| anyhow!("Failed to serialize action event: {}", e))?;
 
-        let mut tags = vec![
+        let mut tags: Vec<nostr_sdk::Tag> = vec![
             Tag::Generic(TagKind::Custom("d".into()), vec!["btc-commons-governance-action".to_string()]),
             Tag::Generic(TagKind::Custom("action".into()), vec![action.to_string()]),
             Tag::Generic(TagKind::Custom("governance_tier".into()), vec![governance_tier.to_string()]),

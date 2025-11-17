@@ -72,7 +72,7 @@ impl GovernanceStatus {
     }
 
     /// Serialize to JSON for Nostr event content
-    pub fn to_json(&self) -> Result<String, serde_json::Error> {
+    pub fn to_json(&self) -> std::result::Result<String, serde_json::Error> {
         serde_json::to_string(self)
     }
 
@@ -143,7 +143,7 @@ pub enum EconomicVetoStatus {
 }
 
 impl GovernanceActionEvent {
-    pub fn to_json(&self) -> Result<String, serde_json::Error> {
+    pub fn to_json(&self) -> std::result::Result<String, serde_json::Error> {
         serde_json::to_string(self)
     }
 }
@@ -167,7 +167,7 @@ pub struct KeyholderAnnouncement {
 }
 
 impl KeyholderAnnouncement {
-    pub fn to_json(&self) -> Result<String, serde_json::Error> {
+    pub fn to_json(&self) -> std::result::Result<String, serde_json::Error> {
         serde_json::to_string(self)
     }
 }
@@ -184,7 +184,7 @@ pub struct NodeStatusReport {
 }
 
 impl NodeStatusReport {
-    pub fn to_json(&self) -> Result<String, serde_json::Error> {
+    pub fn to_json(&self) -> std::result::Result<String, serde_json::Error> {
         serde_json::to_string(self)
     }
 }
