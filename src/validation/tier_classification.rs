@@ -131,8 +131,8 @@ async fn load_tier_classification_config() -> Result<TierClassificationConfig, G
             commands: vec!["/tier".to_string()],
             permissions: vec!["maintainer".to_string()],
             logging: LoggingConfig {
-                enabled: true,
-                level: "info".to_string(),
+                required: true,
+                fields: vec!["user".to_string(), "timestamp".to_string(), "reason".to_string()],
             },
         },
         confidence_scoring: ConfidenceScoring {

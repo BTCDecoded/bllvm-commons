@@ -245,9 +245,7 @@ pub fn create_keyholder_announcement_event(
 ) -> Result<nostr_sdk::prelude::Event> {
     // Add logo/picture if configured
     let mut announcement = keyholder.clone();
-    if announcement.picture.is_none() {
-        announcement.picture = config.nostr.logo_url.clone();
-    }
+    // Note: picture field removed from KeyholderAnnouncement, logo_url is handled elsewhere
 
     let content = announcement.to_json()
         .map_err(|e| anyhow::anyhow!("Failed to serialize keyholder announcement: {}", e))?;

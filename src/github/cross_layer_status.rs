@@ -282,7 +282,7 @@ impl CrossLayerStatusChecker {
 
         // Check if this is a verification-required repository
         let repo_name = format!("{}/{}", owner, repo);
-        if requires_verification(&repo_name)? {
+        if crate::validation::verification_check::requires_verification(&repo_name)? {
             // Get PR data from GitHub
             let pr_json = self.github_client.get_pull_request(owner, repo, pr_number).await?;
             
