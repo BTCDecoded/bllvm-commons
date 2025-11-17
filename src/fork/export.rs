@@ -255,7 +255,7 @@ impl GovernanceExporter {
             })?;
         }
 
-        let filename = format!("{}_{}.yaml", ruleset.id, ruleset.version);
+        let filename = format!("{}_{:?}.yaml", ruleset.id, ruleset.version);
         let file_path = export_dir.join(&filename);
         self.save_export(&export, file_path.to_str().unwrap()).await?;
 

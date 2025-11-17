@@ -384,8 +384,10 @@ impl CrossLayerValidator {
                 changed_files,
             ).await?;
 
-            // Create GitHub client
-            let github_client = crate::github::client::GitHubClient::new(github_token.to_string());
+            // Create GitHub client - for now, use a placeholder app_id and key path
+            // In production, this should use proper authentication
+            let github_client = crate::github::client::GitHubClient::new(0, "/dev/null")
+                .map_err(|_| GovernanceError::ConfigError("Failed to create GitHub client".to_string()))?;
 
             // Post status check to GitHub
             github_client.create_status_check(

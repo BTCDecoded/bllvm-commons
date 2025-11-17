@@ -308,9 +308,9 @@ impl ForkExecutor {
         if let Some(current) = &self.current_ruleset {
             if !self.versioning.is_compatible(&current.version, &ruleset.version) {
                 return Err(GovernanceError::ConfigError(
-                    format!("Incompatible ruleset version: {} -> {}", 
-                        current.version.to_string(), 
-                        ruleset.version.to_string()
+                    format!("Incompatible ruleset version: {:?} -> {:?}", 
+                        current.version, 
+                        ruleset.version
                     )
                 ));
             }

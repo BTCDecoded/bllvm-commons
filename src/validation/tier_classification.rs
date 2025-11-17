@@ -131,21 +131,32 @@ async fn load_tier_classification_config() -> Result<TierClassificationConfig, G
             commands: vec!["/tier".to_string()],
             permissions: vec!["maintainer".to_string()],
             logging: LoggingConfig {
-                enabled: true,
-                level: "info".to_string(),
+                required: true,
+                fields: vec!["user".to_string(), "timestamp".to_string(), "reason".to_string()],
             },
         },
         confidence_scoring: ConfidenceScoring {
             file_pattern_match: governance_config.tier_classification.classification_config.file_pattern_weight,
             keyword_match: governance_config.tier_classification.classification_config.keyword_weight,
-            title_weight: 0.3,
-            body_weight: 0.2,
-            file_count_weight: 0.1,
+            title_analysis: 0.3,
+            description_analysis: 0.2,
+            boost_factors: BoostFactors {
+                multiple_file_matches: 0.1,
+                strong_keyword_matches: 0.1,
+                specification_present: 0.1,
+                audit_present: 0.1,
+            },
+            penalty_factors: PenaltyFactors {
+                missing_specification: 0.1,
+                missing_tests: 0.1,
+                breaking_changes: 0.1,
+            },
         },
         fallback: FallbackConfig {
             default_tier: 1,
-            require_manual_classification: false,
-            escalation_threshold: 0.5,
+            confidence_threshold: 0.5,
+            require_manual_review: false,
+            notification: vec![],
         },
     };
     
