@@ -53,7 +53,7 @@ impl GovernanceActionPublisher {
         signatures: Vec<KeyholderSignature>,
         economic_veto_status: EconomicVetoStatus,
         review_period_ends: Option<chrono::DateTime<chrono::Utc>>,
-    ) -> crate::error::Result<()> {
+    ) -> Result<()> {
         info!(
             "Publishing governance action: {} for {}/PR#{}",
             action,
@@ -69,7 +69,7 @@ impl GovernanceActionPublisher {
             }),
             layer_requirement: layer_req,
             tier_requirement: tier_req,
-            combined_requirement: combined_req.clone(),
+            combined_requirement: combined_req,
             signatures,
             economic_veto_status,
             review_period_ends,
@@ -111,7 +111,7 @@ impl GovernanceActionPublisher {
         let content = action_event.to_json()
             .map_err(|e| anyhow!("Failed to serialize action event: {}", e))?;
 
-        let mut tags: Vec<nostr_sdk::Tag> = vec![
+        let mut tags = vec![
             Tag::Generic(TagKind::Custom("d".into()), vec!["btc-commons-governance-action".to_string()]),
             Tag::Generic(TagKind::Custom("action".into()), vec![action.to_string()]),
             Tag::Generic(TagKind::Custom("governance_tier".into()), vec![governance_tier.to_string()]),

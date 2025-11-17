@@ -138,7 +138,7 @@ impl CrossLayerStatusChecker {
 
         // 6. Create status check
         let status_check = CrossLayerStatusCheck {
-            state: overall_status.clone(),
+            state: overall_status,
             description: self.generate_status_description(&content_hash_status, &version_pinning_status, &equivalence_proof_status),
             target_url: Some(format!("https://github.com/{}/{}/pull/{}", owner, repo, pr_number)),
             context: "cross-layer-sync".to_string(),
@@ -146,7 +146,7 @@ impl CrossLayerStatusChecker {
                 content_hash_status,
                 version_pinning_status,
                 equivalence_proof_status,
-                overall_sync_status: self.map_status_to_sync_status(overall_status.clone()),
+                overall_sync_status: self.map_status_to_sync_status(overall_status),
                 recommendations,
             },
         };
@@ -282,7 +282,7 @@ impl CrossLayerStatusChecker {
 
         // Check if this is a verification-required repository
         let repo_name = format!("{}/{}", owner, repo);
-        if crate::validation::verification_check::requires_verification(&repo_name)? {
+        if requires_verification(&repo_name)? {
             // Get PR data from GitHub
             let pr_json = self.github_client.get_pull_request(owner, repo, pr_number).await?;
             

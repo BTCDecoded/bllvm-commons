@@ -72,7 +72,7 @@ impl GovernanceStatus {
     }
 
     /// Serialize to JSON for Nostr event content
-    pub fn to_json(&self) -> std::result::Result<String, serde_json::Error> {
+    pub fn to_json(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string(self)
     }
 
@@ -143,7 +143,7 @@ pub enum EconomicVetoStatus {
 }
 
 impl GovernanceActionEvent {
-    pub fn to_json(&self) -> std::result::Result<String, serde_json::Error> {
+    pub fn to_json(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string(self)
     }
 }
@@ -162,12 +162,10 @@ pub struct KeyholderAnnouncement {
     pub keyholder_type: String,  // "maintainer" or "emergency_keyholder"
     #[serde(skip_serializing_if = "Option::is_none")]
     pub zap_address: Option<String>,  // Lightning address for donations
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub picture: Option<String>,  // URL to Bitcoin Commons logo
 }
 
 impl KeyholderAnnouncement {
-    pub fn to_json(&self) -> std::result::Result<String, serde_json::Error> {
+    pub fn to_json(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string(self)
     }
 }
@@ -184,7 +182,7 @@ pub struct NodeStatusReport {
 }
 
 impl NodeStatusReport {
-    pub fn to_json(&self) -> std::result::Result<String, serde_json::Error> {
+    pub fn to_json(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string(self)
     }
 }

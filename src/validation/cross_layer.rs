@@ -2,7 +2,6 @@ use crate::error::GovernanceError;
 use crate::validation::content_hash::{ContentHashValidator, SyncReport, SyncStatus};
 use crate::validation::version_pinning::{VersionPinningValidator, VersionPinningConfig, VersionManifest};
 use crate::validation::equivalence_proof::{EquivalenceProofValidator, EquivalenceTestVector};
-use crate::validation::verification_check::requires_verification;
 use crate::github::file_operations::GitHubFileOperations;
 use crate::github::cross_layer_status::{CrossLayerStatusChecker, CrossLayerStatusCheck, StatusState};
 use serde_json::Value;
@@ -143,7 +142,7 @@ impl CrossLayerValidator {
     }
     
     /// Parse repository name into owner and repo
-    fn parse_repo_name(repo_name: &str) -> crate::error::Result<(String, String)> {
+    fn parse_repo_name(repo_name: &str) -> Result<(String, String), GovernanceError> {
         let parts: Vec<&str> = repo_name.split('/').collect();
         if parts.len() != 2 {
             return Err(GovernanceError::ValidationError(format!(
@@ -202,30 +201,26 @@ impl CrossLayerValidator {
         let manifest = VersionManifest {
             repository: "orange-paper".to_string(),
             created_at: Utc::now(),
-            versions: {
-                let mut versions: Vec<VersionManifestEntry> = Vec::new();
-                versions.push(
+            versions: vec![
                 VersionManifestEntry {
                     version: "v1.0.0".to_string(),
                     commit_sha: "a1b2c3d4e5f6789012345678901234567890abcd".to_string(),
                     content_hash: "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef".to_string(),
                     created_at: Utc::now() - chrono::Duration::days(1),
-                    signatures: {
-                        let mut sigs: Vec<VersionSignature> = Vec::new();
-                        sigs.push(VersionSignature {
+                    signatures: vec![
+                        VersionSignature {
                             maintainer_id: "maintainer1".to_string(),
                             signature: "test_signature_1".to_string(),
                             public_key: "test_public_key_1".to_string(),
                             signed_at: Utc::now() - chrono::Duration::days(1),
-                        });
-                        sigs
-                    },
+                        },
+                        // Add more signatures as needed
+                    ],
                     ots_timestamp: Some("bitcoin:test_timestamp".to_string()),
                     is_stable: true,
                     is_latest: true,
-                });
-                versions
-            },
+                }
+            ],
             latest_version: "v1.0.0".to_string(),
             manifest_hash: "sha256:test_manifest_hash".to_string(),
         };
@@ -389,10 +384,8 @@ impl CrossLayerValidator {
                 changed_files,
             ).await?;
 
-            // Create GitHub client - for now, use a placeholder app_id and key path
-            // In production, this should use proper authentication
-            let github_client = crate::github::client::GitHubClient::new(0, "/dev/null")
-                .map_err(|_| GovernanceError::ConfigError("Failed to create GitHub client".to_string()))?;
+            // Create GitHub client
+            let github_client = crate::github::client::GitHubClient::new(github_token.to_string());
 
             // Post status check to GitHub
             github_client.create_status_check(
@@ -400,7 +393,7 @@ impl CrossLayerValidator {
                 repo,
                 pr_number,
                 &status_check.context,
-                &format!("{:?}", status_check.state),
+                &status_check.state,
                 &status_check.description,
                 status_check.target_url.as_deref(),
             ).await?;

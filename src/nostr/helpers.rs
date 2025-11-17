@@ -100,7 +100,7 @@ pub async fn publish_merge_action(
         tier,
         layer as u32,
         repository,
-        &combined_req.signatures.clone(),
+        &combined_req.signatures,
         combined_req.review_days,
         Some(commit_hash),
         Some(pr_number),

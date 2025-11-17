@@ -482,22 +482,20 @@ impl Database {
     ) -> Result<Option<crate::database::models::Maintainer>, GovernanceError> {
         match &self.backend {
             DatabaseBackend::Sqlite(pool) => {
-                let maintainer = sqlx::query_as!(
-                    crate::database::models::Maintainer,
-                    "SELECT id, github_username, public_key, layer, active, last_updated FROM maintainers WHERE github_username = ? AND active = true",
-                    username
+                let maintainer = sqlx::query_as::<_, crate::database::models::Maintainer>(
+                    "SELECT id, github_username, public_key, layer, active, last_updated FROM maintainers WHERE github_username = ? AND active = true"
                 )
+                .bind(username)
                 .fetch_optional(pool)
                 .await
                 .map_err(|e| GovernanceError::DatabaseError(e.to_string()))?;
                 Ok(maintainer)
             }
             DatabaseBackend::Postgres(pool) => {
-                let maintainer = sqlx::query_as!(
-                    crate::database::models::Maintainer,
-                    "SELECT id, github_username, public_key, layer, active, last_updated FROM maintainers WHERE github_username = $1 AND active = true",
-                    username
+                let maintainer = sqlx::query_as::<_, crate::database::models::Maintainer>(
+                    "SELECT id, github_username, public_key, layer, active, last_updated FROM maintainers WHERE github_username = $1 AND active = true"
                 )
+                .bind(username)
                 .fetch_optional(pool)
                 .await
                 .map_err(|e| GovernanceError::DatabaseError(e.to_string()))?;
