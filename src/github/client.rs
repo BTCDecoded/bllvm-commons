@@ -8,7 +8,7 @@ use crate::github::types::{CheckRun, WorkflowStatus};
 
 #[derive(Clone)]
 pub struct GitHubClient {
-    client: Octocrab,
+    pub(crate) client: Octocrab,
     app_id: u64,
     http_client: ReqwestClient,
 }
