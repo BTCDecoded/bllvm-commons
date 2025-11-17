@@ -33,6 +33,23 @@ pub async fn handle_webhook(
                         Err(status) => (status, Json(serde_json::json!({"error": "failed"}))),
                     }
                 }
+                "closed" => {
+                    // Check if PR was merged
+                    let merged = payload
+                        .get("pull_request")
+                        .and_then(|pr| pr.get("merged"))
+                        .and_then(|m| m.as_bool())
+                        .unwrap_or(false);
+                    
+                    if merged {
+                        // PR was merged - publish to Nostr
+                        if let Err(e) = pull_request::handle_pr_merged(&config, &database, &payload).await {
+                            warn!("Failed to publish merge to Nostr: {}", e);
+                        }
+                    }
+                    
+                    (StatusCode::OK, Json(serde_json::json!({"status": "processed"})))
+                }
                 _ => {
                     warn!("Unhandled pull_request action: {}", action);
                     (StatusCode::OK, Json(serde_json::json!({"status": "ignored"})))

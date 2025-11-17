@@ -1,9 +1,11 @@
 //! Nostr Event Types for Governance Status
 //!
 //! Defines the structure of governance status events published to Nostr.
+//! Includes governance actions, keyholder announcements, and node telemetry.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Governance status event published to Nostr
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -83,6 +85,107 @@ impl GovernanceStatus {
             self.health.merges_today,
             self.next_ots_anchor.format("%Y-%m-%d")
         )
+    }
+}
+
+/// Governance action event (Kind 30078)
+/// Published when governance actions occur (merges, releases, etc.)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GovernanceActionEvent {
+    pub description: String,
+    pub pr_url: Option<String>,
+    pub layer_requirement: LayerRequirement,
+    pub tier_requirement: TierRequirement,
+    pub combined_requirement: CombinedRequirement,
+    pub signatures: Vec<KeyholderSignature>,
+    pub economic_veto_status: EconomicVetoStatus,
+    pub review_period_ends: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LayerRequirement {
+    pub layer: u32,
+    pub signatures: String,  // e.g., "6-of-7"
+    pub review_days: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TierRequirement {
+    pub tier: u32,
+    pub signatures: String,  // e.g., "3-of-5"
+    pub review_days: u32,
+    pub economic_veto: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CombinedRequirement {
+    pub signatures: String,  // e.g., "6-of-7"
+    pub review_days: u32,
+    pub economic_veto: bool,
+    pub source: String,  // "layer" or "tier"
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KeyholderSignature {
+    pub keyholder: String,  // pubkey
+    pub keyholder_type: String,  // "maintainer" or "emergency_keyholder"
+    pub signature: String,
+    pub timestamp: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EconomicVetoStatus {
+    NotRequired,
+    Pending,
+    Passed,
+    Vetoed,
+}
+
+impl GovernanceActionEvent {
+    pub fn to_json(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string(self)
+    }
+}
+
+/// Keyholder announcement event (Kind 0 - Metadata)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KeyholderAnnouncement {
+    pub name: String,
+    pub about: String,
+    pub role: String,
+    pub governance_pubkey: String,
+    pub jurisdiction: Option<String>,
+    pub backup_contact: Option<String>,
+    pub joined: i64,
+    pub layer: Option<u32>,
+    pub keyholder_type: String,  // "maintainer" or "emergency_keyholder"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub zap_address: Option<String>,  // Lightning address for donations
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub picture: Option<String>,  // URL to Bitcoin Commons logo
+}
+
+impl KeyholderAnnouncement {
+    pub fn to_json(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string(self)
+    }
+}
+
+/// Node status report event (Kind 30078)
+/// Published by nodes for telemetry (opt-in)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NodeStatusReport {
+    pub node_type: String,  // "full" | "archival" | "pruned"
+    pub uptime_hours: u64,
+    pub sync_status: String,  // "synced" | "syncing"
+    pub modules_enabled: Vec<String>,
+    pub reported_at: i64,
+}
+
+impl NodeStatusReport {
+    pub fn to_json(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string(self)
     }
 }
 

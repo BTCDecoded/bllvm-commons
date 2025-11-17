@@ -27,6 +27,9 @@ pub struct NostrConfig {
     pub server_nsec_path: String,
     pub relays: Vec<String>,
     pub publish_interval_secs: u64,
+    pub governance_config: String,  // e.g., "commons_mainnet"
+    pub zap_address: Option<String>,  // Lightning address for donations
+    pub logo_url: Option<String>,  // URL to Bitcoin Commons logo
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -103,6 +106,15 @@ impl AppConfig {
             .parse()
             .unwrap_or(3600);
 
+        let governance_config = env::var("GOVERNANCE_CONFIG")
+            .unwrap_or_else(|_| "commons_mainnet".to_string());
+
+        let zap_address = env::var("NOSTR_ZAP_ADDRESS").ok();
+
+        let logo_url = env::var("NOSTR_LOGO_URL")
+            .unwrap_or_else(|_| "https://btcdecoded.org/assets/bitcoin-commons-logo.png".to_string())
+            .into();
+
         let ots_enabled = env::var("OTS_ENABLED")
             .unwrap_or_else(|_| "false".to_string())
             .parse()
@@ -152,6 +164,9 @@ impl AppConfig {
                 server_nsec_path: nostr_server_nsec_path,
                 relays: nostr_relays,
                 publish_interval_secs: nostr_publish_interval,
+                governance_config,
+                zap_address,
+                logo_url,
             },
             ots: OtsConfig {
                 enabled: ots_enabled,

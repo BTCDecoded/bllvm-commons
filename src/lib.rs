@@ -9,5 +9,6 @@ pub mod github;
 pub mod validation;
 pub mod webhooks;
 pub mod build;
+pub mod nostr;
 
 pub use error::GovernanceError;

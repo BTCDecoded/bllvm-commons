@@ -23,6 +23,9 @@ relays = [
     "wss://relay.nostr.band"
 ]
 publish_interval_secs = 3600  # 1 hour
+governance_config = "commons_mainnet"  # Governance fork identifier
+zap_address = "donations@btcdecoded.org"  # Optional: Lightning address for donations
+logo_url = "https://btcdecoded.org/assets/bitcoin-commons-logo.png"  # Bitcoin Commons logo for Nostr bots
 
 [ots]
 enabled = true

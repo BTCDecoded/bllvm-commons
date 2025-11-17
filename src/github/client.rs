@@ -50,7 +50,7 @@ impl GitHubClient {
         state: &str,
         description: &str,
         context: &str,
-    ) -> Result<(), GovernanceError> {
+    ) -> crate::error::Result<()> {
         info!(
             "Posting status check for {}/{}@{}: {:?} - {} ({})",
             owner, repo, sha, state, description, context
@@ -96,7 +96,7 @@ impl GitHubClient {
         check_run_id: u64,
         state: &str,
         description: &str,
-    ) -> Result<(), GovernanceError> {
+    ) -> crate::error::Result<()> {
         info!(
             "Updating status check for {}/{} (ID: {}): {} - {}",
             owner, repo, check_run_id, state, description
@@ -239,7 +239,7 @@ impl GitHubClient {
         repo: &str,
         branch: &str,
         contexts: &[String],
-    ) -> Result<(), GovernanceError> {
+    ) -> crate::error::Result<()> {
         info!(
             "Setting required status checks for {}/{} branch '{}': {:?}",
             owner, repo, branch, contexts
@@ -273,14 +273,12 @@ impl GitHubClient {
             .map_err(|e| {
                 GovernanceError::GitHubError(format!("Failed to set required status checks: {}", e))
             })?;
-        */
 
         info!(
             "Successfully set required status checks for {}/{} branch '{}'",
             owner, repo, branch
         );
-
-        Ok(())
+        */
     }
 
     /// Check if a PR can be merged
@@ -365,7 +363,7 @@ impl GitHubClient {
         repo: &str,
         pr_number: u64,
         workflow_file: &str,
-    ) -> Result<WorkflowStatus, GovernanceError> {
+    ) -> crate::error::Result<WorkflowStatus> {
         info!(
             "Getting workflow status for {}/{} PR #{} (workflow: {})",
             owner, repo, pr_number, workflow_file
@@ -373,7 +371,7 @@ impl GitHubClient {
 
         // Get the PR to find the head SHA
         let pr = self.get_pull_request(owner, repo, pr_number).await?;
-        let head_sha = pr.get("head")
+        let _head_sha = pr.get("head")
             .and_then(|h| h.get("sha"))
             .and_then(|s| s.as_str())
             .ok_or_else(|| {
@@ -488,7 +486,7 @@ impl GitHubClient {
         // TODO: Fix octocrab 0.38 API - create_dispatch_event doesn't exist
         // For now, return success
         info!("Workflow dispatch stubbed out - API method not available");
-        return Ok(());
+        Ok(())
         
         /* Original code - needs API fix:
         let response = self
@@ -503,9 +501,6 @@ impl GitHubClient {
                 GovernanceError::GitHubError(format!("Failed to trigger workflow: {}", e))
             })?;
         */
-
-        // Function already returns above - this is unreachable
-        unreachable!()
     }
 
     /// Get workflow run status
@@ -609,8 +604,8 @@ impl GitHubClient {
         &self,
         owner: &str,
         repo: &str,
-        event_type: &str,
-    ) -> Result<u64, GovernanceError> {
+        _event_type: &str,
+    ) -> crate::error::Result<u64> {
         use tokio::time::{sleep, Duration};
         
         // Wait a moment for the workflow to start
@@ -690,7 +685,7 @@ impl GitHubClient {
         // Find installation for this organization
         // TODO: Fix octocrab 0.38 API - account field structure may have changed
         // For now, take the first installation (simplified)
-        let installation = installations
+        let _installation = installations
             .into_iter()
             .next()
             .ok_or_else(|| {
@@ -699,9 +694,9 @@ impl GitHubClient {
 
         // TODO: Fix octocrab 0.38 API - create_installation_access_token doesn't exist
         // For now, return error
-        return Err(GovernanceError::GitHubError(
+        Err(GovernanceError::GitHubError(
             "create_installation_access_token not implemented - octocrab API changed".to_string()
-        ));
+        ))
         
         /* Original code - needs API fix:
         // Create installation access token
@@ -715,9 +710,6 @@ impl GitHubClient {
                 GovernanceError::GitHubError(format!("Failed to create installation token: {}", e))
             })?;
         */
-
-        // Function already returns error above - this is unreachable
-        unreachable!()
     }
 
     /// Download an artifact archive from GitHub
@@ -771,7 +763,7 @@ impl GitHubClient {
         asset_name: &str,
         asset_data: &[u8],
         content_type: &str,
-    ) -> Result<(), GovernanceError> {
+    ) -> crate::error::Result<()> {
         info!(
             "Uploading asset '{}' to release {} in {}/{} ({} bytes, type: {})",
             asset_name, release_id, owner, repo, asset_data.len(), content_type

@@ -202,7 +202,9 @@ impl CrossLayerValidator {
         let manifest = VersionManifest {
             repository: "orange-paper".to_string(),
             created_at: Utc::now(),
-            versions: vec![
+            versions: {
+                let mut versions: Vec<VersionManifestEntry> = Vec::new();
+                versions.push(
                 VersionManifestEntry {
                     version: "v1.0.0".to_string(),
                     commit_sha: "a1b2c3d4e5f6789012345678901234567890abcd".to_string(),
@@ -221,8 +223,9 @@ impl CrossLayerValidator {
                     ots_timestamp: Some("bitcoin:test_timestamp".to_string()),
                     is_stable: true,
                     is_latest: true,
-                }
-            ],
+                });
+                versions
+            },
             latest_version: "v1.0.0".to_string(),
             manifest_hash: "sha256:test_manifest_hash".to_string(),
         };
