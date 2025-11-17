@@ -7,7 +7,7 @@ set -euo pipefail
 # Configuration
 ORG="${GITHUB_ORG:-BTCDecoded}"
 TOKEN="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
-REPOS=("commons" "bllvm-spec" "bllvm-consensus" "bllvm-protocol" "bllvm-node" "bllvm-sdk")
+REPOS=("bllvm-spec" "bllvm-consensus" "bllvm-protocol" "bllvm-node" "bllvm-sdk")
 OUTPUT_DIR="${OUTPUT_DIR:-./workflow-logs}"
 MAX_RUNS="${MAX_RUNS:-5}"  # Number of recent runs to download per workflow
 
@@ -46,9 +46,9 @@ fi
 api_request() {
     local url="$1"
     if [ -n "$TOKEN" ]; then
-        curl -s -H "Authorization: token ${TOKEN}" \
-             -H "Accept: application/vnd.github.v3+json" \
-             "$url"
+        curl -s -H "Authorization: Bearer ${TOKEN}" \
+             -H "Accept: application/vnd.github+json" \
+             "https://api.github.com/${url#https://api.github.com/}"
     elif [ "$gh_available" = true ]; then
         gh api "$url"
     else
@@ -62,7 +62,7 @@ list_workflow_runs() {
     local repo="$1"
     local workflow_file="${2:-}"  # Optional: specific workflow file
     
-    local url="https://api.github.com/repos/${ORG}/${repo}/actions/runs"
+    local url="repos/${ORG}/${repo}/actions/runs"
     
     if [ -n "$workflow_file" ]; then
         # Get workflow ID first
@@ -98,8 +98,8 @@ download_run_logs() {
     local http_code
     if [ -n "$TOKEN" ]; then
         http_code=$(curl -s -o /dev/null -w "%{http_code}" \
-            -H "Authorization: token ${TOKEN}" \
-            -H "Accept: application/vnd.github.v3+json" \
+            -H "Authorization: Bearer ${TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
             -L -o "${output_path}" \
             "https://api.github.com/${url}")
     elif [ "$gh_available" = true ]; then

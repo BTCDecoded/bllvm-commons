@@ -95,3 +95,6 @@ Mempool Operations verification has been successfully implemented with **6 Kani 
 
 All critical mempool invariants are formally verified with proper mathematical specifications. The proofs handle async operations by simulating state changes, which is appropriate for Kani verification.
 
+
+
+

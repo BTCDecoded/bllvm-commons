@@ -124,3 +124,6 @@ All critical hash function properties are formally verified with proper mathemat
 
 **Note**: Signature verification proofs are not included due to Kani limitations with external cryptographic libraries. The hash function proofs provide valuable verification of cryptographic operation correctness where Kani can be effective.
 
+
+
+
