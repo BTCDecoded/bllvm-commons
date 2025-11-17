@@ -52,7 +52,8 @@ Start with these documents:
 
 ## For Administrators
 
-- Review [Deployment Guide](../DEPLOYMENT.md) for production deployment
+- Review [Deployment Guide](./deployment/DEPLOYMENT.md) for production deployment
+- Review [Deployment Requirements](./deployment/DEPLOYMENT_REQUIREMENTS.md) for quick reference
 - Review [Security Guide](../SECURITY.md) for security configuration
 - Review [Configuration](./CONFIGURATION.md) for configuration management
 - Review [Audit Materials](../../audit-materials/README.md) for security requirements

@@ -187,7 +187,7 @@ check_documentation_consistency() {
         "$GOVERNANCE_DIR/architecture/SERVER_AUTHORIZATION.md"
         "$GOVERNANCE_DIR/architecture/CROSS_LAYER_DEPENDENCIES.md"
         "$GOVERNANCE_APP_DIR/README.md"
-        "$GOVERNANCE_APP_DIR/DEPLOYMENT.md"
+        "$GOVERNANCE_APP_DIR/docs/deployment/DEPLOYMENT.md"
         "$GOVERNANCE_APP_DIR/SECURITY.md"
         "$GOVERNANCE_APP_DIR/docs/VERIFICATION.md"
         "$GOVERNANCE_APP_DIR/docs/NOSTR_INTEGRATION.md"

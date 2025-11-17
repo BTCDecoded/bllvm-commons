@@ -486,7 +486,8 @@ nikto -h localhost:8080
 
 ## References
 
-- [Deployment Guide](DEPLOYMENT.md)
+- [Deployment Guide](docs/deployment/DEPLOYMENT.md)
+- [Deployment Requirements](docs/deployment/DEPLOYMENT_REQUIREMENTS.md)
 - [Configuration Reference](docs/CONFIGURATION.md)
 - [Troubleshooting Guide](docs/TROUBLESHOOTING.md)
 - [Audit Materials](../audit-materials/README.md)

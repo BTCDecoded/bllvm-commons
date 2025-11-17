@@ -44,9 +44,21 @@ Rust-based GitHub App for enforcing cryptographic governance rules across all Bi
 - [Server Authorization](docs/SERVER_AUTHORIZATION.md) - Server authorization system
 
 ### For Administrators
-- [Deployment Guide](DEPLOYMENT.md) - Production deployment guide
+- [Deployment Guide](docs/deployment/DEPLOYMENT.md) - Production deployment guide
+- [Deployment Requirements](docs/deployment/DEPLOYMENT_REQUIREMENTS.md) - Quick deployment reference
 - [Security Guide](SECURITY.md) - Security configuration and best practices
 - [Main Governance Documentation](../governance/README.md) - System overview
+
+### For Build System
+- [Build Orchestration](docs/build/BUILD_ORCHESTRATION_IMPLEMENTATION.md) - Build system implementation
+- [Build System Consistency](docs/build/BUILD_SYSTEM_CONSISTENCY_ANALYSIS.md) - Workflow consistency analysis
+- [Completion Plan](docs/build/BLLVM_COMMONS_COMPLETION_PLAN.md) - Build system completion roadmap
+- [Release Inclusion](docs/build/RELEASE_INCLUSION.md) - How binaries are included in releases
+
+### For Testing
+- [Testing Strategy](docs/testing/TESTING_STRATEGY.md) - Overall testing approach
+- [Proof of Work Testing](docs/testing/PROOF_OF_WORK_TESTING.md) - Comprehensive test plan
+- [Prove It Works](docs/testing/PROVE_IT_WORKS.md) - Quick testing summary
 
 ### For Auditors
 - [Audit Materials](../audit-materials/README.md) - Security and audit information
