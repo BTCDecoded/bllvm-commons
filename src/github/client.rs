@@ -58,11 +58,11 @@ impl GitHubClient {
 
         // Convert state to GitHub API format
         let github_state = match state {
-            "success" => "success",
-            "failure" => "failure",
-            "pending" => "pending",
-            "error" => "error",
-            _ => "error",
+            "success" => octocrab::models::StatusState::Success,
+            "failure" => octocrab::models::StatusState::Failure,
+            "pending" => octocrab::models::StatusState::Pending,
+            "error" => octocrab::models::StatusState::Error,
+            _ => octocrab::models::StatusState::Error,
         };
 
         // Create status check payload
