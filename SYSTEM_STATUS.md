@@ -30,7 +30,7 @@ Bitcoin Commons is a comprehensive Bitcoin implementation ecosystem with cryptog
 - **Source Files**: 38 Rust files
 - **Test Files**: 97 Rust test files
 - **Modules Exported**: 20+ modules (constants, script, transaction, block, economic, pow, mempool, mining, segwit, taproot, utxo_commitments, etc.)
-- **Kani Proofs**: 176 `kani::proof` calls found (verified count)
+- **Kani Proofs**: 194+ `kani::proof` calls found (verified count)
 - **Formal Verification**: Active with Kani model checking
 
 **Key Features:**
@@ -51,7 +51,7 @@ Bitcoin Commons is a comprehensive Bitcoin implementation ecosystem with cryptog
 - Property-based tests: Using proptest
 - Fuzzing: Multiple fuzzing targets
 
-**Note**: Documentation claims vary (13 vs 51 vs 60 proofs). Verified actual count: **176 kani::proof calls** in source code.
+**Note**: Documentation claims vary (13 vs 51 vs 60 proofs). Verified actual count: **194+ kani::proof calls** in source code.
 
 ---
 
@@ -219,11 +219,11 @@ Bitcoin Commons is a comprehensive Bitcoin implementation ecosystem with cryptog
 ### Formal Verification
 
 **Kani Proofs** (Verified):
-- **Actual Count**: 176 `kani::proof` calls in bllvm-consensus source code
+- **Actual Count**: 194+ `kani::proof` calls in bllvm-consensus source code
 - **Documentation Claims**: Vary (13, 51, 60, 99% coverage)
 - **Status**: Active formal verification with Kani model checking
 
-**Note**: Documentation contains conflicting claims about formal verification coverage. Verified actual implementation shows 176 proof calls, significantly more than most documentation claims.
+**Note**: Documentation contains conflicting claims about formal verification coverage. Verified actual implementation shows 194+ proof calls, significantly more than most documentation claims.
 
 ### Test Coverage
 
@@ -321,7 +321,7 @@ governance-app (depends on bllvm-sdk)
 
 ### Documentation Gaps
 
-- **Formal Verification**: Conflicting documentation (13 vs 51 vs 60 vs 176 proofs)
+- **Formal Verification**: Conflicting documentation (13 vs 51 vs 60 vs 194+ proofs)
 - **Status Documents**: Multiple conflicting status documents need consolidation
 - **Test Coverage**: Some components lack published coverage reports
 

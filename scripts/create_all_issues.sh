@@ -95,7 +95,7 @@ Add formal verification proofs for uncovered consensus rules.
 
 ## Context
 
-We have 176+ Kani proofs, but there are still consensus rules that could benefit from formal verification. Adding more proofs increases confidence in correctness.
+We have 194+ Kani proofs, but there are still consensus rules that could benefit from formal verification. Adding more proofs increases confidence in correctness.
 
 ## Acceptance Criteria
 

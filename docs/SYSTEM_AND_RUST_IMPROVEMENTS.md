@@ -173,7 +173,7 @@ fn send_message(&self, data: Bytes) -> Result<()>;
 #### Current Status
 - ✅ 4,600+ test functions
 - ✅ 10 fuzzing targets
-- ✅ 176 Kani proofs
+- ✅ 194+ Kani proofs
 - ⚠️ No code coverage reports published
 - ⚠️ Some stress tests marked `#[ignore]`
 

@@ -10,7 +10,7 @@ Kani verification can be slow, especially for complex functions. This guide prov
 
 ## Current Performance Baseline
 
-- **Total Proofs**: 176+ Kani proofs
+- **Total Proofs**: 194+ Kani proofs
 - **Average Time**: 30 seconds - 5 minutes per proof
 - **CI Timeout**: 5 minutes per verification step
 - **Bottlenecks**: Unbounded loops, large input spaces, complex data structures

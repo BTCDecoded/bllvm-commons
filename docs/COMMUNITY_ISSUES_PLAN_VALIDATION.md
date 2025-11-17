@@ -22,7 +22,7 @@ The plan is **structurally sound** but needs corrections based on actual codebas
 2. ✅ **Document mathematical proofs** - Valid (Kani proofs need better docs)
 3. ✅ **Add property test cases** - Valid (proptest coverage can expand)
 4. ✅ **Improve error messages** - Valid
-5. ✅ **Implement missing Kani proofs** - Valid (176 proofs exist, more can be added)
+5. ✅ **Implement missing Kani proofs** - Valid (194+ proofs exist, more can be added)
 6. ✅ **Add fuzzing targets** - Valid (7 targets exist, can add more)
 7. ✅ **Performance optimization** - Valid
 8. ✅ **Implement UTXO commitment verification** - Valid (placeholder exists)
