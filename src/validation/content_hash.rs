@@ -5,6 +5,7 @@
 //! It ensures that changes to one repository have corresponding changes in the other.
 
 use crate::error::GovernanceError;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use tracing::{info, warn, error};
@@ -63,7 +64,7 @@ pub struct SyncReport {
 }
 
 /// Synchronization status
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SyncStatus {
     /// All files are synchronized
     Synchronized,

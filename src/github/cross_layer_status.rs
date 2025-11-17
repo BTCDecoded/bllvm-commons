@@ -7,7 +7,8 @@ use crate::error::GovernanceError;
 use crate::validation::content_hash::{ContentHashValidator, SyncReport, SyncStatus};
 use crate::validation::version_pinning::{VersionPinningValidator, VersionReference};
 use crate::validation::equivalence_proof::{EquivalenceProofValidator, VerificationResult, VerificationStatus};
-use crate::validation::verification_check::{check_verification_status, ValidationResult};
+use crate::validation::verification_check::check_verification_status;
+use crate::validation::ValidationResult;
 use crate::database::models::PullRequest as DatabasePullRequest;
 use crate::github::client::GitHubClient;
 use serde::{Deserialize, Serialize};
@@ -481,9 +482,12 @@ impl CrossLayerStatusChecker {
             vec![
                 VersionReference {
                     file_path: file.to_string(),
-                    orange_paper_version: "v1.2.3".to_string(),
-                    orange_paper_commit: "abc123def456".to_string(),
-                    orange_paper_hash: "sha256:1234567890abcdef".to_string(),
+                    line_number: 0,
+                    reference_type: crate::validation::version_pinning::VersionReferenceType::Combined,
+                    version: "v1.2.3".to_string(),
+                    commit_sha: Some("abc123def456".to_string()),
+                    content_hash: Some("sha256:1234567890abcdef".to_string()),
+                    raw_text: "v1.2.3".to_string(),
                 }
             ]
         } else {
@@ -493,7 +497,7 @@ impl CrossLayerStatusChecker {
 
     fn simulate_verify_version_reference(&self, reference: &VersionReference) -> bool {
         // Simulate version verification
-        reference.orange_paper_version.starts_with("v1.")
+        reference.version.starts_with("v1.")
     }
 
     fn simulate_equivalence_test(&self, file: &str) -> bool {

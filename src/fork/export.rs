@@ -232,4 +232,33 @@ impl GovernanceExporter {
 
         Ok(hex::encode(hash))
     }
+
+    /// Get export directory path
+    pub fn get_export_directory(&self) -> std::path::PathBuf {
+        Path::new(&self.config_path).join("exports")
+    }
+
+    /// Export a ruleset to file
+    pub async fn export_ruleset(&self, ruleset: &super::types::Ruleset) -> Result<(), GovernanceError> {
+        let export = self.export_governance_config(
+            &ruleset.id,
+            &ruleset.version,
+            "governance-app",
+            "BTCDecoded/governance",
+            "unknown",
+        ).await?;
+
+        let export_dir = self.get_export_directory();
+        if !export_dir.exists() {
+            tokio::fs::create_dir_all(&export_dir).await.map_err(|e| {
+                GovernanceError::ConfigError(format!("Failed to create export directory: {}", e))
+            })?;
+        }
+
+        let filename = format!("{}_{}.yaml", ruleset.id, ruleset.version);
+        let file_path = export_dir.join(&filename);
+        self.save_export(&export, file_path.to_str().unwrap()).await?;
+
+        Ok(())
+    }
 }

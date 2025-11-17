@@ -32,7 +32,7 @@ pub struct ForkDetectionEvent {
 }
 
 /// Types of fork triggers
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ForkTriggerType {
     AdoptionThreshold,
     TimeBased,

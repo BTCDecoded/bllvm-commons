@@ -30,11 +30,12 @@ impl ForkExecutor {
     /// Create a new fork executor
     pub fn new(
         export_path: &str,
+        pool: sqlx::SqlitePool,
         fork_thresholds: Option<ForkThresholds>,
     ) -> Result<Self, GovernanceError> {
-        let exporter = GovernanceExporter::new(export_path)?;
-        let adoption_tracker = AdoptionTracker::new()?;
-        let versioning = RulesetVersioning::new()?;
+        let exporter = GovernanceExporter::new(export_path);
+        let adoption_tracker = AdoptionTracker::new(pool);
+        let versioning = RulesetVersioning::new();
         
         Ok(Self {
             current_ruleset: None,
@@ -189,13 +190,21 @@ impl ForkExecutor {
             if path.extension().and_then(|s| s.to_str()) == Some("json") {
                 if let Ok(content) = fs::read_to_string(&path) {
                     if let Ok(export) = serde_json::from_str::<GovernanceExport>(&content) {
+                        // Construct config from individual fields
+                        let config = serde_json::json!({
+                            "action_tiers": export.action_tiers,
+                            "economic_nodes": export.economic_nodes,
+                            "maintainers": export.maintainers,
+                            "repositories": export.repositories,
+                            "governance_fork": export.governance_fork,
+                        });
                         let ruleset = Ruleset {
                             id: export.ruleset_id.clone(),
                             name: format!("Ruleset {}", export.ruleset_id),
                             version: export.ruleset_version,
-                            hash: self.calculate_config_hash(&export.config)?,
+                            hash: self.calculate_config_hash(&config)?,
                             created_at: export.created_at,
-                            config: export.config,
+                            config,
                             description: Some(format!("Exported ruleset from {}", export.metadata.source_repository)),
                         };
                         
@@ -418,7 +427,9 @@ mod tests {
         let temp_dir = tempdir().unwrap();
         let export_path = temp_dir.path().join("exports");
         
-        let executor = ForkExecutor::new(export_path.to_str().unwrap(), None);
+        // Create in-memory database for testing
+        let pool = sqlx::SqlitePool::connect("sqlite::memory:").await.unwrap();
+        let executor = ForkExecutor::new(export_path.to_str().unwrap(), pool, None);
         assert!(executor.is_ok());
     }
 
@@ -427,7 +438,9 @@ mod tests {
         let temp_dir = tempdir().unwrap();
         let export_path = temp_dir.path().join("exports");
         
-        let mut executor = ForkExecutor::new(export_path.to_str().unwrap(), None).unwrap();
+        // Create in-memory database for testing
+        let pool = sqlx::SqlitePool::connect("sqlite::memory:").await.unwrap();
+        let mut executor = ForkExecutor::new(export_path.to_str().unwrap(), pool, None).unwrap();
         
         // Create a valid ruleset
         let config = serde_json::json!({

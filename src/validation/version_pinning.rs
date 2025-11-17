@@ -12,7 +12,7 @@ use std::str::FromStr;
 use tracing::{info, warn, error, debug};
 
 /// Version reference found in code
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct VersionReference {
     pub file_path: String,
     pub line_number: usize,

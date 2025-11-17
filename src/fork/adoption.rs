@@ -260,4 +260,21 @@ impl AdoptionTracker {
 
         Ok(())
     }
+
+    /// Record a fork decision
+    pub async fn record_fork_decision(
+        &self,
+        ruleset_id: &str,
+        node_id: &str,
+        decision: &ForkDecision,
+    ) -> Result<(), GovernanceError> {
+        self.track_adoption(
+            ruleset_id,
+            node_id,
+            &decision.node_type,
+            decision.weight,
+            &decision.decision_reason,
+            &decision.signature,
+        ).await
+    }
 }

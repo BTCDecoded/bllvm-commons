@@ -406,8 +406,8 @@ impl SecurityControlValidator {
             };
             
             comment.push_str(&format!(
-                "- {} **{}** ({}) - {}\n",
-                priority_emoji, control.name, control.id, control.description
+                "- {} **{}** ({})\n",
+                priority_emoji, control.name, control.id
             ));
         }
         

@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 
 /// Result of validation checks
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[allow(dead_code)] // Used across multiple modules
 pub enum ValidationResult {
     /// Validation passed
     Valid {

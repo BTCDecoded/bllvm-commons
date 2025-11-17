@@ -11,6 +11,10 @@ use crate::error::GovernanceError;
 pub struct RulesetVersioning;
 
 impl RulesetVersioning {
+    pub fn new() -> Self {
+        Self
+    }
+
     /// Generate semantic version for a ruleset based on changes
     pub fn version_ruleset(
         &self,
