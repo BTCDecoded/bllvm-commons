@@ -333,11 +333,19 @@ impl ForkExecutor {
         self.available_rulesets.insert("current".to_string(), target_ruleset.clone());
         
         // Notify adoption tracker
+        let decision = ForkDecision {
+            ruleset_id: target_ruleset.id.clone(),
+            node_id: "bllvm-commons".to_string(),
+            node_type: "full_node".to_string(),
+            weight: 1.0,
+            decision_reason: "Fork executed by bllvm-commons".to_string(),
+            signature: "".to_string(), // TODO: Add proper signature
+            timestamp: Utc::now(),
+        };
         self.adoption_tracker.record_fork_decision(
-            "bllvm-commons".to_string(),
-            target_ruleset.id.clone(),
-            "Fork executed by bllvm-commons".to_string(),
-            1.0,
+            &target_ruleset.id,
+            "bllvm-commons",
+            &decision,
         ).await?;
         
         // Export new current ruleset
