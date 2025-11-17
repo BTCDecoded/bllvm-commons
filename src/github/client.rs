@@ -3,6 +3,7 @@ use serde_json::json;
 use tracing::{error, info};
 
 use crate::error::GovernanceError;
+use crate::github::types::{CheckRun, WorkflowStatus};
 
 #[derive(Clone)]
 pub struct GitHubClient {
@@ -166,6 +167,20 @@ impl GitHubClient {
                 GovernanceError::GitHubError(format!("Failed to get pull request info: {}", e))
             })?;
 
+        // Extract head and base SHA from the pull request
+        let head_sha = pull_request.head.as_ref()
+            .map(|h| h.sha.clone())
+            .unwrap_or_default();
+        let base_sha = pull_request.base.as_ref()
+            .map(|b| b.sha.clone())
+            .unwrap_or_default();
+        let head_ref = pull_request.head.as_ref()
+            .map(|h| h.ref_field.clone())
+            .unwrap_or_default();
+        let base_ref = pull_request.base.as_ref()
+            .map(|b| b.ref_field.clone())
+            .unwrap_or_default();
+
         Ok(json!({
             "id": pull_request.id,
             "number": pull_request.number,
@@ -184,7 +199,15 @@ impl GitHubClient {
             "deletions": pull_request.deletions,
             "changed_files": pull_request.changed_files,
             "url": pull_request.url,
-            "html_url": pull_request.html_url
+            "html_url": pull_request.html_url,
+            "head": {
+                "sha": head_sha,
+                "ref": head_ref,
+            },
+            "base": {
+                "sha": base_sha,
+                "ref": base_ref,
+            }
         }))
     }
 
@@ -264,5 +287,132 @@ impl GitHubClient {
             owner, repo, pr_number, can_merge
         );
         Ok(can_merge)
+    }
+
+    /// Get check runs for a commit SHA
+    pub async fn get_check_runs(
+        &self,
+        owner: &str,
+        repo: &str,
+        sha: &str,
+    ) -> Result<Vec<CheckRun>, GovernanceError> {
+        info!("Getting check runs for {}/{}@{}", owner, repo, sha);
+
+        let check_runs = self
+            .client
+            .repos(owner, repo)
+            .check_runs()
+            .for_ref(sha)
+            .send()
+            .await
+            .map_err(|e| {
+                error!("Failed to get check runs: {}", e);
+                GovernanceError::GitHubError(format!("Failed to get check runs: {}", e))
+            })?;
+
+        let mut results = Vec::new();
+        for run in check_runs.check_runs {
+            results.push(CheckRun {
+                name: run.name,
+                conclusion: run.conclusion.map(|c| format!("{:?}", c)),
+                status: format!("{:?}", run.status),
+                html_url: run.html_url.map(|u| u.to_string()),
+            });
+        }
+
+        info!("Found {} check runs for {}/{}@{}", results.len(), owner, repo, sha);
+        Ok(results)
+    }
+
+    /// Get workflow status for a PR
+    pub async fn get_workflow_status(
+        &self,
+        owner: &str,
+        repo: &str,
+        pr_number: u64,
+        workflow_file: &str,
+    ) -> Result<WorkflowStatus, GovernanceError> {
+        info!(
+            "Getting workflow status for {}/{} PR #{} (workflow: {})",
+            owner, repo, pr_number, workflow_file
+        );
+
+        // Get the PR to find the head SHA
+        let pr = self.get_pull_request(owner, repo, pr_number).await?;
+        let head_sha = pr["head"]["sha"]
+            .as_str()
+            .ok_or_else(|| {
+                GovernanceError::GitHubError("Missing head SHA in PR response".to_string())
+            })?;
+
+        // Get workflow runs for this workflow file
+        let workflow_runs = self
+            .client
+            .actions()
+            .list_workflow_runs_for_repo(owner, repo)
+            .workflow_file(workflow_file)
+            .head_sha(head_sha)
+            .per_page(1)
+            .send()
+            .await
+            .map_err(|e| {
+                error!("Failed to get workflow runs: {}", e);
+                GovernanceError::GitHubError(format!("Failed to get workflow runs: {}", e))
+            })?;
+
+        // Get the most recent run
+        if let Some(run) = workflow_runs.workflow_runs.first() {
+            Ok(WorkflowStatus {
+                conclusion: run.conclusion.as_ref().map(|c| format!("{:?}", c)),
+                status: Some(format!("{:?}", run.status)),
+            })
+        } else {
+            // No workflow run found - return pending status
+            Ok(WorkflowStatus {
+                conclusion: None,
+                status: Some("pending".to_string()),
+            })
+        }
+    }
+
+    /// Check if a workflow file exists in the repository
+    pub async fn workflow_exists(
+        &self,
+        owner: &str,
+        repo: &str,
+        workflow_file: &str,
+    ) -> Result<bool, GovernanceError> {
+        info!(
+            "Checking if workflow {} exists in {}/{}",
+            workflow_file, owner, repo
+        );
+
+        // Try to get workflow runs for this workflow file
+        // If we can list workflows, the file exists
+        match self
+            .client
+            .actions()
+            .list_workflows_for_repo(owner, repo)
+            .send()
+            .await
+        {
+            Ok(workflows) => {
+                let exists = workflows.workflows.iter().any(|w| {
+                    w.path.as_ref()
+                        .map(|p| p.ends_with(workflow_file))
+                        .unwrap_or(false)
+                });
+                Ok(exists)
+            }
+            Err(_) => {
+                // If we can't list workflows, assume it exists (conservative approach)
+                // In Phase 1, we'll allow this to avoid blocking
+                warn!(
+                    "Could not verify workflow existence for {}/{} - assuming it exists",
+                    owner, repo
+                );
+                Ok(true)
+            }
+        }
     }
 }

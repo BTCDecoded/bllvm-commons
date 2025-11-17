@@ -7,6 +7,8 @@ use crate::error::GovernanceError;
 use crate::validation::content_hash::{ContentHashValidator, SyncReport, SyncStatus};
 use crate::validation::version_pinning::{VersionPinningValidator, VersionReference};
 use crate::validation::equivalence_proof::{EquivalenceProofValidator, VerificationResult, VerificationStatus};
+use crate::validation::verification_check::{check_verification_status, ValidationResult};
+use crate::database::models::PullRequest as DatabasePullRequest;
 use crate::github::client::GitHubClient;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -93,12 +95,19 @@ pub struct CrossLayerStatusChecker {
 
 impl CrossLayerStatusChecker {
     pub fn new(github_client: GitHubClient) -> Self {
-        Self {
+        let mut validator = Self {
             github_client,
             content_hash_validator: ContentHashValidator::new(),
             version_pinning_validator: VersionPinningValidator::default(),
             equivalence_proof_validator: EquivalenceProofValidator::new(),
+        };
+        
+        // Load test vectors with fallback (for future use, even though we use CI now)
+        if let Err(e) = validator.equivalence_proof_validator.load_test_vectors_with_fallback() {
+            warn!("Failed to load test vectors: {}", e);
         }
+        
+        validator
     }
 
     /// Generate comprehensive cross-layer status check for a PR
@@ -118,7 +127,7 @@ impl CrossLayerStatusChecker {
         let version_pinning_status = self.check_version_pinning(owner, repo, changed_files).await?;
 
         // 3. Check equivalence proofs
-        let equivalence_proof_status = self.check_equivalence_proofs(owner, repo, changed_files).await?;
+        let equivalence_proof_status = self.check_equivalence_proofs(owner, repo, pr_number, changed_files).await?;
 
         // 4. Determine overall status
         let overall_status = self.determine_overall_status(&content_hash_status, &version_pinning_status, &equivalence_proof_status);
@@ -265,52 +274,108 @@ impl CrossLayerStatusChecker {
         &mut self,
         owner: &str,
         repo: &str,
+        pr_number: u64,
         changed_files: &[String],
     ) -> Result<EquivalenceProofStatus, GovernanceError> {
-        info!("Checking equivalence proofs for {} files", changed_files.len());
+        info!("Checking equivalence proofs for {}/{} PR #{}", owner, repo, pr_number);
 
-        // Load test vectors
-        let test_vectors = EquivalenceProofValidator::generate_consensus_test_vectors();
-        self.equivalence_proof_validator.load_test_vectors(test_vectors);
-
-        let mut tests_run = 0;
-        let mut tests_passed = 0;
-        let mut tests_failed = Vec::new();
-
-        // Run equivalence tests for consensus-related files
-        for file in changed_files {
-            if file.contains("consensus-rules") || file.contains("proofs") {
-                tests_run += 1;
-                
-                // Simulate running equivalence tests
-                if self.simulate_equivalence_test(file) {
-                    tests_passed += 1;
-                } else {
-                    tests_failed.push(format!("{}: Equivalence test failed", file));
+        // Check if this is a verification-required repository
+        let repo_name = format!("{}/{}", owner, repo);
+        if requires_verification(&repo_name)? {
+            // Get PR data from GitHub
+            let pr_json = self.github_client.get_pull_request(owner, repo, pr_number).await?;
+            
+            // Extract head_sha from PR response
+            let head_sha = pr_json["head"]["sha"]
+                .as_str()
+                .ok_or_else(|| {
+                    GovernanceError::GitHubError("Missing head SHA in PR response".to_string())
+                })?
+                .to_string();
+            
+            // Convert to database::models::PullRequest for verification_check
+            let pr = DatabasePullRequest {
+                id: 0, // Not needed for verification
+                repo_name: repo_name.clone(),
+                pr_number: pr_number as i32,
+                opened_at: chrono::Utc::now(), // Not critical for verification
+                layer: 0, // Not critical for verification
+                head_sha,
+                signatures: vec![],
+                governance_status: "pending".to_string(),
+                linked_prs: vec![],
+                emergency_mode: false,
+                created_at: chrono::Utc::now(),
+                updated_at: chrono::Utc::now(),
+            };
+            
+            // Use actual verification check
+            let verification_result = check_verification_status(
+                &self.github_client,
+                &pr
+            ).await?;
+            
+            // Map verification result to EquivalenceProofStatus
+            match verification_result {
+                ValidationResult::Valid { message } => {
+                    Ok(EquivalenceProofStatus {
+                        status: StatusState::Success,
+                        message: format!("✅ Equivalence Proof: {}", message),
+                        tests_run: 0, // TODO: Extract from CI if available
+                        tests_passed: 0, // TODO: Extract from CI if available
+                        tests_failed: vec![],
+                        proof_verification: Some("CI verification passed".to_string()),
+                    })
+                }
+                ValidationResult::Invalid { message, blocking: _ } => {
+                    Ok(EquivalenceProofStatus {
+                        status: StatusState::Failure,
+                        message: format!("❌ Equivalence Proof: {}", message),
+                        tests_run: 0,
+                        tests_passed: 0,
+                        tests_failed: vec![message],
+                        proof_verification: Some("CI verification failed".to_string()),
+                    })
+                }
+                ValidationResult::Pending { message } => {
+                    Ok(EquivalenceProofStatus {
+                        status: StatusState::Pending,
+                        message: format!("⏳ Equivalence Proof: {}", message),
+                        tests_run: 0,
+                        tests_passed: 0,
+                        tests_failed: vec![],
+                        proof_verification: None,
+                    })
+                }
+                ValidationResult::NotApplicable => {
+                    // Not a verification-required repo, return success
+                    Ok(EquivalenceProofStatus {
+                        status: StatusState::Success,
+                        message: "Equivalence proof not required for this repository".to_string(),
+                        tests_run: 0,
+                        tests_passed: 0,
+                        tests_failed: vec![],
+                        proof_verification: None,
+                    })
                 }
             }
+        } else {
+            // Not a verification-required repo
+            Ok(EquivalenceProofStatus {
+                status: StatusState::Success,
+                message: "Equivalence proof not required for this repository".to_string(),
+                tests_run: 0,
+                tests_passed: 0,
+                tests_failed: vec![],
+                proof_verification: None,
+            })
         }
-
-        let status = if tests_failed.is_empty() {
-            StatusState::Success
-        } else {
-            StatusState::Failure
-        };
-
-        let message = if tests_failed.is_empty() {
-            format!("✅ Equivalence Proof: All {} tests passed", tests_run)
-        } else {
-            format!("❌ Equivalence Proof: {} tests failed", tests_failed.len())
-        };
-
-        Ok(EquivalenceProofStatus {
-            status,
-            message,
-            tests_run,
-            tests_passed,
-            tests_failed,
-            proof_verification: Some("sha256:verified_proof_hash".to_string()),
-        })
+    }
+    
+    /// Check if repository requires verification
+    fn requires_verification(&self, repo: &str) -> Result<bool, GovernanceError> {
+        crate::validation::verification_check::requires_verification(repo)
+            .map_err(|e| GovernanceError::ValidationError(e.to_string()))
     }
 
     /// Determine overall status from individual checks

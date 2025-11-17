@@ -61,3 +61,19 @@ pub struct Review {
     pub user: User,
     pub body: Option<String>,
 }
+
+/// Check run from GitHub API
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CheckRun {
+    pub name: String,
+    pub conclusion: Option<String>,
+    pub status: String,
+    pub html_url: Option<String>,
+}
+
+/// Workflow status from GitHub API
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkflowStatus {
+    pub conclusion: Option<String>,
+    pub status: Option<String>,
+}

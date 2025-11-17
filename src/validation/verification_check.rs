@@ -4,7 +4,7 @@
 //! before allowing maintainer signatures. Implements Ostrom Principle #5
 //! (Graduated Sanctions) by preventing progress on unverified code.
 
-use crate::error::Result;
+use crate::error::{Result, GovernanceError};
 use crate::github::client::GitHubClient;
 use crate::database::models::PullRequest;
 use crate::validation::ValidationResult;
@@ -45,14 +45,17 @@ pub async fn check_verification_status(
     client: &GitHubClient,
     pr: &PullRequest,
 ) -> Result<ValidationResult> {
+    // Parse repository name to extract owner and repo
+    let (owner, repo) = parse_repo_name(&pr.repo_name)?;
+    
     // Check if PR is to a verification-required repository
-    if !requires_verification(&pr.repository)? {
+    if !requires_verification(&pr.repo_name)? {
         return Ok(ValidationResult::NotApplicable);
     }
     
     // Get CI status for verification workflow
     let workflow = "verify.yml";
-    let status = client.get_workflow_status(&pr.repository, pr.number, workflow).await?;
+    let status = client.get_workflow_status(&owner, &repo, pr.pr_number as u64, workflow).await?;
     
     match status.conclusion {
         Some("success") => {
@@ -98,7 +101,7 @@ pub async fn check_verification_status(
 }
 
 /// Check if repository requires verification
-fn requires_verification(repo: &str) -> Result<bool> {
+pub fn requires_verification(repo: &str) -> Result<bool> {
     // Load from governance config
     let config = load_governance_config()?;
     Ok(config.repos.get(repo)
@@ -107,13 +110,25 @@ fn requires_verification(repo: &str) -> Result<bool> {
         .unwrap_or(false))
 }
 
+/// Parse repository name into owner and repo
+fn parse_repo_name(repo_name: &str) -> Result<(String, String), GovernanceError> {
+    let parts: Vec<&str> = repo_name.split('/').collect();
+    if parts.len() != 2 {
+        return Err(GovernanceError::ValidationError(
+            format!("Invalid repository name format: {}", repo_name)
+        ));
+    }
+    Ok((parts[0].to_string(), parts[1].to_string()))
+}
+
 /// Check specific tool status
 async fn check_tool_status(
     client: &GitHubClient,
     pr: &PullRequest,
     tool_name: &str,
 ) -> Result<bool> {
-    let checks = client.get_check_runs(&pr.repository, &pr.head_sha).await?;
+    let (owner, repo) = parse_repo_name(&pr.repo_name)?;
+    let checks = client.get_check_runs(&owner, &repo, &pr.head_sha).await?;
     
     for check in checks {
         if check.name == tool_name {
@@ -167,8 +182,11 @@ pub async fn validate_verification_requirements(
     if let Some(repo_config) = config.repos.get(repo) {
         if let Some(verification) = &repo_config.verification {
             if verification.required {
+                // Parse repository name to extract owner and repo
+                let (owner, repo_name) = parse_repo_name(repo)?;
+                
                 // Check if verification workflow exists
-                let workflow_exists = client.workflow_exists(repo, &verification.ci_workflow).await?;
+                let workflow_exists = client.workflow_exists(&owner, &repo_name, &verification.ci_workflow).await?;
                 
                 if !workflow_exists {
                     return Ok(VerificationValidationResult::MissingWorkflow {
@@ -294,23 +312,28 @@ mod tests {
                     name: "Kani Model Checking".to_string(),
                     conclusion: Some("success".to_string()),
                     status: "completed".to_string(),
+                    html_url: Some("https://github.com/test/check".to_string()),
                 },
                 CheckRun {
                     name: "Unit & Property Tests".to_string(),
                     conclusion: Some("success".to_string()),
                     status: "completed".to_string(),
+                    html_url: Some("https://github.com/test/check".to_string()),
                 },
             ],
         );
         
         let pr = PullRequest {
-            repository: "bllvm-consensus".to_string(),
-            number: 123,
+            id: 0,
+            repo_name: "BTCDecoded/bllvm-consensus".to_string(),
+            pr_number: 123,
+            opened_at: chrono::Utc::now(),
+            layer: 2,
             head_sha: "abc123".to_string(),
-            base_sha: "def456".to_string(),
-            title: "Test PR".to_string(),
-            body: "Test body".to_string(),
-            author: "test-author".to_string(),
+            signatures: vec![],
+            governance_status: "pending".to_string(),
+            linked_prs: vec![],
+            emergency_mode: false,
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
         };
@@ -336,13 +359,16 @@ mod tests {
         );
         
         let pr = PullRequest {
-            repository: "bllvm-consensus".to_string(),
-            number: 123,
+            id: 0,
+            repo_name: "BTCDecoded/bllvm-consensus".to_string(),
+            pr_number: 123,
+            opened_at: chrono::Utc::now(),
+            layer: 2,
             head_sha: "abc123".to_string(),
-            base_sha: "def456".to_string(),
-            title: "Test PR".to_string(),
-            body: "Test body".to_string(),
-            author: "test-author".to_string(),
+            signatures: vec![],
+            governance_status: "pending".to_string(),
+            linked_prs: vec![],
+            emergency_mode: false,
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
         };
@@ -369,13 +395,16 @@ mod tests {
         );
         
         let pr = PullRequest {
-            repository: "bllvm-consensus".to_string(),
-            number: 123,
+            id: 0,
+            repo_name: "BTCDecoded/bllvm-consensus".to_string(),
+            pr_number: 123,
+            opened_at: chrono::Utc::now(),
+            layer: 2,
             head_sha: "abc123".to_string(),
-            base_sha: "def456".to_string(),
-            title: "Test PR".to_string(),
-            body: "Test body".to_string(),
-            author: "test-author".to_string(),
+            signatures: vec![],
+            governance_status: "pending".to_string(),
+            linked_prs: vec![],
+            emergency_mode: false,
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
         };

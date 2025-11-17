@@ -7,6 +7,7 @@
 use crate::error::GovernanceError;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::path::Path;
 use tracing::{info, warn, error};
 use sha2::{Digest, Sha256};
 use hex;
@@ -100,6 +101,116 @@ impl EquivalenceProofValidator {
             self.test_vectors.insert(vector.test_id.clone(), vector);
         }
         info!("Loaded {} equivalence test vectors", self.test_vectors.len());
+    }
+
+    /// Load test vectors from YAML configuration file
+    pub fn load_test_vectors_from_config(
+        config_path: &str,
+    ) -> Result<Vec<EquivalenceTestVector>, GovernanceError> {
+        use std::fs;
+
+        info!("Loading test vectors from config: {}", config_path);
+
+        let content = fs::read_to_string(config_path).map_err(|e| {
+            GovernanceError::ValidationError(format!(
+                "Failed to read test vector config {}: {}",
+                config_path, e
+            ))
+        })?;
+
+        #[derive(Deserialize)]
+        struct TestVectorConfig {
+            test_vectors: Vec<TestVectorConfigEntry>,
+        }
+
+        #[derive(Deserialize)]
+        struct TestVectorConfigEntry {
+            test_id: String,
+            description: String,
+            orange_paper_section: String,
+            consensus_proof_test: Option<String>,
+            expected_result: String,
+            proof_type: String,
+        }
+
+        let config: TestVectorConfig = serde_yaml::from_str(&content).map_err(|e| {
+            GovernanceError::ValidationError(format!(
+                "Failed to parse test vector config {}: {}",
+                config_path, e
+            ))
+        })?;
+
+        let mut vectors = Vec::new();
+        for entry in config.test_vectors {
+            vectors.push(EquivalenceTestVector {
+                test_id: entry.test_id,
+                description: entry.description,
+                orange_paper_spec: entry.orange_paper_section,
+                consensus_proof_impl: entry
+                    .consensus_proof_test
+                    .unwrap_or_else(|| "N/A".to_string()),
+                expected_result: entry.expected_result,
+                test_data: HashMap::new(), // Can be populated from config if needed
+                proof_metadata: ProofMetadata {
+                    proof_type: match entry.proof_type.as_str() {
+                        "BehavioralEquivalence" => ProofType::BehavioralEquivalence,
+                        "SecurityEquivalence" => ProofType::SecurityEquivalence,
+                        "PerformanceEquivalence" => ProofType::PerformanceEquivalence,
+                        _ => ProofType::DirectEquivalence,
+                    },
+                    created_at: chrono::Utc::now(),
+                    maintainer_signatures: vec![],
+                    proof_hash: "".to_string(), // Will be computed
+                    verification_status: VerificationStatus::Pending,
+                },
+            });
+        }
+
+        // Compute proof hashes
+        for vector in &mut vectors {
+            vector.proof_metadata.proof_hash = Self::compute_proof_hash(vector);
+        }
+
+        info!("Loaded {} test vectors from config", vectors.len());
+        Ok(vectors)
+    }
+
+    /// Load test vectors with fallback to hardcoded vectors
+    pub fn load_test_vectors_with_fallback(&mut self) -> Result<(), GovernanceError> {
+        // Try to load from config first
+        // Look for config in standard locations
+        let config_paths = vec![
+            "governance/config/test-vectors.yml",
+            "../governance/config/test-vectors.yml",
+            "../../governance/config/test-vectors.yml",
+        ];
+
+        let mut loaded = false;
+        for config_path in &config_paths {
+            if Path::new(config_path).exists() {
+                match Self::load_test_vectors_from_config(config_path) {
+                    Ok(vectors) => {
+                        self.load_test_vectors(vectors);
+                        info!("✅ Loaded {} test vectors from config: {}", self.test_vectors.len(), config_path);
+                        loaded = true;
+                        break;
+                    }
+                    Err(e) => {
+                        warn!("⚠️ Failed to load test vectors from {}: {}", config_path, e);
+                    }
+                }
+            }
+        }
+
+        if !loaded {
+            warn!("⚠️ No test vector config found. Using hardcoded fallback.");
+            warn!("⚠️ This is acceptable in Phase 1, but config should be available in Phase 2");
+            let vectors = Self::generate_consensus_test_vectors();
+            self.load_test_vectors(vectors);
+            info!("✅ Loaded {} hardcoded test vectors as fallback", self.test_vectors.len());
+        }
+
+        Ok(())
     }
 
     /// Generate test vectors for common consensus operations
