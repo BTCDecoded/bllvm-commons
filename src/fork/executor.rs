@@ -334,13 +334,13 @@ impl ForkExecutor {
         
         // Notify adoption tracker
         let decision = ForkDecision {
-            ruleset_id: target_ruleset.id.clone(),
             node_id: "bllvm-commons".to_string(),
             node_type: "full_node".to_string(),
-            weight: 1.0,
+            chosen_ruleset: target_ruleset.id.clone(),
             decision_reason: "Fork executed by bllvm-commons".to_string(),
-            signature: "".to_string(), // TODO: Add proper signature
+            weight: 1.0,
             timestamp: Utc::now(),
+            signature: "".to_string(), // TODO: Add proper signature
         };
         self.adoption_tracker.record_fork_decision(
             &target_ruleset.id,
