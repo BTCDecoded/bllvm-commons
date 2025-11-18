@@ -117,7 +117,7 @@ mod tests {
     async fn test_client_creation() {
         // Generate test keys
         let keys = Keys::generate();
-        let nsec = keys.secret_key().to_secret_hex();
+        let nsec = keys.secret_key().unwrap().display_secret().to_string();
         
         // This will fail in test environment without real relays
         // but we can test the key parsing

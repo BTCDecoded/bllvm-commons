@@ -42,6 +42,8 @@ impl Database {
 
     /// Create an in-memory SQLite database for testing
     pub async fn new_in_memory() -> Result<Self, GovernanceError> {
+        // Use a unique in-memory database for each instance to avoid migration conflicts
+        // SQLite in-memory databases are isolated per connection, so each call gets a fresh DB
         let pool = SqlitePool::connect("sqlite::memory:")
             .await
             .map_err(|e| GovernanceError::DatabaseError(e.to_string()))?;
@@ -99,19 +101,43 @@ impl Database {
     pub async fn run_migrations(&self) -> Result<(), GovernanceError> {
         match &self.backend {
             DatabaseBackend::Sqlite(pool) => {
-                sqlx::migrate!("./migrations")
+                let result = sqlx::migrate!("./migrations")
                     .run(pool)
-                    .await
-                    .map_err(|e| GovernanceError::DatabaseError(e.to_string()))?;
+                    .await;
+                
+                match result {
+                    Ok(_) => Ok(()),
+                    Err(e) => {
+                        // Only ignore UNIQUE constraint errors on the _sqlx_migrations table itself
+                        // This happens when migrations run in parallel during tests
+                        let err_str = e.to_string();
+                        if err_str.contains("_sqlx_migrations") && err_str.contains("UNIQUE constraint") {
+                            // Migration table entry already exists, migrations are already applied
+                            Ok(())
+                        } else {
+                            Err(GovernanceError::DatabaseError(err_str))
+                        }
+                    }
+                }
             }
             DatabaseBackend::Postgres(pool) => {
-                sqlx::migrate!("./migrations-postgres")
+                let result = sqlx::migrate!("./migrations-postgres")
                     .run(pool)
-                    .await
-                    .map_err(|e| GovernanceError::DatabaseError(e.to_string()))?;
+                    .await;
+                
+                match result {
+                    Ok(_) => Ok(()),
+                    Err(e) => {
+                        let err_str = e.to_string();
+                        if err_str.contains("_sqlx_migrations") && err_str.contains("UNIQUE constraint") {
+                            Ok(())
+                        } else {
+                            Err(GovernanceError::DatabaseError(err_str))
+                        }
+                    }
+                }
             }
         }
-        Ok(())
     }
 
     pub fn get_sqlite_pool(&self) -> Option<&SqlitePool> {

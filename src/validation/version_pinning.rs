@@ -184,8 +184,8 @@ impl VersionPinningValidator {
             });
         }
 
-        // Pattern: @orange-paper-commit: abc123def456
-        if let Some(captures) = regex::Regex::new(r"@orange-paper-commit:\s*([a-f0-9]{40})")
+        // Pattern: @orange-paper-commit: abc123def456 (accept 7-40 hex chars for short/long commit SHAs)
+        if let Some(captures) = regex::Regex::new(r"@orange-paper-commit:\s*([a-f0-9]{7,40})")
             .unwrap()
             .captures(trimmed)
         {
@@ -200,8 +200,8 @@ impl VersionPinningValidator {
             });
         }
 
-        // Pattern: @orange-paper-hash: sha256:fedcba...
-        if let Some(captures) = regex::Regex::new(r"@orange-paper-hash:\s*(sha256:[a-f0-9]{64})")
+        // Pattern: @orange-paper-hash: sha256:fedcba... (accept any length hex string)
+        if let Some(captures) = regex::Regex::new(r"@orange-paper-hash:\s*(sha256:[a-f0-9]+)")
             .unwrap()
             .captures(trimmed)
         {
@@ -216,17 +216,23 @@ impl VersionPinningValidator {
             });
         }
 
-        // Pattern: Combined reference
+        // Pattern: Combined reference (only if no specific pattern matched)
+        // This should be checked last, after all specific patterns
         if trimmed.contains("@orange-paper") && trimmed.contains(":") {
-            return Some(VersionReference {
-                file_path: file_path.to_string(),
-                line_number,
-                reference_type: VersionReferenceType::Combined,
-                version: String::new(),
-                commit_sha: None,
-                content_hash: None,
-                raw_text: trimmed.to_string(),
-            });
+            // Check if it's not already matched by a specific pattern
+            if !trimmed.contains("@orange-paper-version") 
+                && !trimmed.contains("@orange-paper-commit")
+                && !trimmed.contains("@orange-paper-hash") {
+                return Some(VersionReference {
+                    file_path: file_path.to_string(),
+                    line_number,
+                    reference_type: VersionReferenceType::Combined,
+                    version: String::new(),
+                    commit_sha: None,
+                    content_hash: None,
+                    raw_text: trimmed.to_string(),
+                });
+            }
         }
 
         None

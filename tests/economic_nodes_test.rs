@@ -4,16 +4,17 @@
 //! weight calculation, veto signal collection, and threshold calculation
 
 use chrono::Utc;
-use governance_app::database::Database;
-use governance_app::economic_nodes::{registry::EconomicNodeRegistry, types::*, veto::VetoManager};
-use governance_app::error::GovernanceError;
+use bllvm_commons::database::Database;
+use bllvm_commons::economic_nodes::{registry::EconomicNodeRegistry, types::*, veto::VetoManager};
+use bllvm_commons::error::GovernanceError;
 use sqlx::SqlitePool;
 
 #[tokio::test]
 async fn test_economic_node_registration() -> Result<(), Box<dyn std::error::Error>> {
     // Setup in-memory database
     let db = Database::new_in_memory().await?;
-    let registry = EconomicNodeRegistry::new(db.pool().clone());
+    let pool = db.pool().expect("Database should have SQLite pool").clone();
+    let registry = EconomicNodeRegistry::new(pool);
 
     // Test mining pool registration
     let mining_pool_proof = QualificationProof {
@@ -27,18 +28,19 @@ async fn test_economic_node_registration() -> Result<(), Box<dyn std::error::Err
         holdings_proof: None,
         volume_proof: None,
         contact_info: ContactInfo {
-            email: "test@mining.com".to_string(),
-            website: "https://mining.com".to_string(),
-            social_media: None,
+            entity_name: "Test Mining Pool".to_string(),
+            contact_email: "test@mining.com".to_string(),
+            website: Some("https://mining.com".to_string()),
+            github_username: None,
         },
     };
 
     let node_id = registry
-        .register_node(
+        .register_economic_node(
             NodeType::MiningPool,
             "Test Mining Pool",
             "test_public_key_1",
-            mining_pool_proof,
+            &mining_pool_proof,
             Some("test_admin"),
         )
         .await?;
@@ -47,19 +49,35 @@ async fn test_economic_node_registration() -> Result<(), Box<dyn std::error::Err
     println!("✅ Mining pool registered with ID: {}", node_id);
 
     // Test exchange registration
+    use bllvm_commons::economic_nodes::types::{HashpowerProof, HoldingsProof, VolumeProof};
     let exchange_proof = QualificationProof {
-        hash_power_percent: None,
-        btc_holdings: Some(2000.0),     // 2000 BTC
-        volume_usd: Some(15_000_000.0), // $15M USD
-        transactions_monthly: Some(150_000),
+        node_type: NodeType::Exchange,
+        hashpower_proof: None,
+        holdings_proof: Some(HoldingsProof {
+            addresses: vec!["addr1".to_string()],
+            total_btc: 2000.0,
+            signature_challenge: "sig1".to_string(),
+        }),
+        volume_proof: Some(VolumeProof {
+            daily_volume_usd: 15_000_000.0,
+            monthly_volume_usd: 450_000_000.0,
+            data_source: "test".to_string(),
+            verification_url: None,
+        }),
+        contact_info: ContactInfo {
+            entity_name: "Test Exchange".to_string(),
+            contact_email: "test@exchange.com".to_string(),
+            website: Some("https://exchange.com".to_string()),
+            github_username: None,
+        },
     };
 
     let exchange_id = registry
-        .register_node(
+        .register_economic_node(
             NodeType::Exchange,
             "Test Exchange",
             "test_public_key_2",
-            exchange_proof,
+            &exchange_proof,
             Some("test_admin"),
         )
         .await?;
@@ -69,18 +87,28 @@ async fn test_economic_node_registration() -> Result<(), Box<dyn std::error::Err
 
     // Test custodian registration
     let custodian_proof = QualificationProof {
-        hash_power_percent: None,
-        btc_holdings: Some(6000.0), // 6000 BTC
-        volume_usd: None,
-        transactions_monthly: None,
+        node_type: NodeType::Custodian,
+        hashpower_proof: None,
+        holdings_proof: Some(HoldingsProof {
+            addresses: vec!["addr2".to_string()],
+            total_btc: 6000.0,
+            signature_challenge: "sig2".to_string(),
+        }),
+        volume_proof: None,
+        contact_info: ContactInfo {
+            entity_name: "Test Custodian".to_string(),
+            contact_email: "test@custodian.com".to_string(),
+            website: Some("https://custodian.com".to_string()),
+            github_username: None,
+        },
     };
 
     let custodian_id = registry
-        .register_node(
+        .register_economic_node(
             NodeType::Custodian,
             "Test Custodian",
             "test_public_key_3",
-            custodian_proof,
+            &custodian_proof,
             Some("test_admin"),
         )
         .await?;
@@ -94,22 +122,34 @@ async fn test_economic_node_registration() -> Result<(), Box<dyn std::error::Err
 #[tokio::test]
 async fn test_qualification_verification() -> Result<(), Box<dyn std::error::Error>> {
     let db = Database::new_in_memory().await?;
-    let registry = EconomicNodeRegistry::new(db.pool().clone());
+    let pool = db.pool().expect("Database should have SQLite pool").clone();
+    let registry = EconomicNodeRegistry::new(pool);
 
     // Test insufficient mining pool qualification
     let insufficient_mining_proof = QualificationProof {
-        hash_power_percent: Some(0.5), // Below 1% threshold
-        btc_holdings: None,
-        volume_usd: None,
-        transactions_monthly: None,
+        node_type: NodeType::MiningPool,
+        hashpower_proof: Some(HashpowerProof {
+            blocks_mined: vec!["block1".to_string()],
+            time_period_days: 30,
+            total_network_blocks: 1000,
+            percentage: 0.5, // Below 1% threshold
+        }),
+        holdings_proof: None,
+        volume_proof: None,
+        contact_info: ContactInfo {
+            entity_name: "Insufficient Mining Pool".to_string(),
+            contact_email: "test@insufficient.com".to_string(),
+            website: None,
+            github_username: None,
+        },
     };
 
     let result = registry
-        .register_node(
+        .register_economic_node(
             NodeType::MiningPool,
             "Insufficient Mining Pool",
             "test_public_key_4",
-            insufficient_mining_proof,
+            &insufficient_mining_proof,
             Some("test_admin"),
         )
         .await;
@@ -119,18 +159,33 @@ async fn test_qualification_verification() -> Result<(), Box<dyn std::error::Err
 
     // Test insufficient exchange qualification
     let insufficient_exchange_proof = QualificationProof {
-        hash_power_percent: None,
-        btc_holdings: Some(500.0),          // Below 1000 BTC threshold
-        volume_usd: Some(5_000_000.0),      // Below $10M threshold
-        transactions_monthly: Some(50_000), // Below 100k threshold
+        node_type: NodeType::Exchange,
+        hashpower_proof: None,
+        holdings_proof: Some(HoldingsProof {
+            addresses: vec!["addr3".to_string()],
+            total_btc: 500.0, // Below 1000 BTC threshold
+            signature_challenge: "sig3".to_string(),
+        }),
+        volume_proof: Some(VolumeProof {
+            daily_volume_usd: 5_000_000.0, // Below $10M threshold
+            monthly_volume_usd: 150_000_000.0,
+            data_source: "test".to_string(),
+            verification_url: None,
+        }),
+        contact_info: ContactInfo {
+            entity_name: "Insufficient Exchange".to_string(),
+            contact_email: "test@insufficient.com".to_string(),
+            website: None,
+            github_username: None,
+        },
     };
 
     let result = registry
-        .register_node(
+        .register_economic_node(
             NodeType::Exchange,
             "Insufficient Exchange",
             "test_public_key_5",
-            insufficient_exchange_proof,
+            &insufficient_exchange_proof,
             Some("test_admin"),
         )
         .await;
@@ -144,32 +199,59 @@ async fn test_qualification_verification() -> Result<(), Box<dyn std::error::Err
 #[tokio::test]
 async fn test_weight_calculation() -> Result<(), Box<dyn std::error::Error>> {
     let db = Database::new_in_memory().await?;
-    let registry = EconomicNodeRegistry::new(db.pool().clone());
+    let pool = db.pool().expect("Database should have SQLite pool").clone();
+    let registry = EconomicNodeRegistry::new(pool);
 
     // Test mining pool weight calculation
     let mining_proof = QualificationProof {
-        hash_power_percent: Some(10.0), // 10% hashpower
-        btc_holdings: None,
-        volume_usd: None,
-        transactions_monthly: None,
+        node_type: NodeType::MiningPool,
+        hashpower_proof: Some(HashpowerProof {
+            blocks_mined: vec!["block1".to_string()],
+            time_period_days: 30,
+            total_network_blocks: 1000,
+            percentage: 10.0,
+        }),
+        holdings_proof: None,
+        volume_proof: None,
+        contact_info: ContactInfo {
+            entity_name: "Test Mining Pool".to_string(),
+            contact_email: "test@mining.com".to_string(),
+            website: None,
+            github_username: None,
+        },
     };
 
     let weight = registry
-        .calculate_weight(NodeType::MiningPool, mining_proof)
+        .calculate_weight(NodeType::MiningPool, &mining_proof)
         .await?;
     assert!(weight > 10.0); // Base weight + hashpower adjustment
     println!("✅ Mining pool weight calculated: {}", weight);
 
     // Test exchange weight calculation
     let exchange_proof = QualificationProof {
-        hash_power_percent: None,
-        btc_holdings: Some(5000.0),     // 5000 BTC
-        volume_usd: Some(50_000_000.0), // $50M USD
-        transactions_monthly: Some(200_000),
+        node_type: NodeType::Exchange,
+        hashpower_proof: None,
+        holdings_proof: Some(HoldingsProof {
+            addresses: vec!["addr4".to_string()],
+            total_btc: 5000.0,
+            signature_challenge: "sig4".to_string(),
+        }),
+        volume_proof: Some(VolumeProof {
+            daily_volume_usd: 50_000_000.0,
+            monthly_volume_usd: 1_500_000_000.0,
+            data_source: "test".to_string(),
+            verification_url: None,
+        }),
+        contact_info: ContactInfo {
+            entity_name: "Test Exchange".to_string(),
+            contact_email: "test@exchange.com".to_string(),
+            website: None,
+            github_username: None,
+        },
     };
 
     let weight = registry
-        .calculate_weight(NodeType::Exchange, exchange_proof)
+        .calculate_weight(NodeType::Exchange, &exchange_proof)
         .await?;
     assert!(weight > 5.0); // Base weight + holdings/volume adjustment
     println!("✅ Exchange weight calculated: {}", weight);
@@ -180,30 +262,42 @@ async fn test_weight_calculation() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 async fn test_veto_signal_collection() -> Result<(), Box<dyn std::error::Error>> {
     let db = Database::new_in_memory().await?;
-    let registry = EconomicNodeRegistry::new(db.pool().clone());
-    let veto_manager = VetoManager::new(db.pool().clone());
+    let pool = db.pool().expect("Database should have SQLite pool").clone();
+    let registry = EconomicNodeRegistry::new(pool.clone());
+    let veto_manager = VetoManager::new(pool);
 
     // Register a mining pool
     let mining_proof = QualificationProof {
-        hash_power_percent: Some(5.0),
-        btc_holdings: None,
-        volume_usd: None,
-        transactions_monthly: None,
+        node_type: NodeType::MiningPool,
+        hashpower_proof: Some(HashpowerProof {
+            blocks_mined: vec!["block1".to_string()],
+            time_period_days: 30,
+            total_network_blocks: 1000,
+            percentage: 5.0,
+        }),
+        holdings_proof: None,
+        volume_proof: None,
+        contact_info: ContactInfo {
+            entity_name: "Test Node".to_string(),
+            contact_email: "test@test.com".to_string(),
+            website: None,
+            github_username: None,
+        },
     };
 
     let node_id = registry
-        .register_node(
+        .register_economic_node(
             NodeType::MiningPool,
             "Test Mining Pool",
             "test_public_key_1",
-            mining_proof,
+            &mining_proof,
             Some("test_admin"),
         )
         .await?;
 
     // Submit a veto signal
     let signal_id = veto_manager
-        .submit_veto_signal(
+        .collect_veto_signal(
             1, // PR ID
             node_id,
             SignalType::Veto,
@@ -217,7 +311,7 @@ async fn test_veto_signal_collection() -> Result<(), Box<dyn std::error::Error>>
 
     // Test duplicate signal rejection
     let result = veto_manager
-        .submit_veto_signal(
+        .collect_veto_signal(
             1, // Same PR ID
             node_id,
             SignalType::Support,
@@ -235,47 +329,74 @@ async fn test_veto_signal_collection() -> Result<(), Box<dyn std::error::Error>>
 #[tokio::test]
 async fn test_veto_threshold_calculation() -> Result<(), Box<dyn std::error::Error>> {
     let db = Database::new_in_memory().await?;
-    let registry = EconomicNodeRegistry::new(db.pool().clone());
-    let veto_manager = VetoManager::new(db.pool().clone());
+    let pool = db.pool().expect("Database should have SQLite pool").clone();
+    let registry = EconomicNodeRegistry::new(pool.clone());
+    let veto_manager = VetoManager::new(pool);
 
     // Register multiple nodes with different weights
     let mining_proof = QualificationProof {
-        hash_power_percent: Some(20.0), // 20% hashpower
-        btc_holdings: None,
-        volume_usd: None,
-        transactions_monthly: None,
+        node_type: NodeType::MiningPool,
+        hashpower_proof: Some(HashpowerProof {
+            blocks_mined: vec!["block1".to_string()],
+            time_period_days: 30,
+            total_network_blocks: 1000,
+            percentage: 20.0,
+        }),
+        holdings_proof: None,
+        volume_proof: None,
+        contact_info: ContactInfo {
+            entity_name: "Large Mining Pool".to_string(),
+            contact_email: "test@large.com".to_string(),
+            website: None,
+            github_username: None,
+        },
     };
 
     let mining_node_id = registry
-        .register_node(
+        .register_economic_node(
             NodeType::MiningPool,
             "Large Mining Pool",
             "test_public_key_1",
-            mining_proof,
+            &mining_proof,
             Some("test_admin"),
         )
         .await?;
 
     let exchange_proof = QualificationProof {
-        hash_power_percent: None,
-        btc_holdings: Some(10000.0),     // 10000 BTC
-        volume_usd: Some(100_000_000.0), // $100M USD
-        transactions_monthly: Some(500_000),
+        node_type: NodeType::Exchange,
+        hashpower_proof: None,
+        holdings_proof: Some(HoldingsProof {
+            addresses: vec!["addr6".to_string()],
+            total_btc: 10000.0,
+            signature_challenge: "sig6".to_string(),
+        }),
+        volume_proof: Some(VolumeProof {
+            daily_volume_usd: 100_000_000.0,
+            monthly_volume_usd: 3_000_000_000.0,
+            data_source: "test".to_string(),
+            verification_url: None,
+        }),
+        contact_info: ContactInfo {
+            entity_name: "Large Exchange".to_string(),
+            contact_email: "test@large.com".to_string(),
+            website: None,
+            github_username: None,
+        },
     };
 
     let exchange_node_id = registry
-        .register_node(
+        .register_economic_node(
             NodeType::Exchange,
             "Large Exchange",
             "test_public_key_2",
-            exchange_proof,
+            &exchange_proof,
             Some("test_admin"),
         )
         .await?;
 
     // Submit veto signals
     veto_manager
-        .submit_veto_signal(
+        .collect_veto_signal(
             1, // PR ID
             mining_node_id,
             SignalType::Veto,
@@ -285,7 +406,7 @@ async fn test_veto_threshold_calculation() -> Result<(), Box<dyn std::error::Err
         .await?;
 
     veto_manager
-        .submit_veto_signal(
+        .collect_veto_signal(
             1, // PR ID
             exchange_node_id,
             SignalType::Veto,
@@ -310,22 +431,34 @@ async fn test_veto_threshold_calculation() -> Result<(), Box<dyn std::error::Err
 #[tokio::test]
 async fn test_node_status_management() -> Result<(), Box<dyn std::error::Error>> {
     let db = Database::new_in_memory().await?;
-    let registry = EconomicNodeRegistry::new(db.pool().clone());
+    let pool = db.pool().expect("Database should have SQLite pool").clone();
+    let registry = EconomicNodeRegistry::new(pool);
 
     // Register a node
     let proof = QualificationProof {
-        hash_power_percent: Some(5.0),
-        btc_holdings: None,
-        volume_usd: None,
-        transactions_monthly: None,
+        node_type: NodeType::MiningPool,
+        hashpower_proof: Some(HashpowerProof {
+            blocks_mined: vec!["block1".to_string()],
+            time_period_days: 30,
+            total_network_blocks: 1000,
+            percentage: 5.0,
+        }),
+        holdings_proof: None,
+        volume_proof: None,
+        contact_info: ContactInfo {
+            entity_name: "Test Node".to_string(),
+            contact_email: "test@test.com".to_string(),
+            website: None,
+            github_username: None,
+        },
     };
 
     let node_id = registry
-        .register_node(
+        .register_economic_node(
             NodeType::MiningPool,
             "Test Node",
             "test_public_key",
-            proof,
+            &proof,
             Some("test_admin"),
         )
         .await?;
@@ -344,7 +477,7 @@ async fn test_node_status_management() -> Result<(), Box<dyn std::error::Error>>
 
     // Update to inactive
     registry
-        .update_node_status(node_id, NodeStatus::Inactive)
+        .update_node_status(node_id, NodeStatus::Suspended)
         .await?;
     let active_nodes = registry.get_active_nodes().await?;
     assert_eq!(active_nodes.len(), 0);
@@ -356,39 +489,62 @@ async fn test_node_status_management() -> Result<(), Box<dyn std::error::Error>>
 #[tokio::test]
 async fn test_weight_recalculation() -> Result<(), Box<dyn std::error::Error>> {
     let db = Database::new_in_memory().await?;
-    let registry = EconomicNodeRegistry::new(db.pool().clone());
+    let pool = db.pool().expect("Database should have SQLite pool").clone();
+    let registry = EconomicNodeRegistry::new(pool);
 
     // Register multiple nodes
     let proof1 = QualificationProof {
-        hash_power_percent: Some(5.0),
-        btc_holdings: None,
-        volume_usd: None,
-        transactions_monthly: None,
+        node_type: NodeType::MiningPool,
+        hashpower_proof: Some(HashpowerProof {
+            blocks_mined: vec!["block1".to_string()],
+            time_period_days: 30,
+            total_network_blocks: 1000,
+            percentage: 5.0,
+        }),
+        holdings_proof: None,
+        volume_proof: None,
+        contact_info: ContactInfo {
+            entity_name: "Test Node".to_string(),
+            contact_email: "test@test.com".to_string(),
+            website: None,
+            github_username: None,
+        },
     };
 
     let proof2 = QualificationProof {
-        hash_power_percent: Some(10.0),
-        btc_holdings: None,
-        volume_usd: None,
-        transactions_monthly: None,
+        node_type: NodeType::MiningPool,
+        hashpower_proof: Some(HashpowerProof {
+            blocks_mined: vec!["block1".to_string()],
+            time_period_days: 30,
+            total_network_blocks: 1000,
+            percentage: 10.0,
+        }),
+        holdings_proof: None,
+        volume_proof: None,
+        contact_info: ContactInfo {
+            entity_name: "Test Node".to_string(),
+            contact_email: "test@test.com".to_string(),
+            website: None,
+            github_username: None,
+        },
     };
 
     registry
-        .register_node(
+        .register_economic_node(
             NodeType::MiningPool,
             "Small Pool",
             "test_public_key_1",
-            proof1,
+            &proof1,
             Some("test_admin"),
         )
         .await?;
 
     registry
-        .register_node(
+        .register_economic_node(
             NodeType::MiningPool,
             "Large Pool",
             "test_public_key_2",
-            proof2,
+            &proof2,
             Some("test_admin"),
         )
         .await?;
@@ -403,47 +559,74 @@ async fn test_weight_recalculation() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 async fn test_veto_statistics() -> Result<(), Box<dyn std::error::Error>> {
     let db = Database::new_in_memory().await?;
-    let registry = EconomicNodeRegistry::new(db.pool().clone());
-    let veto_manager = VetoManager::new(db.pool().clone());
+    let pool = db.pool().expect("Database should have SQLite pool").clone();
+    let registry = EconomicNodeRegistry::new(pool.clone());
+    let veto_manager = VetoManager::new(pool);
 
     // Register nodes
     let mining_proof = QualificationProof {
-        hash_power_percent: Some(15.0),
-        btc_holdings: None,
-        volume_usd: None,
-        transactions_monthly: None,
+        node_type: NodeType::MiningPool,
+        hashpower_proof: Some(HashpowerProof {
+            blocks_mined: vec!["block1".to_string()],
+            time_period_days: 30,
+            total_network_blocks: 1000,
+            percentage: 15.0,
+        }),
+        holdings_proof: None,
+        volume_proof: None,
+        contact_info: ContactInfo {
+            entity_name: "Test Node".to_string(),
+            contact_email: "test@test.com".to_string(),
+            website: None,
+            github_username: None,
+        },
     };
 
     let exchange_proof = QualificationProof {
-        hash_power_percent: None,
-        btc_holdings: Some(5000.0),
-        volume_usd: Some(25_000_000.0),
-        transactions_monthly: Some(100_000),
+        node_type: NodeType::Exchange,
+        hashpower_proof: None,
+        holdings_proof: Some(HoldingsProof {
+            addresses: vec!["addr1".to_string()],
+            total_btc: 5000.0,
+            signature_challenge: "sig1".to_string(),
+        }),
+        volume_proof: Some(VolumeProof {
+            daily_volume_usd: 25_000_000.0,
+            monthly_volume_usd: 750000000.0,
+            data_source: "test".to_string(),
+            verification_url: None,
+        }),
+        contact_info: ContactInfo {
+            entity_name: "Test Exchange".to_string(),
+            contact_email: "test@exchange.com".to_string(),
+            website: None,
+            github_username: None,
+        },
     };
 
     let mining_node_id = registry
-        .register_node(
+        .register_economic_node(
             NodeType::MiningPool,
             "Mining Pool",
             "test_public_key_1",
-            mining_proof,
+            &mining_proof,
             Some("test_admin"),
         )
         .await?;
 
     let exchange_node_id = registry
-        .register_node(
+        .register_economic_node(
             NodeType::Exchange,
             "Exchange",
             "test_public_key_2",
-            exchange_proof,
+            &exchange_proof,
             Some("test_admin"),
         )
         .await?;
 
     // Submit different types of signals
     veto_manager
-        .submit_veto_signal(
+        .collect_veto_signal(
             1,
             mining_node_id,
             SignalType::Veto,
@@ -453,7 +636,7 @@ async fn test_veto_statistics() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     veto_manager
-        .submit_veto_signal(
+        .collect_veto_signal(
             1,
             exchange_node_id,
             SignalType::Support,

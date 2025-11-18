@@ -356,7 +356,7 @@ fn check_governance_status(
     repo: &str,
     pr: u64,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    println!("🔍 Checking governance status for {}/{}#{}", repo, pr);
+    println!("🔍 Checking governance status for {}/{}#{}", repo, pr, pr);
     
     // Check for veto signals
     let veto_dir = "veto-signals";

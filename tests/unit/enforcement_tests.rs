@@ -1,7 +1,7 @@
-use governance_app::enforcement::*;
-use governance_app::enforcement::status_checks::StatusCheckGenerator;
-use governance_app::enforcement::merge_block::MergeBlocker;
-use governance_app::validation::emergency::*;
+use bllvm_commons::enforcement::*;
+use bllvm_commons::enforcement::status_checks::StatusCheckGenerator;
+use bllvm_commons::enforcement::merge_block::MergeBlocker;
+use bllvm_commons::validation::emergency::*;
 use chrono::{DateTime, Utc, Duration};
 
 mod common;
@@ -242,19 +242,19 @@ async fn test_post_emergency_requirements() {
 #[tokio::test]
 async fn test_merge_blocker_normal_mode() {
     // Test normal mode - both requirements must be met
-    let result = MergeBlocker::should_block_merge(true, true, false);
+    let result = MergeBlocker::should_block_merge(true, true, false, 1, false);
     assert!(result.is_ok());
     assert!(!result.unwrap()); // Should not block
     
-    let result = MergeBlocker::should_block_merge(false, true, false);
+    let result = MergeBlocker::should_block_merge(false, true, false, 1, false);
     assert!(result.is_ok());
     assert!(result.unwrap()); // Should block
     
-    let result = MergeBlocker::should_block_merge(true, false, false);
+    let result = MergeBlocker::should_block_merge(true, false, false, 1, false);
     assert!(result.is_ok());
     assert!(result.unwrap()); // Should block
     
-    let result = MergeBlocker::should_block_merge(false, false, false);
+    let result = MergeBlocker::should_block_merge(false, false, false, 1, false);
     assert!(result.is_ok());
     assert!(result.unwrap()); // Should block
 }
@@ -262,15 +262,15 @@ async fn test_merge_blocker_normal_mode() {
 #[tokio::test]
 async fn test_merge_blocker_emergency_mode() {
     // Test emergency mode - only signatures matter
-    let result = MergeBlocker::should_block_merge(false, true, true);
+    let result = MergeBlocker::should_block_merge(false, true, false, 4, true);
     assert!(result.is_ok());
     assert!(!result.unwrap()); // Should not block (signatures met)
     
-    let result = MergeBlocker::should_block_merge(true, false, true);
+    let result = MergeBlocker::should_block_merge(true, false, false, 4, true);
     assert!(result.is_ok());
     assert!(result.unwrap()); // Should block (signatures not met)
     
-    let result = MergeBlocker::should_block_merge(false, false, true);
+    let result = MergeBlocker::should_block_merge(false, false, false, 4, true);
     assert!(result.is_ok());
     assert!(result.unwrap()); // Should block (signatures not met)
 }

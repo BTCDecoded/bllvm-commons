@@ -172,6 +172,7 @@ impl StatusPublisher {
 mod tests {
     use super::*;
     use tempfile::tempdir;
+    use nostr_sdk::prelude::Keys;
     use std::collections::HashMap;
 
     #[tokio::test]
@@ -180,8 +181,12 @@ mod tests {
         let test_file = temp_dir.path().join("test.txt");
         fs::write(&test_file, "test content").unwrap();
 
+        // Generate valid Nostr keys for testing
+        let keys = Keys::generate();
+        let nsec = keys.secret_key().unwrap().display_secret().to_string();
+
         let publisher = StatusPublisher {
-            client: NostrClient::new("test".to_string(), vec![]).await.unwrap(),
+            client: NostrClient::new(nsec, vec![]).await.unwrap(),
             database: Database::new_in_memory().await.unwrap(),
             server_id: "test".to_string(),
             binary_path: test_file.to_string_lossy().to_string(),
@@ -196,8 +201,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_next_ots_anchor_calculation() {
+        // Generate valid Nostr keys for testing
+        let keys = Keys::generate();
+        let nsec = keys.secret_key().unwrap().display_secret().to_string();
+
         let publisher = StatusPublisher {
-            client: NostrClient::new("test".to_string(), vec![]).await.unwrap(),
+            client: NostrClient::new(nsec, vec![]).await.unwrap(),
             database: Database::new_in_memory().await.unwrap(),
             server_id: "test".to_string(),
             binary_path: "".to_string(),

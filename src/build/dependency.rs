@@ -83,10 +83,20 @@ impl DependencyGraph {
         let mut result = Vec::new();
         
         // Add all nodes with no dependencies
-        for (repo, degree) in &in_degree {
-            if *degree == 0 {
-                queue.push_back(repo.clone());
-            }
+        // Sort to ensure deterministic order (bllvm-consensus should come first)
+        let mut zero_degree_repos: Vec<String> = in_degree
+            .iter()
+            .filter(|(_, degree)| **degree == 0)
+            .map(|(repo, _)| repo.clone())
+            .collect();
+        zero_degree_repos.sort();
+        // Ensure bllvm-consensus comes first if it has no dependencies
+        if zero_degree_repos.contains(&"bllvm-consensus".to_string()) {
+            zero_degree_repos.retain(|r| r != "bllvm-consensus");
+            zero_degree_repos.insert(0, "bllvm-consensus".to_string());
+        }
+        for repo in zero_degree_repos {
+            queue.push_back(repo);
         }
         
         while let Some(repo) = queue.pop_front() {

@@ -2,9 +2,11 @@
 //!
 //! Basic tests to verify the governance system components work correctly
 
-use governance_app::database::Database;
-use governance_app::validation::tier_classification;
+use bllvm_commons::database::Database;
+use bllvm_commons::validation::tier_classification;
 use serde_json::json;
+
+mod common;
 
 #[tokio::test]
 async fn test_database_creation() -> Result<(), Box<dyn std::error::Error>> {
@@ -16,7 +18,7 @@ async fn test_database_creation() -> Result<(), Box<dyn std::error::Error>> {
 
     // Test database operations
     let pool = _db.pool();
-    assert!(!pool.is_closed());
+    assert!(pool.is_some(), "Database pool should be accessible");
     println!("✅ Database pool is accessible");
 
     Ok(())
@@ -97,10 +99,10 @@ async fn test_tier_classification() -> Result<(), Box<dyn std::error::Error>> {
 async fn test_status_check_generation() -> Result<(), Box<dyn std::error::Error>> {
     println!("🧪 Testing status check generation...");
 
-    use governance_app::enforcement::status_checks::StatusCheckGenerator;
+    use bllvm_commons::enforcement::status_checks::StatusCheckGenerator;
 
     // Test review period status
-    let opened_at = chrono::Utc::now() - chrono::Duration::days(10);
+    let opened_at = chrono::Utc::now() - chrono::Duration::try_days(10).unwrap_or_default();
     let review_status = StatusCheckGenerator::generate_review_period_status(
         opened_at, 7,     // required days
         false, // emergency mode
@@ -109,7 +111,7 @@ async fn test_status_check_generation() -> Result<(), Box<dyn std::error::Error>
     println!("✅ Review period status generated: {}", review_status);
 
     // Test signature status
-    let signature_status = StatusCheckGenerator::generate_signature_status(
+    let _signature_status = StatusCheckGenerator::generate_signature_status(
         3, // current signatures
         3, // required signatures
         5, // total maintainers
@@ -120,15 +122,15 @@ async fn test_status_check_generation() -> Result<(), Box<dyn std::error::Error>
         ],
         &["maintainer4".to_string(), "maintainer5".to_string()],
     );
-    assert!(signature_status.contains("Governance: Signatures Complete"));
-    println!("✅ Signature status generated: {}", signature_status);
+    assert!(_signature_status.contains("Governance: Signatures Complete"));
+    println!("✅ Signature status generated: {}", _signature_status);
 
     // Test combined status
     let combined_status = StatusCheckGenerator::generate_combined_status(
         true, // review period met
         true, // signatures met
-        "Feature Changes",
         &review_status,
+        &_signature_status,
     );
     assert!(combined_status.contains("Feature Changes"));
     println!("✅ Combined status generated: {}", combined_status);
@@ -140,9 +142,9 @@ async fn test_status_check_generation() -> Result<(), Box<dyn std::error::Error>
 async fn test_merge_blocking_logic() -> Result<(), Box<dyn std::error::Error>> {
     println!("🧪 Testing merge blocking logic...");
 
-    use governance_app::enforcement::merge_block::MergeBlocker;
-
-    let blocker = MergeBlocker::new(None);
+    use bllvm_commons::enforcement::merge_block::MergeBlocker;
+    use common::create_test_decision_logger;
+    let blocker = MergeBlocker::new(None, create_test_decision_logger());
 
     // Test case: All requirements met
     let should_block_all_met = MergeBlocker::should_block_merge(
@@ -199,7 +201,7 @@ async fn test_merge_blocking_logic() -> Result<(), Box<dyn std::error::Error>> {
 async fn test_threshold_validation() -> Result<(), Box<dyn std::error::Error>> {
     println!("🧪 Testing threshold validation...");
 
-    use governance_app::validation::threshold::ThresholdValidator;
+    use bllvm_commons::validation::threshold::ThresholdValidator;
 
     // Test tier-specific thresholds
     let (required, total) = ThresholdValidator::get_tier_threshold(1);
@@ -233,7 +235,7 @@ async fn test_threshold_validation() -> Result<(), Box<dyn std::error::Error>> {
 async fn test_governance_fork_export() -> Result<(), Box<dyn std::error::Error>> {
     println!("🧪 Testing governance fork export...");
 
-    use governance_app::fork::{export::GovernanceExporter, types::*};
+    use bllvm_commons::fork::{export::GovernanceExporter, types::*};
 
     // Create a temporary config directory for testing
     let temp_dir = tempfile::tempdir()?;
@@ -305,7 +307,7 @@ fork:
     let export = exporter
         .export_governance_config(
             "test-ruleset-v1.0.0",
-            &RulesetVersion::new(1, 0, 0),
+            &bllvm_commons::fork::types::RulesetVersion::new(1, 0, 0),
             "test_exporter",
             "test-repo",
             "abc123def456",
@@ -353,9 +355,9 @@ async fn test_complete_governance_workflow() -> Result<(), Box<dyn std::error::E
     println!("✅ PR classified as Tier 2 (Feature)");
 
     // 3. Test status check generation
-    use governance_app::enforcement::status_checks::StatusCheckGenerator;
+    use bllvm_commons::enforcement::status_checks::StatusCheckGenerator;
 
-    let opened_at = chrono::Utc::now() - chrono::Duration::days(5);
+    let opened_at = chrono::Utc::now() - chrono::Duration::try_days(5).unwrap_or_default();
     let review_status = StatusCheckGenerator::generate_review_period_status(opened_at, 30, false);
     let signature_status = StatusCheckGenerator::generate_signature_status(
         4,
@@ -372,15 +374,15 @@ async fn test_complete_governance_workflow() -> Result<(), Box<dyn std::error::E
     let combined_status = StatusCheckGenerator::generate_combined_status(
         true,
         true,
-        "Feature Changes",
         &review_status,
+        &signature_status,
     );
 
     assert!(combined_status.contains("Feature Changes"));
     println!("✅ Status checks generated");
 
     // 4. Test merge blocking
-    use governance_app::enforcement::merge_block::MergeBlocker;
+    use bllvm_commons::enforcement::merge_block::MergeBlocker;
 
     let should_block = MergeBlocker::should_block_merge(
         true,  // review period met

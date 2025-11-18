@@ -134,12 +134,30 @@ impl AdoptionTracker {
     /// Get comprehensive adoption statistics
     pub async fn get_adoption_statistics(&self) -> Result<AdoptionStatistics, GovernanceError> {
         // Get all unique rulesets
-        let rulesets = sqlx::query("SELECT DISTINCT ruleset_id FROM fork_decisions")
+        // If table doesn't exist or is empty, return empty statistics
+        let rulesets_result = sqlx::query("SELECT DISTINCT ruleset_id FROM fork_decisions")
             .fetch_all(&self.pool)
-            .await
-            .map_err(|e| {
-                GovernanceError::DatabaseError(format!("Failed to fetch rulesets: {}", e))
-            })?;
+            .await;
+        
+        let rulesets = match rulesets_result {
+            Ok(r) => r,
+            Err(e) => {
+                let err_str = e.to_string();
+                // If table doesn't exist, return empty statistics (migrations may not have run)
+                if err_str.contains("no such table") {
+                    return Ok(AdoptionStatistics {
+                        total_nodes: 0,
+                        total_hashpower: 0.0,
+                        total_economic_activity: 0.0,
+                        rulesets: Vec::new(),
+                        winning_ruleset: None,
+                        adoption_percentage: 0.0,
+                        last_updated: Utc::now(),
+                    });
+                }
+                return Err(GovernanceError::DatabaseError(format!("Failed to fetch rulesets: {}", e)));
+            }
+        };
 
         let mut adoption_metrics = Vec::new();
         let mut total_nodes = 0;

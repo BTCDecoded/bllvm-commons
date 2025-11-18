@@ -108,7 +108,7 @@ fn submit_veto(
     reason: &str,
     strength: u8,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    println!("🚫 Submitting veto signal for {}/{}#{}", repo, pr);
+    println!("🚫 Submitting veto signal for {}/{}#{}", repo, pr, pr);
     
     // Validate strength
     if strength == 0 || strength > 100 {
@@ -166,7 +166,7 @@ fn check_veto_status(
     repo: &str,
     pr: u64,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    println!("🔍 Checking veto status for {}/{}#{}", repo, pr);
+    println!("🔍 Checking veto status for {}/{}#{}", repo, pr, pr);
     
     // Look for veto signals for this PR
     let veto_dir = "veto-signals";
@@ -254,6 +254,7 @@ fn list_vetoes(
                             veto["node_name"],
                             veto["repository"],
                             veto["pr_number"],
+                            veto["pr_number"],
                             veto["strength"]
                         );
                         println!("     Reason: {}", veto["reason"]);
@@ -280,7 +281,7 @@ fn withdraw_veto(
     repo: &str,
     pr: u64,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    println!("↩️ Withdrawing veto signal for {}/{}#{}", repo, pr);
+    println!("↩️ Withdrawing veto signal for {}/{}#{}", repo, pr, pr);
     
     // Load private key
     let _private_key = fs::read_to_string(key)?;
@@ -289,7 +290,7 @@ fn withdraw_veto(
     let veto_file = format!("veto-signals/{}_{}_{}.json", repo.replace("/", "_"), pr, node);
     
     if !fs::metadata(&veto_file).is_ok() {
-        return Err(format!("No veto signal found for {}/{}#{} by {}", repo, pr, node).into());
+        return Err(format!("No veto signal found for {}/{}#{} by {}", repo, pr, pr, node).into());
     }
     
     // Load and update veto signal

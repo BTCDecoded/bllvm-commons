@@ -343,7 +343,7 @@ mod tests {
         let genesis = crate::audit::entry::create_genesis_entry("test".to_string());
         entries.push(genesis);
 
-        let mut metadata = HashMap::new();
+        let metadata = HashMap::new();
         let mut entry = AuditLogEntry::new(
             "test-job".to_string(),
             "test_type".to_string(),

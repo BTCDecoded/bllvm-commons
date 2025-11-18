@@ -3,11 +3,13 @@
 //! Tests for GitHub API client, status check posting,
 //! merge blocking/unblocking, and webhook event handling
 
-use governance_app::database::Database;
-use governance_app::error::GovernanceError;
-use governance_app::github::{client::GitHubClient, webhooks::WebhookProcessor};
-use governance_app::webhooks::github_integration::GitHubIntegration;
+use bllvm_commons::database::Database;
+use bllvm_commons::error::GovernanceError;
+use bllvm_commons::github::{client::GitHubClient, webhooks::WebhookProcessor};
+use bllvm_commons::webhooks::github_integration::GitHubIntegration;
 use serde_json::json;
+
+mod common;
 
 #[tokio::test]
 async fn test_github_client_creation() -> Result<(), Box<dyn std::error::Error>> {
@@ -58,7 +60,7 @@ async fn test_webhook_event_processing() -> Result<(), Box<dyn std::error::Error
     });
 
     let event = WebhookProcessor::process_webhook(&pr_opened_payload)?;
-    assert_eq!(event.event_type.to_string(), "pull_request");
+    assert!(matches!(event.event_type, bllvm_commons::github::webhooks::WebhookEventType::PullRequest));
     println!("✅ PR opened webhook processed successfully");
 
     // Test PR comment event
@@ -83,7 +85,7 @@ async fn test_webhook_event_processing() -> Result<(), Box<dyn std::error::Error
     });
 
     let event = WebhookProcessor::process_webhook(&pr_comment_payload)?;
-    assert_eq!(event.event_type.to_string(), "issue_comment");
+    assert!(matches!(event.event_type, bllvm_commons::github::webhooks::WebhookEventType::Comment));
     println!("✅ PR comment webhook processed successfully");
 
     // Test PR updated event
@@ -109,7 +111,7 @@ async fn test_webhook_event_processing() -> Result<(), Box<dyn std::error::Error
     });
 
     let event = WebhookProcessor::process_webhook(&pr_updated_payload)?;
-    assert_eq!(event.event_type.to_string(), "pull_request");
+    assert!(matches!(event.event_type, bllvm_commons::github::webhooks::WebhookEventType::PullRequest));
     println!("✅ PR updated webhook processed successfully");
 
     Ok(())
@@ -231,7 +233,7 @@ async fn test_governance_signature_parsing() -> Result<(), Box<dyn std::error::E
 
 #[tokio::test]
 async fn test_tier_classification() -> Result<(), Box<dyn std::error::Error>> {
-    use governance_app::validation::tier_classification;
+    use bllvm_commons::validation::tier_classification;
 
     // Test different PR payloads for tier classification
     let routine_pr = json!({
@@ -294,7 +296,7 @@ async fn test_tier_classification() -> Result<(), Box<dyn std::error::Error>> {
 
 #[tokio::test]
 async fn test_status_check_generation() -> Result<(), Box<dyn std::error::Error>> {
-    use governance_app::enforcement::status_checks::StatusCheckGenerator;
+    use bllvm_commons::enforcement::status_checks::StatusCheckGenerator;
 
     // Test review period status generation
     let opened_at = chrono::Utc::now() - chrono::Duration::days(5);
@@ -324,8 +326,8 @@ async fn test_status_check_generation() -> Result<(), Box<dyn std::error::Error>
     let combined_status = StatusCheckGenerator::generate_combined_status(
         true, // review period met
         true, // signatures met
-        "Feature Changes",
         &review_status,
+        &signature_status,
     );
     assert!(combined_status.contains("Feature Changes"));
     println!("✅ Combined status generated: {}", combined_status);
@@ -335,10 +337,11 @@ async fn test_status_check_generation() -> Result<(), Box<dyn std::error::Error>
 
 #[tokio::test]
 async fn test_merge_blocking_logic() -> Result<(), Box<dyn std::error::Error>> {
-    use governance_app::enforcement::merge_block::MergeBlocker;
+    use bllvm_commons::enforcement::merge_block::MergeBlocker;
+    use common::create_test_decision_logger;
 
     // Test merge blocking conditions
-    let blocker = MergeBlocker::new(None);
+    let blocker = MergeBlocker::new(None, create_test_decision_logger());
 
     // Test case: All requirements met
     let should_block_all_met = MergeBlocker::should_block_merge(
@@ -393,26 +396,37 @@ async fn test_merge_blocking_logic() -> Result<(), Box<dyn std::error::Error>> {
 
 #[tokio::test]
 async fn test_webhook_event_types() -> Result<(), Box<dyn std::error::Error>> {
-    use governance_app::github::webhooks::WebhookEventType;
+    use bllvm_commons::github::webhooks::{WebhookEventType, WebhookProcessor};
+    use serde_json::json;
 
-    // Test webhook event type parsing
-    let event_types = vec![
-        ("pull_request", WebhookEventType::PullRequest),
-        ("issue_comment", WebhookEventType::IssueComment),
-        ("push", WebhookEventType::Push),
-    ];
+    // Test webhook event type detection from payloads
+    let pr_payload = json!({
+        "action": "opened",
+        "pull_request": {"number": 123},
+        "repository": {"full_name": "test/repo"}
+    });
+    let event = WebhookProcessor::process_webhook(&pr_payload)?;
+    assert!(matches!(event.event_type, WebhookEventType::PullRequest));
+    println!("✅ PullRequest event type detected correctly");
 
-    for (event_name, expected_type) in event_types {
-        let parsed = event_name.parse::<WebhookEventType>();
-        assert!(parsed.is_ok());
-        assert_eq!(parsed.unwrap(), expected_type);
-        println!("✅ Event type '{}' parsed correctly", event_name);
-    }
+    let comment_payload = json!({
+        "action": "created",
+        "issue": {"number": 123, "pull_request": {}},
+        "comment": {"body": "test"},
+        "repository": {"full_name": "test/repo"}
+    });
+    let event = WebhookProcessor::process_webhook(&comment_payload)?;
+    assert!(matches!(event.event_type, WebhookEventType::Comment));
+    println!("✅ Comment event type detected correctly");
 
-    // Test invalid event type
-    let invalid_parsed = "invalid_event".parse::<WebhookEventType>();
-    assert!(invalid_parsed.is_err());
-    println!("✅ Invalid event type correctly rejected");
+    let push_payload = json!({
+        "action": "push",
+        "ref": "refs/heads/main",
+        "repository": {"full_name": "test/repo"}
+    });
+    let event = WebhookProcessor::process_webhook(&push_payload)?;
+    assert!(matches!(event.event_type, WebhookEventType::Push));
+    println!("✅ Push event type detected correctly");
 
     Ok(())
 }

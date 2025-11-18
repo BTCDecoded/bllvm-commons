@@ -114,38 +114,71 @@ pub fn generate_merkle_proof(entries: &[AuditLogEntry], entry_index: usize) -> R
         return Err(anyhow!("Entry index out of range"));
     }
 
+    // Build tree and collect proof hashes by traversing from leaf to root
     let tree = build_merkle_tree(entries)?;
-    let mut proof = Vec::new();
+    let mut proof_hashes = Vec::new();
+    
+    // Rebuild tree structure to find path
     let mut current_index = entry_index;
-    let mut current_level_size = entries.len();
-
-    // Traverse tree to find path to leaf
-    let mut current_node = &tree;
-    while current_node.left.is_some() && current_node.right.is_some() {
-        let left_size = (current_level_size + 1) / 2;
-        
-        if current_index < left_size {
-            // Entry is in left subtree
-            if let Some(right) = &current_node.right {
-                proof.push(right.hash.clone());
+    let mut current_level = entries.len();
+    
+    // Build levels bottom-up to track path
+    let mut levels: Vec<Vec<String>> = vec![entries.iter().map(|e| e.this_log_hash.clone()).collect()];
+    let mut current_entries = entries.len();
+    
+    while current_entries > 1 {
+        let mut next_level = Vec::new();
+        let mut i = 0;
+        while i < current_entries {
+            if i + 1 < current_entries {
+                // Two entries - combine them
+                let combined = format!("{}{}", levels.last().unwrap()[i], levels.last().unwrap()[i + 1]);
+                let mut hasher = Sha256::new();
+                hasher.update(combined.as_bytes());
+                next_level.push(format!("sha256:{}", hex::encode(hasher.finalize())));
+                i += 2;
+            } else {
+                // One entry left - duplicate it
+                let combined = format!("{}{}", levels.last().unwrap()[i], levels.last().unwrap()[i]);
+                let mut hasher = Sha256::new();
+                hasher.update(combined.as_bytes());
+                next_level.push(format!("sha256:{}", hex::encode(hasher.finalize())));
+                i += 1;
             }
-            current_node = current_node.left.as_ref().unwrap();
-            current_level_size = left_size;
-        } else {
-            // Entry is in right subtree
-            if let Some(left) = &current_node.left {
-                proof.push(left.hash.clone());
-            }
-            current_node = current_node.right.as_ref().unwrap();
-            current_index -= left_size;
-            current_level_size = current_level_size - left_size;
         }
+        levels.push(next_level);
+        current_entries = levels.last().unwrap().len();
+    }
+    
+    // Now traverse from leaf to root to collect proof hashes with order info
+    let mut idx = entry_index;
+    let mut proof_order = Vec::new();
+    for level in 0..levels.len() - 1 {
+        let level_size = levels[level].len();
+        let is_left = idx % 2 == 0;
+        
+        if is_left && idx + 1 < level_size {
+            // We're on the left, add right sibling (current_hash + proof_hash)
+            proof_hashes.push(levels[level][idx + 1].clone());
+            proof_order.push(true); // current is on left
+        } else if !is_left {
+            // We're on the right, add left sibling (proof_hash + current_hash)
+            proof_hashes.push(levels[level][idx - 1].clone());
+            proof_order.push(false); // current is on right
+        } else if is_left && idx + 1 >= level_size {
+            // Odd number, duplicate last entry (current_hash + current_hash)
+            proof_hashes.push(levels[level][idx].clone());
+            proof_order.push(true); // current is on left
+        }
+        
+        idx = idx / 2;
     }
 
     Ok(MerkleProof {
         leaf_hash: entries[entry_index].this_log_hash.clone(),
-        proof_hashes: proof,
+        proof_hashes,
         root_hash: tree.hash,
+        proof_order,
     })
 }
 
@@ -153,9 +186,18 @@ pub fn generate_merkle_proof(entries: &[AuditLogEntry], entry_index: usize) -> R
 pub fn verify_merkle_proof(proof: &MerkleProof, leaf_hash: &str, root_hash: &str) -> bool {
     let mut current_hash = leaf_hash.to_string();
 
-    for proof_hash in &proof.proof_hashes {
-        // Combine with proof hash (order depends on tree structure)
-        let combined = format!("{}{}", current_hash, proof_hash);
+    for (i, proof_hash) in proof.proof_hashes.iter().enumerate() {
+        // Use the order information if available
+        let is_left = proof.proof_order.get(i).copied().unwrap_or(true);
+        
+        let combined = if is_left {
+            // Current hash is on left: (current_hash, proof_hash)
+            format!("{}{}", current_hash, proof_hash)
+        } else {
+            // Current hash is on right: (proof_hash, current_hash)
+            format!("{}{}", proof_hash, current_hash)
+        };
+        
         let mut hasher = Sha256::new();
         hasher.update(combined.as_bytes());
         current_hash = format!("sha256:{}", hex::encode(hasher.finalize()));
@@ -170,6 +212,10 @@ pub struct MerkleProof {
     pub leaf_hash: String,
     pub proof_hashes: Vec<String>,
     pub root_hash: String,
+    /// Track whether each proof hash is on the left (true) or right (false) side
+    /// When true: combine as (current_hash, proof_hash)
+    /// When false: combine as (proof_hash, current_hash)
+    pub proof_order: Vec<bool>,
 }
 
 impl MerkleProof {

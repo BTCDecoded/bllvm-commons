@@ -7,8 +7,8 @@ use anyhow::{anyhow, Result};
 use std::collections::HashMap;
 use tracing::{debug, info, warn};
 
-use crate::authorization::server::{AuthorizedServer, ServerStatus};
-use crate::ots::anchor::GovernanceRegistry;
+use crate::authorization::server::ServerStatus;
+use crate::ots::anchor::{GovernanceRegistry, AuthorizedServer};
 
 /// Verify if a server is authorized
 pub fn verify_server_authorization(
@@ -139,7 +139,7 @@ impl ServerVerificationResult {
         }
 
         if let Some(server) = &self.server_info {
-            status.push(format!("Server: {}", server.summary()));
+            status.push(format!("Server: {} ({})", server.server_id, server.status));
         }
 
         status.join("\n")
@@ -247,7 +247,7 @@ impl ServerStatistics {
 }
 
 /// Validate server configuration
-pub fn validate_server_config(server: &AuthorizedServer) -> Result<()> {
+pub fn validate_server_config(server: &crate::ots::anchor::AuthorizedServer) -> Result<()> {
     // Check required fields
     if server.server_id.is_empty() {
         return Err(anyhow!("Server ID cannot be empty"));
@@ -297,43 +297,41 @@ mod tests {
             authorized_servers: vec![
                 AuthorizedServer {
                     server_id: "governance-01".to_string(),
-                    operator: crate::authorization::server::OperatorInfo {
+                    operator: crate::ots::anchor::OperatorInfo {
                         name: "Alice".to_string(),
                         jurisdiction: "United States".to_string(),
                         contact: Some("alice@example.com".to_string()),
                     },
-                    keys: crate::authorization::server::ServerKeys {
+                    keys: crate::ots::anchor::ServerKeys {
                         nostr_npub: "npub1abc123".to_string(),
                         ssh_fingerprint: "SHA256:xyz789".to_string(),
                     },
-                    infrastructure: crate::authorization::server::InfrastructureInfo {
+                    infrastructure: crate::ots::anchor::InfrastructureInfo {
                         vpn_ip: Some("10.0.0.2".to_string()),
                         github_runner: true,
                         ots_enabled: true,
                     },
-                    status: ServerStatus::Active,
+                    status: "active".to_string(),
                     added_at: chrono::Utc::now(),
-                    last_verified: None,
                 },
                 AuthorizedServer {
                     server_id: "governance-02".to_string(),
-                    operator: crate::authorization::server::OperatorInfo {
+                    operator: crate::ots::anchor::OperatorInfo {
                         name: "Bob".to_string(),
                         jurisdiction: "European Union".to_string(),
                         contact: Some("bob@example.com".to_string()),
                     },
-                    keys: crate::authorization::server::ServerKeys {
+                    keys: crate::ots::anchor::ServerKeys {
                         nostr_npub: "npub1def456".to_string(),
                         ssh_fingerprint: "SHA256:uvw012".to_string(),
                     },
-                    infrastructure: crate::authorization::server::InfrastructureInfo {
+                    infrastructure: crate::ots::anchor::InfrastructureInfo {
                         vpn_ip: Some("10.0.0.3".to_string()),
                         github_runner: true,
                         ots_enabled: true,
                     },
-                    status: ServerStatus::Compromised,
+                    status: "compromised".to_string(),
                     added_at: chrono::Utc::now(),
-                    last_verified: None,
                 },
             ],
             audit_logs: HashMap::new(),
@@ -393,25 +391,24 @@ mod tests {
 
     #[test]
     fn test_validate_server_config() {
-        let server = AuthorizedServer {
+        let server = crate::ots::anchor::AuthorizedServer {
             server_id: "test".to_string(),
-            operator: crate::authorization::server::OperatorInfo {
+            operator: crate::ots::anchor::OperatorInfo {
                 name: "Test".to_string(),
                 jurisdiction: "Test".to_string(),
                 contact: None,
             },
-            keys: crate::authorization::server::ServerKeys {
+            keys: crate::ots::anchor::ServerKeys {
                 nostr_npub: "npub1test".to_string(),
                 ssh_fingerprint: "SHA256:test".to_string(),
             },
-            infrastructure: crate::authorization::server::InfrastructureInfo {
+            infrastructure: crate::ots::anchor::InfrastructureInfo {
                 vpn_ip: None,
                 github_runner: false,
                 ots_enabled: false,
             },
-            status: ServerStatus::Active,
+            status: "active".to_string(),
             added_at: chrono::Utc::now(),
-            last_verified: None,
         };
 
         assert!(validate_server_config(&server).is_ok());

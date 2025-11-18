@@ -1,4 +1,4 @@
-use governance_app::crypto::*;
+use bllvm_commons::crypto::*;
 use secp256k1::{SecretKey, Secp256k1, PublicKey};
 use rand::rngs::OsRng;
 use std::collections::HashMap;

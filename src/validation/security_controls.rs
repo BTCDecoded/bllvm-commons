@@ -134,8 +134,8 @@ impl SecurityControlValidator {
                     
                     affected_controls.push(affected_control);
                     
-                    // Track highest priority
-                    if self.priority_level(&control.priority) > self.priority_level(&max_priority) {
+                    // Track highest priority (lower number = higher priority: P0=0, P1=1, etc.)
+                    if self.priority_level(&control.priority) < self.priority_level(&max_priority) {
                         max_priority = control.priority.clone();
                     }
                     
@@ -187,8 +187,85 @@ impl SecurityControlValidator {
 
     /// Simple glob pattern matching
     fn matches_pattern(&self, file: &str, pattern: &str) -> Result<bool> {
-        // Handle ** glob patterns
+        // Handle ** glob patterns (recursive directory matching)
         if pattern.contains("**") {
+            // Convert ** pattern to proper matching
+            // e.g., "bllvm-protocol/**/*.rs" should match "bllvm-protocol/src/lib.rs"
+            let parts: Vec<&str> = pattern.split("**").collect();
+            if parts.len() == 2 {
+                let prefix = parts[0].trim_end_matches('/');
+                let suffix = parts[1].trim_start_matches('/');
+                
+                // Normalize: ensure prefix comparison works
+                let normalized_prefix = if prefix.ends_with('/') {
+                    &prefix[..prefix.len()-1]
+                } else {
+                    prefix
+                };
+                
+                // Check if file contains normalized prefix (works with absolute paths)
+                // For absolute paths, check if any path segment matches
+                if !file.contains(normalized_prefix) {
+                    return Ok(false);
+                }
+                
+                // Find the position where prefix appears in file
+                let prefix_pos = file.find(normalized_prefix).unwrap_or(0);
+                
+                // Get remaining part after prefix (skip the / if present)
+                let remaining_start = if file.len() > prefix_pos + normalized_prefix.len() {
+                    let next_char_pos = prefix_pos + normalized_prefix.len();
+                    let next_char = file.chars().nth(next_char_pos);
+                    if next_char == Some('/') {
+                        next_char_pos + 1
+                    } else {
+                        next_char_pos
+                    }
+                } else {
+                    prefix_pos + normalized_prefix.len()
+                };
+                
+                let remaining = if file.len() > remaining_start {
+                    &file[remaining_start..]
+                } else {
+                    ""
+                };
+                
+                // For suffix like "/*.rs", we need to match any path ending with .rs
+                // The pattern "bllvm-protocol/**/*.rs" means: prefix + any dirs + / + *.rs
+                if suffix.starts_with("/*") {
+                    // Pattern like "/*.rs" - match any file ending with .rs
+                    let file_extension = suffix.strip_prefix("/*").unwrap_or(suffix);
+                    // ** matches any directories, so remaining just needs to end with extension
+                    // Also handle case where suffix is "*.rs" (without leading /)
+                    if remaining.ends_with(file_extension) {
+                        return Ok(true);
+                    }
+                    // Try without the leading / in suffix
+                    if suffix.starts_with("*") {
+                        let alt_extension = suffix.strip_prefix("*").unwrap_or(suffix);
+                        if remaining.ends_with(alt_extension) {
+                            return Ok(true);
+                        }
+                    }
+                } else if suffix.starts_with("*") {
+                    // Pattern like "*.rs" - match any file ending with .rs
+                    let file_extension = suffix.strip_prefix("*").unwrap_or(suffix);
+                    if remaining.ends_with(file_extension) {
+                        return Ok(true);
+                    }
+                } else if suffix.is_empty() {
+                    // Pattern like "**" at the end - matches everything after prefix
+                    return Ok(true);
+                } else {
+                    // Simple suffix match - check if remaining ends with suffix
+                    // For patterns like "**/file.rs", suffix is "/file.rs"
+                    if remaining.ends_with(suffix) || remaining == suffix.trim_start_matches('/') {
+                        return Ok(true);
+                    }
+                }
+            }
+            // Fallback to simple replacement
             let pattern = pattern.replace("**", "*");
             return Ok(self.simple_glob_match(file, &pattern));
         }
@@ -449,6 +526,7 @@ pub struct PlaceholderViolation {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tempfile::tempdir;
 
     #[test]
     fn test_file_pattern_matching() {
@@ -482,18 +560,21 @@ mod tests {
     fn test_placeholder_detection() {
         let validator = create_test_validator();
         
-        // Create a temporary file with placeholder
-        let temp_file = "/tmp/test_security.rs";
-        std::fs::write(temp_file, "// TODO: Implement actual cryptographic verification\nlet key = 0x02[PLACEHOLDER_64_CHAR_HEX];").unwrap();
+        // Create a temporary file with placeholder that matches the security control pattern
+        // Use a relative path that matches the pattern "bllvm-protocol/**/*.rs"
+        let temp_dir = tempfile::tempdir().unwrap();
+        let test_dir = temp_dir.path().join("bllvm-protocol").join("src");
+        std::fs::create_dir_all(&test_dir).unwrap();
+        let temp_file = test_dir.join("test_security.rs");
+        std::fs::write(&temp_file, "// TODO: Implement actual cryptographic verification\nlet key = 0x02[PLACEHOLDER_64_CHAR_HEX];").unwrap();
         
-        let violations = validator.check_for_placeholders(&[temp_file.to_string()]).unwrap();
+        // Use the file path relative to temp_dir to match the pattern
+        let file_path = temp_file.to_string_lossy().to_string();
+        let violations = validator.check_for_placeholders(&[file_path]).unwrap();
         
         assert!(!violations.is_empty());
         assert!(violations.iter().any(|v| v.pattern == "TODO: Implement"));
         assert!(violations.iter().any(|v| v.pattern == "0x02[PLACEHOLDER"));
-        
-        // Cleanup
-        std::fs::remove_file(temp_file).unwrap();
     }
 
     fn create_test_validator() -> SecurityControlValidator {

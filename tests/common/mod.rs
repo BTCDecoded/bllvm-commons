@@ -1,5 +1,7 @@
-use governance_app::database::Database;
-use governance_app::crypto::{SignatureManager, MultisigManager};
+use bllvm_commons::database::Database;
+use bllvm_commons::crypto::signatures::SignatureManager;
+use bllvm_commons::crypto::multisig::MultisigManager;
+use bllvm_commons::enforcement::decision_log::DecisionLogger;
 use secp256k1::{SecretKey, Secp256k1, PublicKey};
 use rand::rngs::OsRng;
 use std::collections::HashMap;
@@ -18,6 +20,11 @@ pub fn create_test_signature_manager() -> SignatureManager {
 /// Create a test multisig manager
 pub fn create_test_multisig_manager() -> MultisigManager {
     MultisigManager::new()
+}
+
+/// Create a test decision logger
+pub fn create_test_decision_logger() -> DecisionLogger {
+    DecisionLogger::new(true, false, None)
 }
 
 /// Generate test keypairs for testing

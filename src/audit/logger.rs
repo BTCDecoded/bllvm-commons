@@ -39,11 +39,17 @@ impl AuditLogger {
             .map_err(|e| anyhow!("Failed to open audit log file: {}", e))?;
 
         let logger = Self {
-            log_path,
+            log_path: log_path.clone(),
             file: Arc::new(Mutex::new(Some(file))),
             head_hash: Arc::new(Mutex::new(String::new())),
             entry_count: Arc::new(Mutex::new(0)),
         };
+
+        // Initialize if file is new (synchronous initialization)
+        let path = Path::new(&log_path);
+        if path.metadata().map(|m| m.len() == 0).unwrap_or(true) {
+            // File is new or empty, will be initialized on first append
+        }
 
         Ok(logger)
     }
@@ -97,7 +103,9 @@ impl AuditLogger {
     /// Load existing entries to initialize head hash and count
     async fn load_existing_entries(&self) -> Result<()> {
         let path = Path::new(&self.log_path);
-        if !path.exists() {
+        let file_size = path.metadata().map(|m| m.len()).unwrap_or(0);
+        
+        if !path.exists() || file_size == 0 {
             // Create genesis entry for new log
             let genesis = crate::audit::entry::create_genesis_entry("governance-01".to_string());
             self.append_entry(genesis).await?;
@@ -225,7 +233,9 @@ mod tests {
         let temp_dir = tempdir().unwrap();
         let log_path = temp_dir.path().join("audit.log").to_string_lossy().to_string();
         
-        let logger = AuditLogger::new(log_path).await.unwrap();
+        let logger = AuditLogger::new(log_path).unwrap();
+        // Initialize by loading existing entries (which will create genesis if empty)
+        logger.load_existing_entries().await.unwrap();
         assert_eq!(logger.get_entry_count().await, 1); // Genesis entry
     }
 
@@ -234,7 +244,9 @@ mod tests {
         let temp_dir = tempdir().unwrap();
         let log_path = temp_dir.path().join("audit.log").to_string_lossy().to_string();
         
-        let logger = AuditLogger::new(log_path).await.unwrap();
+        let logger = AuditLogger::new(log_path).unwrap();
+        // Initialize by loading existing entries (which will create genesis if empty)
+        logger.load_existing_entries().await.unwrap();
         
         let mut metadata = HashMap::new();
         metadata.insert("test".to_string(), "value".to_string());
@@ -258,7 +270,9 @@ mod tests {
         let temp_dir = tempdir().unwrap();
         let log_path = temp_dir.path().join("audit.log").to_string_lossy().to_string();
         
-        let logger = AuditLogger::new(log_path).await.unwrap();
+        let logger = AuditLogger::new(log_path).unwrap();
+        // Initialize by loading existing entries (which will create genesis if empty)
+        logger.load_existing_entries().await.unwrap();
         
         // Add multiple entries
         for i in 0..5 {

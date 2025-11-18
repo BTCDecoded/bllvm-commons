@@ -39,7 +39,7 @@ impl EconomicNodeRegistry {
 
         // Calculate initial weight
         let weight = self
-            .calculate_weight(node_type.clone(), qualification_data)
+            .calculate_weight(node_type.clone(), &qualification_data)
             .await?;
 
         // Insert into database

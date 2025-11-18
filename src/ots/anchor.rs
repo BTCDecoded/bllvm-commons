@@ -274,7 +274,7 @@ mod tests {
     async fn test_registry_anchorer_creation() {
         let temp_dir = tempdir().unwrap();
         let ots_client = OtsClient::new("https://alice.btc.calendar.opentimestamps.org".to_string());
-        let database = Database::new_sqlite(":memory:".to_string()).await.unwrap();
+        let database = Database::new_in_memory().await.unwrap();
         
         let anchorer = RegistryAnchorer::new(
             ots_client,

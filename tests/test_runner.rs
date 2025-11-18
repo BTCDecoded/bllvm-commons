@@ -7,7 +7,7 @@ use std::time::Instant;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("🚀 Starting Comprehensive Governance System Tests");
-    println!("=".repeat(60));
+    println!("{}", "=".repeat(60));
 
     let start_time = Instant::now();
     let mut passed = 0;
@@ -23,7 +23,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     for (category_name, test_module) in test_categories {
         println!("\n📋 Running {} Tests", category_name);
-        println!("-".repeat(40));
+        println!("{}", "-".repeat(40));
 
         let category_start = Instant::now();
 
@@ -92,9 +92,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let total_duration = start_time.elapsed();
 
-    println!("\n" + &"=".repeat(60));
+    println!("\n{}", "=".repeat(60));
     println!("📊 Test Results Summary");
-    println!("=".repeat(60));
+    println!("{}", "=".repeat(60));
     println!("✅ Tests Passed: {}", passed);
     println!("❌ Tests Failed: {}", failed);
     println!("⏱️  Total Duration: {:.2}s", total_duration.as_secs_f64());

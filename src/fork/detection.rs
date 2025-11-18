@@ -312,11 +312,14 @@ pub struct ForkDetectionStats {
 mod tests {
     use super::*;
     use tempfile::tempdir;
+    use crate::database::Database;
 
     #[tokio::test]
     async fn test_fork_detection() {
-        let temp_dir = tempdir().unwrap();
-        let adoption_tracker = AdoptionTracker::new().unwrap();
+        let _temp_dir = tempdir().unwrap();
+        let db = Database::new_in_memory().await.unwrap();
+        let pool = db.pool().expect("Database should have SQLite pool").clone();
+        let adoption_tracker = AdoptionTracker::new(pool);
         let mut detector = ForkDetector::new(adoption_tracker, None);
         
         // Test with empty adoption stats
@@ -324,10 +327,12 @@ mod tests {
         assert_eq!(detections.len(), 0);
     }
 
-    #[test]
-    fn test_threshold_checking() {
-        let temp_dir = tempdir().unwrap();
-        let adoption_tracker = AdoptionTracker::new().unwrap();
+    #[tokio::test]
+    async fn test_threshold_checking() {
+        let _temp_dir = tempdir().unwrap();
+        let db = Database::new_in_memory().await.unwrap();
+        let pool = db.pool().expect("Database should have SQLite pool").clone();
+        let adoption_tracker = AdoptionTracker::new(pool);
         let detector = ForkDetector::new(adoption_tracker, None);
         
         let metrics = AdoptionMetrics {

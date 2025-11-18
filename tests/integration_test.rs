@@ -1,8 +1,8 @@
 //! Integration tests for governance-app
 //! Tests the core functionality with test data
 
-use governance_app::database::Database;
-use governance_app::validation::tier_classification;
+use bllvm_commons::database::Database;
+use bllvm_commons::validation::tier_classification;
 use serde_json::json;
 
 #[tokio::test]
@@ -57,7 +57,7 @@ async fn test_database_operations() {
 #[tokio::test]
 async fn test_signature_verification() {
     use bllvm_sdk::governance::GovernanceKeypair;
-    use governance_app::crypto::signatures::SignatureManager;
+    use bllvm_commons::crypto::signatures::SignatureManager;
 
     // Generate test keypair
     let keypair = GovernanceKeypair::generate().expect("Failed to generate keypair");

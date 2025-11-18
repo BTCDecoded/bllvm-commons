@@ -1,7 +1,7 @@
-use governance_app::database::Database;
-use governance_app::validation::*;
-use governance_app::enforcement::*;
-use governance_app::crypto::*;
+use bllvm_commons::database::Database;
+use bllvm_commons::validation::*;
+use bllvm_commons::enforcement::*;
+use bllvm_commons::crypto::*;
 use chrono::{DateTime, Utc, Duration};
 use secp256k1::{SecretKey, Secp256k1, PublicKey};
 use rand::rngs::OsRng;
@@ -58,7 +58,7 @@ async fn test_complete_pr_lifecycle() {
     
     // Step 5: Check if merge should be blocked
     let signatures_met = result.unwrap();
-    let should_block = MergeBlocker::should_block_merge(review_period_met, signatures_met, false).unwrap();
+    let should_block = MergeBlocker::should_block_merge(review_period_met, signatures_met, false, 1, false).unwrap();
     
     // For a new PR, it should be blocked due to review period
     assert!(should_block);
@@ -117,7 +117,7 @@ async fn test_emergency_mode_activation() {
     let review_period_met = ReviewPeriodValidator::validate_review_period(pr.opened_at, review_period_days, true).is_ok();
     let signatures_met = signatures.len() >= 4; // Emergency threshold
     
-    let should_block = MergeBlocker::should_block_merge(review_period_met, signatures_met, true).unwrap();
+    let should_block = MergeBlocker::should_block_merge(review_period_met, signatures_met, false, 4, true).unwrap();
     
     // Should not be blocked in emergency mode if signatures are met
     assert!(!should_block);
@@ -230,7 +230,7 @@ async fn test_review_period_with_emergency_tier_override() {
     assert_eq!(emergency_period, 30); // Emergency mode period
     
     // Step 4: Test with different emergency tiers
-    use governance_app::validation::emergency::*;
+    use bllvm_commons::validation::emergency::*;
     
     // Critical tier (0 days review)
     assert_eq!(EmergencyTier::Critical.review_period_days(), 0);
@@ -385,7 +385,7 @@ async fn test_migration_rollback_scenarios() {
     let db = setup_test_db().await;
     
     // Verify database was created successfully
-    assert!(db.pool.is_closed() == false);
+    assert!(db.pool().is_some(), "Database pool should be accessible");
     
     // Test that we can create and query data
     let repo_name = "BTCDecoded/test-migration";

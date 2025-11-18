@@ -1,5 +1,5 @@
-use governance_app::database::Database;
-use governance_app::database::models::*;
+use bllvm_commons::database::Database;
+use bllvm_commons::database::models::*;
 use chrono::{DateTime, Utc, Duration};
 use serde_json::json;
 
@@ -11,7 +11,7 @@ async fn test_database_creation_and_migration() {
     let db = setup_test_db().await;
     
     // Test that database was created successfully
-    assert!(db.pool.is_closed() == false);
+    assert!(db.pool().is_some(), "Database pool should be accessible");
 }
 
 #[tokio::test]
@@ -210,7 +210,7 @@ async fn test_migration_execution() {
     let db = setup_test_db().await;
     
     // If we get here without error, migrations executed successfully
-    assert!(db.pool.is_closed() == false);
+    assert!(db.pool().is_some(), "Database pool should be accessible");
 }
 
 #[tokio::test]
