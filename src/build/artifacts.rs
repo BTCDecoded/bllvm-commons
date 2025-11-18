@@ -187,3 +187,78 @@ impl ArtifactCollector {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::github::client::GitHubClient;
+    use tempfile::tempdir;
+
+    fn create_test_github_client() -> GitHubClient {
+        let temp_dir = tempdir().unwrap();
+        let private_key_path = temp_dir.path().join("test_key.pem");
+        std::fs::write(&private_key_path, "-----BEGIN PRIVATE KEY-----\nMOCK_KEY\n-----END PRIVATE KEY-----").unwrap();
+        GitHubClient::new(123456, private_key_path.to_str().unwrap()).unwrap()
+    }
+
+    #[test]
+    fn test_artifact_collector_new() {
+        let github_client = create_test_github_client();
+        let collector = ArtifactCollector::new(github_client, "BTCDecoded".to_string());
+        
+        assert_eq!(collector.organization, "BTCDecoded");
+    }
+
+    #[test]
+    fn test_artifact_creation() {
+        let artifact = Artifact {
+            name: "test-artifact.zip".to_string(),
+            size: 1024,
+            download_url: "https://example.com/artifact.zip".to_string(),
+            content_type: "application/zip".to_string(),
+            data: None,
+            sha256: None,
+            expires_at: None,
+        };
+        
+        assert_eq!(artifact.name, "test-artifact.zip");
+        assert_eq!(artifact.size, 1024);
+        assert_eq!(artifact.content_type, "application/zip");
+        assert!(artifact.data.is_none());
+        assert!(artifact.sha256.is_none());
+    }
+
+    #[test]
+    fn test_artifact_with_data() {
+        let data = b"test artifact data".to_vec();
+        let artifact = Artifact {
+            name: "test.zip".to_string(),
+            size: data.len() as u64,
+            download_url: "https://example.com/test.zip".to_string(),
+            content_type: "application/zip".to_string(),
+            data: Some(data.clone()),
+            sha256: Some("abc123".to_string()),
+            expires_at: None,
+        };
+        
+        assert_eq!(artifact.data, Some(data));
+        assert_eq!(artifact.sha256, Some("abc123".to_string()));
+    }
+
+    #[test]
+    fn test_artifact_with_expiration() {
+        let expires_at = chrono::Utc::now() + chrono::Duration::hours(24);
+        let artifact = Artifact {
+            name: "expiring.zip".to_string(),
+            size: 512,
+            download_url: "https://example.com/expiring.zip".to_string(),
+            content_type: "application/zip".to_string(),
+            data: None,
+            sha256: None,
+            expires_at: Some(expires_at),
+        };
+        
+        assert!(artifact.expires_at.is_some());
+        assert!(artifact.expires_at.unwrap() > chrono::Utc::now());
+    }
+}
+

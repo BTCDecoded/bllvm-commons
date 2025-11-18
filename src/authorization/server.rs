@@ -287,6 +287,170 @@ mod tests {
         assert_eq!(approval.maintainer_id, 1);
         assert_eq!(approval.action.as_str(), "add");
     }
+
+    #[test]
+    fn test_authorized_server_summary() {
+        let operator = OperatorInfo {
+            name: "Alice".to_string(),
+            jurisdiction: "United States".to_string(),
+            contact: Some("alice@example.com".to_string()),
+        };
+
+        let keys = ServerKeys {
+            nostr_npub: "npub1abc123".to_string(),
+            ssh_fingerprint: "SHA256:xyz789".to_string(),
+        };
+
+        let infrastructure = InfrastructureInfo {
+            vpn_ip: Some("10.0.0.2".to_string()),
+            github_runner: true,
+            ots_enabled: true,
+        };
+
+        let server = AuthorizedServer::new(
+            "governance-01".to_string(),
+            operator,
+            keys,
+            infrastructure,
+        );
+
+        let summary = server.summary();
+        assert!(summary.contains("governance-01"));
+        assert!(summary.contains("Alice"));
+        assert!(summary.contains("United States"));
+    }
+
+    #[test]
+    fn test_authorized_server_verification_info() {
+        let operator = OperatorInfo {
+            name: "Alice".to_string(),
+            jurisdiction: "United States".to_string(),
+            contact: Some("alice@example.com".to_string()),
+        };
+
+        let keys = ServerKeys {
+            nostr_npub: "npub1abc123".to_string(),
+            ssh_fingerprint: "SHA256:xyz789".to_string(),
+        };
+
+        let infrastructure = InfrastructureInfo {
+            vpn_ip: Some("10.0.0.2".to_string()),
+            github_runner: true,
+            ots_enabled: true,
+        };
+
+        let server = AuthorizedServer::new(
+            "governance-01".to_string(),
+            operator,
+            keys,
+            infrastructure,
+        );
+
+        let info = server.verification_info();
+        assert_eq!(info.get("server_id"), Some(&"governance-01".to_string()));
+        assert_eq!(info.get("nostr_npub"), Some(&"npub1abc123".to_string()));
+        assert_eq!(info.get("ssh_fingerprint"), Some(&"SHA256:xyz789".to_string()));
+        assert_eq!(info.get("status"), Some(&"active".to_string()));
+    }
+
+    #[test]
+    fn test_server_status_display() {
+        assert_eq!(ServerStatus::Active.to_string(), "active");
+        assert_eq!(ServerStatus::Compromised.to_string(), "compromised");
+        assert_eq!(ServerStatus::Inactive.to_string(), "inactive");
+        assert_eq!(ServerStatus::Retiring.to_string(), "retiring");
+    }
+
+    #[test]
+    fn test_server_action_from_str() {
+        assert_eq!("add".parse::<ServerAction>().unwrap(), ServerAction::Add);
+        assert_eq!("remove".parse::<ServerAction>().unwrap(), ServerAction::Remove);
+        assert_eq!("compromise".parse::<ServerAction>().unwrap(), ServerAction::Compromise);
+        assert!("invalid".parse::<ServerAction>().is_err());
+    }
+
+    #[test]
+    fn test_server_approval_summary() {
+        let approval = ServerApproval::new(
+            "governance-01".to_string(),
+            1,
+            ServerAction::Add,
+            "sig123".to_string(),
+        );
+
+        let summary = approval.summary();
+        assert!(summary.contains("governance-01"));
+        assert!(summary.contains("add"));
+        assert!(summary.contains("1"));
+    }
+
+    #[test]
+    fn test_authorized_server_compromised() {
+        let operator = OperatorInfo {
+            name: "Bob".to_string(),
+            jurisdiction: "EU".to_string(),
+            contact: None,
+        };
+
+        let keys = ServerKeys {
+            nostr_npub: "npub1def456".to_string(),
+            ssh_fingerprint: "SHA256:uvw012".to_string(),
+        };
+
+        let infrastructure = InfrastructureInfo {
+            vpn_ip: None,
+            github_runner: false,
+            ots_enabled: false,
+        };
+
+        let mut server = AuthorizedServer::new(
+            "governance-02".to_string(),
+            operator,
+            keys,
+            infrastructure,
+        );
+        
+        // Server starts as active
+        assert!(server.is_authorized());
+        assert!(!server.is_compromised());
+        
+        // Mark as compromised
+        server.status = ServerStatus::Compromised;
+        assert!(!server.is_authorized());
+        assert!(server.is_compromised());
+    }
+
+    #[test]
+    fn test_authorized_server_inactive() {
+        let operator = OperatorInfo {
+            name: "Charlie".to_string(),
+            jurisdiction: "UK".to_string(),
+            contact: None,
+        };
+
+        let keys = ServerKeys {
+            nostr_npub: "npub1ghi789".to_string(),
+            ssh_fingerprint: "SHA256:rst345".to_string(),
+        };
+
+        let infrastructure = InfrastructureInfo {
+            vpn_ip: None,
+            github_runner: false,
+            ots_enabled: false,
+        };
+
+        let mut server = AuthorizedServer::new(
+            "governance-03".to_string(),
+            operator,
+            keys,
+            infrastructure,
+        );
+        
+        // Mark as inactive
+        server.status = ServerStatus::Inactive;
+        assert!(!server.is_authorized());
+        assert!(!server.is_compromised());
+    }
 }
 
 // Conversion from ots::anchor::AuthorizedServer to authorization::server::AuthorizedServer

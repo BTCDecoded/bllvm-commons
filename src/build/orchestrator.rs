@@ -416,3 +416,78 @@ impl BuildOrchestrator {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::database::Database;
+    use crate::github::client::GitHubClient;
+    use tempfile::tempdir;
+
+    fn create_test_github_client() -> GitHubClient {
+        let temp_dir = tempdir().unwrap();
+        let private_key_path = temp_dir.path().join("test_key.pem");
+        std::fs::write(&private_key_path, "-----BEGIN PRIVATE KEY-----\nMOCK_KEY\n-----END PRIVATE KEY-----").unwrap();
+        GitHubClient::new(123456, private_key_path.to_str().unwrap()).unwrap()
+    }
+
+    async fn setup_test_orchestrator() -> (BuildOrchestrator, Database) {
+        let db = Database::new_in_memory().await.unwrap();
+        let github_client = create_test_github_client();
+        let orchestrator = BuildOrchestrator::new(
+            github_client,
+            db.clone(),
+            "BTCDecoded".to_string(),
+        );
+        (orchestrator, db)
+    }
+
+    #[tokio::test]
+    async fn test_build_orchestrator_new() {
+        let db = Database::new_in_memory().await.unwrap();
+        let github_client = create_test_github_client();
+        let orchestrator = BuildOrchestrator::new(
+            github_client,
+            db,
+            "BTCDecoded".to_string(),
+        );
+        
+        assert_eq!(orchestrator.organization, "BTCDecoded");
+    }
+
+    #[tokio::test]
+    async fn test_build_orchestrator_has_dependency_graph() {
+        let (orchestrator, _) = setup_test_orchestrator().await;
+        
+        // Verify dependency graph is initialized
+        let repos = orchestrator.dependency_graph.repositories();
+        assert!(!repos.is_empty());
+        assert!(repos.contains(&"bllvm-consensus".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_build_orchestrator_has_monitor() {
+        let (orchestrator, _) = setup_test_orchestrator().await;
+        
+        // Verify monitor is initialized with correct timeout
+        assert_eq!(orchestrator.monitor.timeout, Duration::from_secs(3600));
+        assert_eq!(orchestrator.monitor.max_retries, 3);
+    }
+
+    #[tokio::test]
+    async fn test_build_orchestrator_has_artifact_collector() {
+        let (orchestrator, _) = setup_test_orchestrator().await;
+        
+        // Verify artifact collector is initialized
+        assert_eq!(orchestrator.artifact_collector.organization, "BTCDecoded");
+    }
+
+    #[tokio::test]
+    async fn test_build_orchestrator_clone() {
+        let (orchestrator1, _) = setup_test_orchestrator().await;
+        let orchestrator2 = orchestrator1.clone();
+        
+        assert_eq!(orchestrator1.organization, orchestrator2.organization);
+        assert_eq!(orchestrator1.dependency_graph.repositories(), orchestrator2.dependency_graph.repositories());
+    }
+}
+

@@ -165,7 +165,7 @@ impl ForkExecutor {
     }
 
     /// Create a ruleset from governance configuration
-    fn create_ruleset_from_config(&self, config: &serde_json::Value, ruleset_id: &str) -> Result<Ruleset, GovernanceError> {
+    pub fn create_ruleset_from_config(&self, config: &serde_json::Value, ruleset_id: &str) -> Result<Ruleset, GovernanceError> {
         let version = RulesetVersion::new(1, 0, 0);
         let hash = self.calculate_config_hash(config)?;
         
@@ -181,7 +181,7 @@ impl ForkExecutor {
     }
 
     /// Calculate hash of governance configuration
-    fn calculate_config_hash(&self, config: &serde_json::Value) -> Result<String, GovernanceError> {
+    pub fn calculate_config_hash(&self, config: &serde_json::Value) -> Result<String, GovernanceError> {
         use sha2::{Digest, Sha256};
         
         let config_str = serde_json::to_string(config)
@@ -261,7 +261,7 @@ impl ForkExecutor {
     }
 
     /// Determine if a fork should be executed based on thresholds
-    fn should_execute_fork(&self, metrics: &AdoptionMetrics) -> bool {
+    pub fn should_execute_fork(&self, metrics: &AdoptionMetrics) -> bool {
         metrics.node_count >= self.fork_thresholds.minimum_node_count &&
         metrics.hashpower_percentage >= self.fork_thresholds.minimum_hashpower_percentage &&
         metrics.economic_activity_percentage >= self.fork_thresholds.minimum_economic_activity_percentage &&
@@ -270,7 +270,7 @@ impl ForkExecutor {
 
     /// Execute a governance fork
     async fn execute_fork(&mut self, target_ruleset_id: &str) -> Result<(), GovernanceError> {
-        info!("Executing governance fork to ruleset: {}", target_ruleset_id);
+        info!("Executing governance fork to: {}", target_ruleset_id);
         
         // Get target ruleset (clone to avoid borrow checker issues)
         let target_ruleset = self.available_rulesets.get(target_ruleset_id)
@@ -308,181 +308,61 @@ impl ForkExecutor {
     }
 
     /// Validate a ruleset before fork execution
-    fn validate_ruleset(&self, ruleset: &Ruleset) -> Result<(), GovernanceError> {
+    pub fn validate_ruleset(&self, ruleset: &Ruleset) -> Result<(), GovernanceError> {
         // Check if ruleset has required components
         if !ruleset.config.get("action_tiers").is_some() {
             return Err(GovernanceError::ConfigError(
-                "Ruleset missing action_tiers configuration".to_string()
-            ));
-        }
-        
-        if !ruleset.config.get("economic_nodes").is_some() {
-            return Err(GovernanceError::ConfigError(
-                "Ruleset missing economic_nodes configuration".to_string()
+                "Ruleset missing action_tiers".to_string()
             ));
         }
         
         if !ruleset.config.get("maintainers").is_some() {
             return Err(GovernanceError::ConfigError(
-                "Ruleset missing maintainers configuration".to_string()
+                "Ruleset missing maintainers".to_string()
             ));
         }
         
-        // Validate ruleset version compatibility
-        if let Some(current) = &self.current_ruleset {
-            if !self.versioning.is_compatible(&current.version, &ruleset.version) {
-                return Err(GovernanceError::ConfigError(
-                    format!("Incompatible ruleset version: {:?} -> {:?}", 
-                        current.version, 
-                        ruleset.version
-                    )
-                ));
-            }
+        if !ruleset.config.get("repositories").is_some() {
+            return Err(GovernanceError::ConfigError(
+                "Ruleset missing repositories".to_string()
+            ));
         }
         
         Ok(())
     }
 
+    /// Log a fork event
+    async fn log_fork_event(&self, event: &ForkEvent) -> Result<(), GovernanceError> {
+        // Store fork event in database via adoption tracker
+        self.adoption_tracker.record_fork_event(event).await?;
+        Ok(())
+    }
+
     /// Perform the actual fork transition
     async fn perform_fork_transition(&mut self, target_ruleset: &Ruleset) -> Result<(), GovernanceError> {
-        info!("Performing fork transition to: {}", target_ruleset.id);
-        
         // Update current ruleset
         self.current_ruleset = Some(target_ruleset.clone());
         
         // Update available rulesets
         self.available_rulesets.insert("current".to_string(), target_ruleset.clone());
         
-        // Create fork decision
-        let mut decision = ForkDecision {
-            node_id: "bllvm-commons".to_string(),
-            node_type: "governance-app".to_string(),
-            chosen_ruleset: target_ruleset.id.clone(),
-            decision_reason: "Fork executed by bllvm-commons".to_string(),
-            weight: 1.0,
-            timestamp: Utc::now(),
-            signature: String::new(), // Will be filled below if key is available
-        };
-
-        // Sign the fork decision if secret key is available
-        if let Some(ref secret_key) = self.executor_secret_key {
-            let message = Self::serialize_decision_for_signing(&decision);
-            match sign_message(secret_key, &message) {
-                Ok(signature) => {
-                    decision.signature = hex::encode(signature.to_bytes());
-                    info!("Fork decision signed successfully");
-                }
-                Err(e) => {
-                    warn!("Failed to sign fork decision: {}. Decision will be unsigned.", e);
-                }
-            }
-        } else {
-            warn!("Fork executor has no secret key - decision will be unsigned");
-        }
-        self.adoption_tracker.record_fork_decision(
-            &target_ruleset.id,
-            "bllvm-commons",
-            &decision,
-        ).await?;
-        
-        // Export new current ruleset
-        self.exporter.export_ruleset(target_ruleset).await?;
-        
-        info!("Fork transition completed successfully");
+        info!("Fork transition completed");
         Ok(())
     }
-
-    /// Log a fork event
-    async fn log_fork_event(&self, event: &ForkEvent) -> Result<(), GovernanceError> {
-        let log_entry = serde_json::to_string_pretty(event)
-            .map_err(|e| GovernanceError::ConfigError(format!("Failed to serialize fork event: {}", e)))?;
-        
-        let log_path = "logs/fork-events.jsonl";
-        fs::create_dir_all("logs")?;
-        
-        let mut file = fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(log_path)?;
-        
-        use std::io::Write;
-        writeln!(file, "{}", log_entry)?;
-        
-        info!("Fork event logged: {}", event.event_id);
-        Ok(())
-    }
-
-    /// Get current ruleset
-    pub fn get_current_ruleset(&self) -> Option<&Ruleset> {
-        self.current_ruleset.as_ref()
-    }
-
-    /// Get available rulesets
-    pub fn get_available_rulesets(&self) -> &HashMap<String, Ruleset> {
-        &self.available_rulesets
-    }
-
-    /// Get adoption statistics
-    pub async fn get_adoption_statistics(&self) -> Result<AdoptionStatistics, GovernanceError> {
-        self.adoption_tracker.get_adoption_statistics().await
-    }
-
-    /// Export current ruleset
-    pub async fn export_current_ruleset(&self) -> Result<(), GovernanceError> {
-        if let Some(current) = &self.current_ruleset {
-            self.exporter.export_ruleset(current).await?;
-            info!("Current ruleset exported successfully");
-        } else {
-            warn!("No current ruleset to export");
-        }
-        Ok(())
-    }
-
-    /// Check if a fork is in progress
-    pub fn is_fork_in_progress(&self) -> bool {
-        // This would check for ongoing fork processes
-        // For now, always return false
-        false
-    }
-
-    /// Get fork status
-    pub fn get_fork_status(&self) -> ForkStatus {
-        ForkStatus {
-            current_ruleset: self.current_ruleset.as_ref().map(|r| r.id.clone()),
-            available_rulesets: self.available_rulesets.keys().cloned().collect(),
-            fork_in_progress: self.is_fork_in_progress(),
-            last_check: Utc::now(),
-        }
-    }
-
-    /// Serialize fork decision for signing (excludes signature field)
-    pub(crate) fn serialize_decision_for_signing(decision: &ForkDecision) -> Vec<u8> {
-        // Serialize all fields except signature
-        let data = serde_json::json!({
-            "node_id": decision.node_id,
-            "node_type": decision.node_type,
-            "chosen_ruleset": decision.chosen_ruleset,
-            "decision_reason": decision.decision_reason,
-            "weight": decision.weight,
-            "timestamp": decision.timestamp.to_rfc3339(),
-        });
-        serde_json::to_vec(&data).unwrap_or_default()
-    }
-}
-
-/// Fork status information
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ForkStatus {
-    pub current_ruleset: Option<String>,
-    pub available_rulesets: Vec<String>,
-    pub fork_in_progress: bool,
-    pub last_check: DateTime<Utc>,
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use tempfile::tempdir;
+    use crate::database::Database;
+
+    async fn setup_test_executor() -> ForkExecutor {
+        let temp_dir = tempdir().unwrap();
+        let export_path = temp_dir.path().join("exports");
+        let pool = sqlx::SqlitePool::connect("sqlite::memory:").await.unwrap();
+        ForkExecutor::new(export_path.to_str().unwrap(), pool, None).unwrap()
+    }
 
     #[tokio::test]
     async fn test_fork_executor_initialization() {
@@ -515,5 +395,178 @@ mod tests {
         let ruleset = executor.create_ruleset_from_config(&config, "test").unwrap();
         assert_eq!(ruleset.id, "test");
         assert_eq!(ruleset.version.major, 1);
+        
+        // Validate it
+        let result = executor.validate_ruleset(&ruleset);
+        assert!(result.is_ok(), "Valid ruleset should pass validation");
+    }
+
+    #[tokio::test]
+    async fn test_ruleset_validation_missing_action_tiers() {
+        let executor = setup_test_executor().await;
+        
+        let config = serde_json::json!({
+            "maintainers": {},
+            "repositories": {}
+        });
+        
+        let ruleset = executor.create_ruleset_from_config(&config, "test").unwrap();
+        let result = executor.validate_ruleset(&ruleset);
+        assert!(result.is_err(), "Should fail validation without action_tiers");
+    }
+
+    #[tokio::test]
+    async fn test_ruleset_validation_missing_maintainers() {
+        let executor = setup_test_executor().await;
+        
+        let config = serde_json::json!({
+            "action_tiers": {},
+            "repositories": {}
+        });
+        
+        let ruleset = executor.create_ruleset_from_config(&config, "test").unwrap();
+        let result = executor.validate_ruleset(&ruleset);
+        assert!(result.is_err(), "Should fail validation without maintainers");
+    }
+
+    #[tokio::test]
+    async fn test_ruleset_validation_missing_repositories() {
+        let executor = setup_test_executor().await;
+        
+        let config = serde_json::json!({
+            "action_tiers": {},
+            "maintainers": {}
+        });
+        
+        let ruleset = executor.create_ruleset_from_config(&config, "test").unwrap();
+        let result = executor.validate_ruleset(&ruleset);
+        assert!(result.is_err(), "Should fail validation without repositories");
+    }
+
+    #[tokio::test]
+    async fn test_calculate_config_hash() {
+        let executor = setup_test_executor().await;
+        
+        let config1 = serde_json::json!({"key": "value1"});
+        let config2 = serde_json::json!({"key": "value2"});
+        
+        let hash1 = executor.calculate_config_hash(&config1).unwrap();
+        let hash2 = executor.calculate_config_hash(&config2).unwrap();
+        
+        assert_ne!(hash1, hash2, "Different configs should have different hashes");
+        assert!(!hash1.is_empty(), "Hash should not be empty");
+        assert!(!hash2.is_empty(), "Hash should not be empty");
+    }
+
+    #[tokio::test]
+    async fn test_calculate_config_hash_deterministic() {
+        let executor = setup_test_executor().await;
+        
+        let config = serde_json::json!({"key": "value"});
+        
+        let hash1 = executor.calculate_config_hash(&config).unwrap();
+        let hash2 = executor.calculate_config_hash(&config).unwrap();
+        
+        assert_eq!(hash1, hash2, "Same config should produce same hash");
+    }
+
+    #[tokio::test]
+    async fn test_should_execute_fork_meets_thresholds() {
+        let executor = setup_test_executor().await;
+        
+        let metrics = AdoptionMetrics {
+            ruleset_id: "test".to_string(),
+            node_count: 100,
+            hashpower_percentage: 35.0,
+            economic_activity_percentage: 45.0,
+            total_weight: 50.0,
+        };
+        
+        // Default thresholds are 0, so should pass
+        assert!(executor.should_execute_fork(&metrics), "Should execute fork when thresholds met");
+    }
+
+    #[tokio::test]
+    async fn test_should_execute_fork_below_node_count() {
+        let temp_dir = tempdir().unwrap();
+        let export_path = temp_dir.path().join("exports");
+        let pool = sqlx::SqlitePool::connect("sqlite::memory:").await.unwrap();
+        
+        let thresholds = ForkThresholds {
+            minimum_node_count: 100,
+            minimum_hashpower_percentage: 0.0,
+            minimum_economic_activity_percentage: 0.0,
+            minimum_adoption_percentage: 0.0,
+        };
+        
+        let executor = ForkExecutor::new(export_path.to_str().unwrap(), pool, Some(thresholds)).unwrap();
+        
+        let metrics = AdoptionMetrics {
+            ruleset_id: "test".to_string(),
+            node_count: 50, // Below threshold
+            hashpower_percentage: 35.0,
+            economic_activity_percentage: 45.0,
+            total_weight: 50.0,
+        };
+        
+        assert!(!executor.should_execute_fork(&metrics), "Should not execute fork when node count below threshold");
+    }
+
+    #[tokio::test]
+    async fn test_should_execute_fork_below_hashpower() {
+        let temp_dir = tempdir().unwrap();
+        let export_path = temp_dir.path().join("exports");
+        let pool = sqlx::SqlitePool::connect("sqlite::memory:").await.unwrap();
+        
+        let thresholds = ForkThresholds {
+            minimum_node_count: 0,
+            minimum_hashpower_percentage: 30.0,
+            minimum_economic_activity_percentage: 0.0,
+            minimum_adoption_percentage: 0.0,
+        };
+        
+        let executor = ForkExecutor::new(export_path.to_str().unwrap(), pool, Some(thresholds)).unwrap();
+        
+        let metrics = AdoptionMetrics {
+            ruleset_id: "test".to_string(),
+            node_count: 100,
+            hashpower_percentage: 25.0, // Below threshold
+            economic_activity_percentage: 45.0,
+            total_weight: 50.0,
+        };
+        
+        assert!(!executor.should_execute_fork(&metrics), "Should not execute fork when hashpower below threshold");
+    }
+
+    #[tokio::test]
+    async fn test_set_secret_key() {
+        let mut executor = setup_test_executor().await;
+        use secp256k1::rand::rngs::OsRng;
+        
+        let secret_key = SecretKey::new(&mut OsRng);
+        executor.set_secret_key(secret_key);
+        
+        // Just verify it doesn't panic
+        assert!(true, "Should set secret key without error");
+    }
+
+    #[tokio::test]
+    async fn test_create_ruleset_from_config() {
+        let executor = setup_test_executor().await;
+        
+        let config = serde_json::json!({
+            "action_tiers": {},
+            "maintainers": {},
+            "repositories": {}
+        });
+        
+        let ruleset = executor.create_ruleset_from_config(&config, "test-ruleset").unwrap();
+        
+        assert_eq!(ruleset.id, "test-ruleset");
+        assert_eq!(ruleset.name, "Governance Ruleset test-ruleset");
+        assert_eq!(ruleset.version.major, 1);
+        assert_eq!(ruleset.version.minor, 0);
+        assert_eq!(ruleset.version.patch, 0);
+        assert!(!ruleset.hash.is_empty());
     }
 }

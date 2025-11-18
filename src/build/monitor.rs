@@ -232,3 +232,74 @@ impl Clone for BuildMonitor {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::github::client::GitHubClient;
+    use tempfile::tempdir;
+
+    fn create_test_github_client() -> GitHubClient {
+        let temp_dir = tempdir().unwrap();
+        let private_key_path = temp_dir.path().join("test_key.pem");
+        std::fs::write(&private_key_path, "-----BEGIN PRIVATE KEY-----\nMOCK_KEY\n-----END PRIVATE KEY-----").unwrap();
+        GitHubClient::new(123456, private_key_path.to_str().unwrap()).unwrap()
+    }
+
+    #[test]
+    fn test_build_monitor_new() {
+        let github_client = create_test_github_client();
+        let monitor = BuildMonitor::new(
+            github_client,
+            "BTCDecoded".to_string(),
+            Duration::from_secs(3600),
+            3,
+        );
+        
+        assert_eq!(monitor.organization, "BTCDecoded");
+        assert_eq!(monitor.timeout, Duration::from_secs(3600));
+        assert_eq!(monitor.max_retries, 3);
+        assert_eq!(monitor.poll_interval, Duration::from_secs(10));
+    }
+
+    #[test]
+    fn test_build_monitor_clone() {
+        let github_client = create_test_github_client();
+        let monitor1 = BuildMonitor::new(
+            github_client.clone(),
+            "BTCDecoded".to_string(),
+            Duration::from_secs(1800),
+            5,
+        );
+        let monitor2 = monitor1.clone();
+        
+        assert_eq!(monitor1.organization, monitor2.organization);
+        assert_eq!(monitor1.timeout, monitor2.timeout);
+        assert_eq!(monitor1.max_retries, monitor2.max_retries);
+    }
+
+    #[test]
+    fn test_build_status_equality() {
+        assert_eq!(BuildStatus::Success, BuildStatus::Success);
+        assert_ne!(BuildStatus::Success, BuildStatus::Failure);
+        assert_ne!(BuildStatus::Pending, BuildStatus::InProgress);
+    }
+
+    #[test]
+    fn test_build_state_creation() {
+        let state = BuildState {
+            repo: "test-repo".to_string(),
+            status: BuildStatus::Pending,
+            workflow_run_id: Some(12345),
+            started_at: None,
+            completed_at: None,
+            error: None,
+            retry_count: 0,
+        };
+        
+        assert_eq!(state.repo, "test-repo");
+        assert_eq!(state.status, BuildStatus::Pending);
+        assert_eq!(state.workflow_run_id, Some(12345));
+        assert_eq!(state.retry_count, 0);
+    }
+}
+

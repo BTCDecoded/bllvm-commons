@@ -66,3 +66,38 @@ pub async fn handle_push_event(
         ))
     }
 }
+
+/// Check if a ref is a protected branch (main/master)
+pub fn is_protected_branch(ref_name: &str) -> bool {
+    ref_name == "refs/heads/main" || ref_name == "refs/heads/master"
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_protected_branch_main() {
+        assert!(is_protected_branch("refs/heads/main"));
+    }
+
+    #[test]
+    fn test_is_protected_branch_master() {
+        assert!(is_protected_branch("refs/heads/master"));
+    }
+
+    #[test]
+    fn test_is_protected_branch_feature() {
+        assert!(!is_protected_branch("refs/heads/feature/new-feature"));
+    }
+
+    #[test]
+    fn test_is_protected_branch_develop() {
+        assert!(!is_protected_branch("refs/heads/develop"));
+    }
+
+    #[test]
+    fn test_is_protected_branch_empty() {
+        assert!(!is_protected_branch(""));
+    }
+}

@@ -173,3 +173,70 @@ pub async fn handle_pr_merged(
 
     Ok(())
 }
+
+/// Determine layer from repository name
+pub fn determine_layer(repo_name: &str) -> Option<i32> {
+    if repo_name.contains("bllvm-spec") || repo_name.contains("orange-paper") {
+        Some(1)
+    } else if repo_name.contains("bllvm-consensus") || repo_name.contains("consensus-proof") {
+        Some(2)
+    } else if repo_name.contains("bllvm-protocol") || repo_name.contains("protocol-engine") {
+        Some(3)
+    } else if repo_name.contains("bllvm-node") || repo_name.contains("reference-node") || repo_name.contains("/bllvm") {
+        Some(4)
+    } else if repo_name.contains("bllvm-sdk") || repo_name.contains("developer-sdk") {
+        Some(5)
+    } else if repo_name.contains("bllvm-commons") || repo_name.contains("governance-app") {
+        Some(6)
+    } else {
+        None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_determine_layer_spec() {
+        assert_eq!(determine_layer("BTCDecoded/bllvm-spec"), Some(1));
+        assert_eq!(determine_layer("BTCDecoded/orange-paper"), Some(1));
+    }
+
+    #[test]
+    fn test_determine_layer_consensus() {
+        assert_eq!(determine_layer("BTCDecoded/bllvm-consensus"), Some(2));
+        assert_eq!(determine_layer("BTCDecoded/consensus-proof"), Some(2));
+    }
+
+    #[test]
+    fn test_determine_layer_protocol() {
+        assert_eq!(determine_layer("BTCDecoded/bllvm-protocol"), Some(3));
+        assert_eq!(determine_layer("BTCDecoded/protocol-engine"), Some(3));
+    }
+
+    #[test]
+    fn test_determine_layer_node() {
+        assert_eq!(determine_layer("BTCDecoded/bllvm-node"), Some(4));
+        assert_eq!(determine_layer("BTCDecoded/reference-node"), Some(4));
+        assert_eq!(determine_layer("BTCDecoded/bllvm"), Some(4));
+    }
+
+    #[test]
+    fn test_determine_layer_sdk() {
+        assert_eq!(determine_layer("BTCDecoded/bllvm-sdk"), Some(5));
+        assert_eq!(determine_layer("BTCDecoded/developer-sdk"), Some(5));
+    }
+
+    #[test]
+    fn test_determine_layer_commons() {
+        assert_eq!(determine_layer("BTCDecoded/bllvm-commons"), Some(6));
+        assert_eq!(determine_layer("BTCDecoded/governance-app"), Some(6));
+    }
+
+    #[test]
+    fn test_determine_layer_unknown() {
+        assert_eq!(determine_layer("Unknown/Repository"), None);
+        assert_eq!(determine_layer(""), None);
+    }
+}

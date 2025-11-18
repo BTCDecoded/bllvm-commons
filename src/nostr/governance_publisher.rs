@@ -154,9 +154,55 @@ impl GovernanceActionPublisher {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::nostr::events::EconomicVetoStatus;
+    use crate::nostr::events::{EconomicVetoStatus, GovernanceActionEvent, LayerRequirement, TierRequirement, CombinedRequirement, KeyholderSignature};
 
-    // Note: Full test requires valid Nostr keys and relay connections
-    // This is a placeholder - actual tests should use mock clients
+    fn create_test_publisher() -> GovernanceActionPublisher {
+        // Create a mock client for testing
+        // Note: This won't actually connect to relays
+        let keys = nostr_sdk::prelude::Keys::generate();
+        let client = nostr_sdk::prelude::Client::new(&keys);
+        
+        GovernanceActionPublisher::new(
+            crate::nostr::client::NostrClient {
+                client,
+                keys,
+                relay_status: std::sync::Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new())),
+            },
+            "test-config".to_string(),
+            None,
+        )
+    }
+
+    #[test]
+    fn test_governance_action_publisher_new() {
+        let publisher = create_test_publisher();
+        assert_eq!(publisher.governance_config, "test-config");
+        assert!(publisher.zap_address.is_none());
+    }
+
+    #[test]
+    fn test_governance_action_publisher_with_zap() {
+        let keys = nostr_sdk::prelude::Keys::generate();
+        let client = nostr_sdk::prelude::Client::new(&keys);
+        
+        let publisher = GovernanceActionPublisher::new(
+            crate::nostr::client::NostrClient {
+                client,
+                keys,
+                relay_status: std::sync::Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new())),
+            },
+            "test-config".to_string(),
+            Some("zap@example.com".to_string()),
+        );
+        
+        assert_eq!(publisher.governance_config, "test-config");
+        assert_eq!(publisher.zap_address, Some("zap@example.com".to_string()));
+    }
+
+    #[test]
+    fn test_governance_action_publisher_governance_config() {
+        let publisher = create_test_publisher();
+        assert_eq!(publisher.governance_config(), "test-config");
+    }
 }
 

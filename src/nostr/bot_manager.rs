@@ -138,5 +138,42 @@ mod tests {
         // This test would require actual Nostr keys
         // For now, just verify the structure compiles
     }
+
+    #[test]
+    fn test_resolve_nsec_from_env() {
+        std::env::set_var("TEST_NSEC_VAR", "test_nsec_value");
+        
+        let result = NostrBotManager::resolve_nsec("env:TEST_NSEC_VAR");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "test_nsec_value");
+        
+        std::env::remove_var("TEST_NSEC_VAR");
+    }
+
+    #[test]
+    fn test_resolve_nsec_from_file() {
+        use tempfile::NamedTempFile;
+        use std::io::Write;
+        
+        let mut file = NamedTempFile::new().unwrap();
+        writeln!(file, "test_nsec_from_file").unwrap();
+        let path = file.path().to_str().unwrap().to_string();
+        
+        let result = NostrBotManager::resolve_nsec(&path);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().trim(), "test_nsec_from_file");
+    }
+
+    #[test]
+    fn test_resolve_nsec_invalid_env() {
+        let result = NostrBotManager::resolve_nsec("env:NONEXISTENT_VAR");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_resolve_nsec_invalid_file() {
+        let result = NostrBotManager::resolve_nsec("/nonexistent/path/nsec");
+        assert!(result.is_err());
+    }
 }
 

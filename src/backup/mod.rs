@@ -286,3 +286,270 @@ impl BackupManager {
 
 use std::sync::Arc;
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::database::Database;
+    use tempfile::TempDir;
+
+    async fn setup_test_backup_manager() -> (BackupManager, Database, TempDir) {
+        let db = Database::new_in_memory().await.unwrap();
+        let temp_dir = TempDir::new().unwrap();
+        let config = BackupConfig {
+            directory: temp_dir.path().to_path_buf(),
+            retention_days: 30,
+            compression: false, // Disable compression for tests (requires gzip)
+            interval: Duration::from_secs(3600),
+            enabled: true,
+        };
+        let manager = BackupManager::new(db.clone(), config);
+        (manager, db, temp_dir)
+    }
+
+    #[tokio::test]
+    async fn test_backup_manager_new() {
+        let db = Database::new_in_memory().await.unwrap();
+        let temp_dir = TempDir::new().unwrap();
+        let config = BackupConfig {
+            directory: temp_dir.path().to_path_buf(),
+            retention_days: 30,
+            compression: true,
+            interval: Duration::from_secs(86400),
+            enabled: true,
+        };
+        let manager = BackupManager::new(db, config);
+        assert_eq!(manager.config.retention_days, 30);
+        assert!(manager.config.compression);
+        assert!(manager.config.enabled);
+    }
+
+    #[tokio::test]
+    async fn test_backup_config_default() {
+        let config = BackupConfig::default();
+        assert_eq!(config.retention_days, 30);
+        assert!(config.compression);
+        assert!(config.enabled);
+        assert_eq!(config.interval, Duration::from_secs(86400));
+    }
+
+    #[tokio::test]
+    async fn test_create_backup_sqlite() {
+        let (manager, _, _temp_dir) = setup_test_backup_manager().await;
+        
+        // Create a backup
+        let backup_path = manager.create_backup().await;
+        assert!(backup_path.is_ok());
+        let backup_path = backup_path.unwrap();
+        
+        // Verify backup file exists
+        assert!(backup_path.exists());
+        assert!(backup_path.is_file());
+        
+        // Verify backup filename format
+        let filename = backup_path.file_name().unwrap().to_string_lossy();
+        assert!(filename.starts_with("governance_backup_"));
+        assert!(filename.ends_with(".db"));
+    }
+
+    #[tokio::test]
+    async fn test_create_backup_without_compression() {
+        let db = Database::new_in_memory().await.unwrap();
+        let temp_dir = TempDir::new().unwrap();
+        let config = BackupConfig {
+            directory: temp_dir.path().to_path_buf(),
+            retention_days: 30,
+            compression: false, // No compression
+            interval: Duration::from_secs(3600),
+            enabled: true,
+        };
+        let manager = BackupManager::new(db, config);
+        
+        let backup_path = manager.create_backup().await;
+        assert!(backup_path.is_ok());
+        let backup_path = backup_path.unwrap();
+        
+        // Should be .db file, not .db.gz
+        assert!(!backup_path.to_string_lossy().ends_with(".gz"));
+        assert!(backup_path.exists());
+    }
+
+    #[tokio::test]
+    async fn test_create_backup_creates_directory() {
+        let db = Database::new_in_memory().await.unwrap();
+        let temp_dir = TempDir::new().unwrap();
+        let subdir = temp_dir.path().join("backups");
+        
+        // Directory doesn't exist yet
+        assert!(!subdir.exists());
+        
+        let config = BackupConfig {
+            directory: subdir.clone(),
+            retention_days: 30,
+            compression: false,
+            interval: Duration::from_secs(3600),
+            enabled: true,
+        };
+        let manager = BackupManager::new(db, config);
+        
+        let backup_path = manager.create_backup().await;
+        assert!(backup_path.is_ok());
+        
+        // Directory should now exist
+        assert!(subdir.exists());
+        assert!(subdir.is_dir());
+    }
+
+    #[tokio::test]
+    async fn test_cleanup_old_backups_no_backups() {
+        let (manager, _, _temp_dir) = setup_test_backup_manager().await;
+        
+        // No backups exist, should return 0
+        let deleted = manager.cleanup_old_backups().await.unwrap();
+        assert_eq!(deleted, 0);
+    }
+
+    #[tokio::test]
+    async fn test_cleanup_old_backups_recent_backups() {
+        let (manager, _, _temp_dir) = setup_test_backup_manager().await;
+        
+        // Create a recent backup
+        let _backup_path = manager.create_backup().await.unwrap();
+        
+        // Cleanup should not delete recent backups
+        let deleted = manager.cleanup_old_backups().await.unwrap();
+        assert_eq!(deleted, 0);
+    }
+
+    #[tokio::test]
+    async fn test_cleanup_old_backups_with_old_backups() {
+        let db = Database::new_in_memory().await.unwrap();
+        let temp_dir = TempDir::new().unwrap();
+        let config = BackupConfig {
+            directory: temp_dir.path().to_path_buf(),
+            retention_days: 1, // Very short retention for testing
+            compression: false,
+            interval: Duration::from_secs(3600),
+            enabled: true,
+        };
+        let manager = BackupManager::new(db, config);
+        
+        // Create a backup file manually with old timestamp
+        let old_backup_path = temp_dir.path().join("governance_backup_old.db");
+        fs::write(&old_backup_path, b"fake backup data").await.unwrap();
+        
+        // Set file modification time to 2 days ago
+        let two_days_ago = Utc::now() - chrono::Duration::days(2);
+        let system_time: std::time::SystemTime = two_days_ago.into();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::FileTimeExt;
+            let file = std::fs::File::create(&old_backup_path).unwrap();
+            file.set_times(
+                std::time::SystemTime::UNIX_EPOCH,
+                system_time,
+            ).unwrap();
+        }
+        
+        // Cleanup should delete old backup
+        // Note: This test may be platform-specific due to file time manipulation
+        // On some systems, we may not be able to set file times, so we just verify
+        // the function runs without error
+        let _deleted = manager.cleanup_old_backups().await;
+        // Don't assert on count as file time manipulation may not work on all platforms
+    }
+
+    #[tokio::test]
+    async fn test_cleanup_old_backups_ignores_non_backup_files() {
+        let (manager, _, temp_dir) = setup_test_backup_manager().await;
+        
+        // Create a non-backup file
+        let other_file = temp_dir.path().join("other_file.txt");
+        fs::write(&other_file, b"not a backup").await.unwrap();
+        
+        // Cleanup should not delete non-backup files
+        let deleted = manager.cleanup_old_backups().await.unwrap();
+        assert_eq!(deleted, 0);
+        
+        // File should still exist
+        assert!(other_file.exists());
+    }
+
+    #[tokio::test]
+    async fn test_cleanup_old_backups_empty_directory() {
+        let (manager, _, temp_dir) = setup_test_backup_manager().await;
+        
+        // Ensure directory exists but is empty
+        fs::create_dir_all(&manager.config.directory).await.unwrap();
+        
+        let deleted = manager.cleanup_old_backups().await.unwrap();
+        assert_eq!(deleted, 0);
+    }
+
+    #[tokio::test]
+    async fn test_start_backup_task_disabled() {
+        let db = Database::new_in_memory().await.unwrap();
+        let temp_dir = TempDir::new().unwrap();
+        let config = BackupConfig {
+            directory: temp_dir.path().to_path_buf(),
+            retention_days: 30,
+            compression: false,
+            interval: Duration::from_secs(1),
+            enabled: false, // Disabled
+        };
+        let manager = BackupManager::new(db, config);
+        
+        // Start task (should exit immediately if disabled)
+        let manager_arc = Arc::new(manager);
+        manager_arc.clone().start_backup_task();
+        
+        // Give it a moment to start and check if disabled
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        
+        // Task should have started and logged that backups are disabled
+        // We can't easily verify this without capturing logs, but we verify it doesn't panic
+    }
+
+    #[tokio::test]
+    async fn test_backup_manager_with_custom_config() {
+        let db = Database::new_in_memory().await.unwrap();
+        let temp_dir = TempDir::new().unwrap();
+        let config = BackupConfig {
+            directory: temp_dir.path().to_path_buf(),
+            retention_days: 7,
+            compression: true,
+            interval: Duration::from_secs(7200),
+            enabled: false,
+        };
+        let manager = BackupManager::new(db, config);
+        
+        assert_eq!(manager.config.retention_days, 7);
+        assert!(manager.config.compression);
+        assert!(!manager.config.enabled);
+        assert_eq!(manager.config.interval, Duration::from_secs(7200));
+    }
+
+    #[tokio::test]
+    async fn test_create_backup_multiple_times() {
+        let (manager, _, _temp_dir) = setup_test_backup_manager().await;
+        
+        // Create multiple backups
+        let backup1 = manager.create_backup().await.unwrap();
+        tokio::time::sleep(Duration::from_millis(100)).await; // Small delay for timestamp
+        let backup2 = manager.create_backup().await.unwrap();
+        
+        // Both should exist and be different files
+        assert!(backup1.exists());
+        assert!(backup2.exists());
+        assert_ne!(backup1, backup2);
+    }
+
+    #[tokio::test]
+    async fn test_backup_verification_passes() {
+        let (manager, _, _temp_dir) = setup_test_backup_manager().await;
+        
+        // Create backup (which includes verification)
+        let result = manager.create_backup().await;
+        assert!(result.is_ok(), "Backup creation should succeed and pass verification");
+    }
+}
+

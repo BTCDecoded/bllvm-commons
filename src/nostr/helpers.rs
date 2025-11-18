@@ -317,3 +317,91 @@ pub fn create_keyholder_announcement_event(
     Ok(event)
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::database::Database;
+    use crate::nostr::KeyholderAnnouncement;
+
+    async fn setup_test_config() -> AppConfig {
+        AppConfig {
+            nostr: crate::config::NostrConfig {
+                enabled: false, // Disable for unit tests
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+    }
+
+    #[tokio::test]
+    async fn test_publish_merge_action_disabled() {
+        let config = setup_test_config().await;
+        let db = Database::new_in_memory().await.unwrap();
+        
+        // Should return Ok immediately when Nostr is disabled
+        let result = publish_merge_action(
+            &config,
+            &db,
+            "BTCDecoded/bllvm-consensus",
+            1,
+            "abc123",
+            2,
+            3,
+        ).await;
+        
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_publish_review_period_notification_disabled() {
+        let config = setup_test_config().await;
+        
+        // Should return Ok immediately when Nostr is disabled
+        let result = publish_review_period_notification(
+            &config,
+            "BTCDecoded/bllvm-consensus",
+            1,
+            2,
+            3,
+            chrono::Utc::now(),
+        ).await;
+        
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_create_keyholder_announcement_event() {
+        let config = setup_test_config().await;
+        let keyholder = KeyholderAnnouncement {
+            keyholder: "alice".to_string(),
+            keyholder_type: "maintainer".to_string(),
+            layer: Some(2),
+            zap_address: Some("alice@example.com".to_string()),
+            bio: Some("Test maintainer".to_string()),
+            github_username: Some("alice".to_string()),
+        };
+        
+        let result = create_keyholder_announcement_event(&config, &keyholder);
+        assert!(result.is_ok());
+        
+        let event = result.unwrap();
+        assert_eq!(event.kind, nostr_sdk::prelude::Kind::Metadata);
+    }
+
+    #[test]
+    fn test_create_keyholder_announcement_event_without_layer() {
+        let config = setup_test_config().await;
+        let keyholder = KeyholderAnnouncement {
+            keyholder: "bob".to_string(),
+            keyholder_type: "emergency".to_string(),
+            layer: None,
+            zap_address: None,
+            bio: None,
+            github_username: None,
+        };
+        
+        let result = create_keyholder_announcement_event(&config, &keyholder);
+        assert!(result.is_ok());
+    }
+}
+

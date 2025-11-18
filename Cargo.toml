@@ -72,6 +72,7 @@ opentimestamps = "0.1"
 base64 = "0.21"
 uuid = { version = "1.6", features = ["v4", "serde"] }
 regex = "1.10"
+async-trait = "0.1"
 
 [[bin]]
 name = "bllvm-commons"
@@ -99,9 +100,8 @@ mockito = "1.2"
 wiremock = "0.6"
 tempfile = "3.8"
 async-trait = "0.1"
-
-[dependencies]
-async-trait = "0.1"
+proptest = "1.4"
+insta = { version = "1.38", features = ["redactions"] }
 
 
 

@@ -1411,3 +1411,282 @@ pub struct PerformanceStats {
     pub wal_checkpoint_threshold: i64,
     pub slow_queries_count: i64,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[tokio::test]
+    async fn test_database_new_in_memory() {
+        let db = Database::new_in_memory().await.unwrap();
+        assert!(db.is_sqlite());
+        assert!(db.pool().is_some());
+    }
+
+    #[tokio::test]
+    async fn test_database_new_invalid_url() {
+        let result = Database::new("invalid://url").await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_check_health() {
+        let db = Database::new_in_memory().await.unwrap();
+        let health = db.check_health().await.unwrap();
+        assert!(health, "Database should be healthy");
+    }
+
+    #[tokio::test]
+    async fn test_get_pool_stats() {
+        let db = Database::new_in_memory().await.unwrap();
+        let stats = db.get_pool_stats().await.unwrap();
+        assert!(stats.size > 0, "Pool should have connections");
+        assert!(!stats.is_closed, "Pool should not be closed");
+    }
+
+    #[tokio::test]
+    async fn test_create_pull_request() {
+        let db = Database::new_in_memory().await.unwrap();
+        let result = db.create_pull_request("test/repo", 1, "abc123", 2).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_create_pull_request_duplicate() {
+        let db = Database::new_in_memory().await.unwrap();
+        db.create_pull_request("test/repo", 1, "abc123", 2).await.unwrap();
+        // Should update existing PR
+        let result = db.create_pull_request("test/repo", 1, "def456", 2).await;
+        assert!(result.is_ok());
+        
+        let pr = db.get_pull_request("test/repo", 1).await.unwrap().unwrap();
+        assert_eq!(pr.head_sha, "def456", "Head SHA should be updated");
+    }
+
+    #[tokio::test]
+    async fn test_get_pull_request_not_found() {
+        let db = Database::new_in_memory().await.unwrap();
+        let result = db.get_pull_request("test/repo", 999).await.unwrap();
+        assert!(result.is_none(), "PR should not exist");
+    }
+
+    #[tokio::test]
+    async fn test_add_signature() {
+        let db = Database::new_in_memory().await.unwrap();
+        db.create_pull_request("test/repo", 1, "abc123", 2).await.unwrap();
+        
+        let result = db.add_signature("test/repo", 1, "alice", "sig123", Some("reason")).await;
+        assert!(result.is_ok());
+        
+        let pr = db.get_pull_request("test/repo", 1).await.unwrap().unwrap();
+        assert_eq!(pr.signatures.len(), 1);
+        assert_eq!(pr.signatures[0].signer, "alice");
+        assert_eq!(pr.signatures[0].signature, "sig123");
+    }
+
+    #[tokio::test]
+    async fn test_add_multiple_signatures() {
+        let db = Database::new_in_memory().await.unwrap();
+        db.create_pull_request("test/repo", 1, "abc123", 2).await.unwrap();
+        
+        db.add_signature("test/repo", 1, "alice", "sig1", None).await.unwrap();
+        db.add_signature("test/repo", 1, "bob", "sig2", None).await.unwrap();
+        
+        let pr = db.get_pull_request("test/repo", 1).await.unwrap().unwrap();
+        assert_eq!(pr.signatures.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_log_governance_event() {
+        let db = Database::new_in_memory().await.unwrap();
+        let details = json!({"test": "value"});
+        
+        let result = db.log_governance_event(
+            "test_event",
+            Some("test/repo"),
+            Some(1),
+            Some("alice"),
+            &details,
+        ).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_get_governance_events() {
+        let db = Database::new_in_memory().await.unwrap();
+        let details = json!({"test": "value"});
+        
+        db.log_governance_event("event1", None, None, None, &details).await.unwrap();
+        db.log_governance_event("event2", None, None, None, &details).await.unwrap();
+        
+        let events = db.get_governance_events(10).await.unwrap();
+        assert!(events.len() >= 2);
+    }
+
+    #[tokio::test]
+    async fn test_get_governance_events_limit() {
+        let db = Database::new_in_memory().await.unwrap();
+        let details = json!({"test": "value"});
+        
+        for i in 0..5 {
+            db.log_governance_event(&format!("event{}", i), None, None, None, &details).await.unwrap();
+        }
+        
+        let events = db.get_governance_events(3).await.unwrap();
+        assert_eq!(events.len(), 3, "Should respect limit");
+    }
+
+    #[tokio::test]
+    async fn test_get_last_merged_pr_none() {
+        let db = Database::new_in_memory().await.unwrap();
+        let result = db.get_last_merged_pr().await.unwrap();
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_get_last_merged_pr_exists() {
+        let db = Database::new_in_memory().await.unwrap();
+        let details = json!({"pr": 123});
+        db.log_governance_event("merge", Some("test/repo"), Some(123), None, &details).await.unwrap();
+        
+        let result = db.get_last_merged_pr().await.unwrap();
+        assert!(result.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_count_merges_today() {
+        let db = Database::new_in_memory().await.unwrap();
+        let details = json!({});
+        
+        db.log_governance_event("merge", None, Some(1), None, &details).await.unwrap();
+        db.log_governance_event("merge", None, Some(2), None, &details).await.unwrap();
+        
+        let count = db.count_merges_today().await.unwrap();
+        assert!(count >= 2);
+    }
+
+    #[tokio::test]
+    async fn test_set_tier_override() {
+        let db = Database::new_in_memory().await.unwrap();
+        db.create_pull_request("test/repo", 1, "abc123", 2).await.unwrap();
+        
+        let result = db.set_tier_override("test/repo", 1, 3, "Justification", "alice").await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_get_tier_override() {
+        let db = Database::new_in_memory().await.unwrap();
+        db.create_pull_request("test/repo", 1, "abc123", 2).await.unwrap();
+        db.set_tier_override("test/repo", 1, 3, "Justification", "alice").await.unwrap();
+        
+        let override_val = db.get_tier_override("test/repo", 1).await.unwrap();
+        assert!(override_val.is_some());
+        assert_eq!(override_val.unwrap().override_tier, 3);
+    }
+
+    #[tokio::test]
+    async fn test_get_tier_override_not_found() {
+        let db = Database::new_in_memory().await.unwrap();
+        let result = db.get_tier_override("test/repo", 999).await.unwrap();
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_get_emergency_keyholders_empty() {
+        let db = Database::new_in_memory().await.unwrap();
+        let keyholders = db.get_emergency_keyholders().await.unwrap();
+        assert_eq!(keyholders.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_health_check() {
+        let db = Database::new_in_memory().await.unwrap();
+        let health = db.health_check().await.unwrap();
+        assert!(health.integrity_ok);
+    }
+
+    #[tokio::test]
+    async fn test_optimize_database() {
+        let db = Database::new_in_memory().await.unwrap();
+        let result = db.optimize_database().await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_checkpoint_wal() {
+        let db = Database::new_in_memory().await.unwrap();
+        let result = db.checkpoint_wal().await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_upsert_build_run() {
+        let db = Database::new_in_memory().await.unwrap();
+        let build_id = db.upsert_build_run("v1.0.0", "test/repo", Some(123), "running").await.unwrap();
+        assert!(build_id > 0);
+    }
+
+    #[tokio::test]
+    async fn test_upsert_build_run_update() {
+        let db = Database::new_in_memory().await.unwrap();
+        let _id1 = db.upsert_build_run("v1.0.0", "test/repo", Some(123), "running").await.unwrap();
+        let _id2 = db.upsert_build_run("v1.0.0", "test/repo", Some(456), "success").await.unwrap();
+        // Should update existing, not create new
+        assert_eq!(_id1, _id2);
+    }
+
+    #[tokio::test]
+    async fn test_update_build_run_status() {
+        let db = Database::new_in_memory().await.unwrap();
+        db.upsert_build_run("v1.0.0", "test/repo", Some(123), "running").await.unwrap();
+        
+        let result = db.update_build_run_status("v1.0.0", "test/repo", "success", None).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_get_build_runs_for_release() {
+        let db = Database::new_in_memory().await.unwrap();
+        db.upsert_build_run("v1.0.0", "repo1", Some(1), "success").await.unwrap();
+        db.upsert_build_run("v1.0.0", "repo2", Some(2), "running").await.unwrap();
+        
+        let builds = db.get_build_runs_for_release("v1.0.0").await.unwrap();
+        assert_eq!(builds.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_are_all_builds_complete_true() {
+        let db = Database::new_in_memory().await.unwrap();
+        db.upsert_build_run("v1.0.0", "repo1", Some(1), "success").await.unwrap();
+        db.upsert_build_run("v1.0.0", "repo2", Some(2), "success").await.unwrap();
+        
+        let complete = db.are_all_builds_complete("v1.0.0").await.unwrap();
+        assert!(complete);
+    }
+
+    #[tokio::test]
+    async fn test_are_all_builds_complete_false() {
+        let db = Database::new_in_memory().await.unwrap();
+        db.upsert_build_run("v1.0.0", "repo1", Some(1), "success").await.unwrap();
+        db.upsert_build_run("v1.0.0", "repo2", Some(2), "running").await.unwrap();
+        
+        let complete = db.are_all_builds_complete("v1.0.0").await.unwrap();
+        assert!(!complete);
+    }
+
+    #[tokio::test]
+    async fn test_is_sqlite() {
+        let db = Database::new_in_memory().await.unwrap();
+        assert!(db.is_sqlite());
+        assert!(!db.is_postgres());
+    }
+
+    #[tokio::test]
+    async fn test_get_sqlite_pool() {
+        let db = Database::new_in_memory().await.unwrap();
+        assert!(db.get_sqlite_pool().is_some());
+        assert!(db.get_postgres_pool().is_none());
+    }
+}

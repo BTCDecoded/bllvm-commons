@@ -188,3 +188,44 @@ pub async fn handle_repository_dispatch(
     ))
 }
 
+/// Check if release action should be handled
+pub fn should_handle_release_action(action: &str) -> bool {
+    action == "published"
+}
+
+/// Map GitHub build status to internal build status
+pub fn map_build_status(status: &str) -> &str {
+    match status {
+        "success" => "success",
+        "failure" => "failure",
+        "cancelled" => "cancelled",
+        "timed_out" => "timed_out",
+        _ => "failure",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_should_handle_release_action_published() {
+        assert!(should_handle_release_action("published"));
+    }
+
+    #[test]
+    fn test_should_handle_release_action_other() {
+        assert!(!should_handle_release_action("created"));
+        assert!(!should_handle_release_action("edited"));
+        assert!(!should_handle_release_action("deleted"));
+    }
+
+    #[test]
+    fn test_map_build_status() {
+        assert_eq!(map_build_status("success"), "success");
+        assert_eq!(map_build_status("failure"), "failure");
+        assert_eq!(map_build_status("cancelled"), "cancelled");
+        assert_eq!(map_build_status("timed_out"), "timed_out");
+        assert_eq!(map_build_status("unknown"), "failure");
+    }
+}

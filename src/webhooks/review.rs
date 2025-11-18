@@ -54,3 +54,39 @@ pub async fn handle_review_event(
         }
     }
 }
+
+/// Check if review state is valid
+pub fn is_valid_review_state(state: &str) -> bool {
+    matches!(state, "approved" | "changes_requested" | "commented" | "dismissed")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_valid_review_state_approved() {
+        assert!(is_valid_review_state("approved"));
+    }
+
+    #[test]
+    fn test_is_valid_review_state_changes_requested() {
+        assert!(is_valid_review_state("changes_requested"));
+    }
+
+    #[test]
+    fn test_is_valid_review_state_commented() {
+        assert!(is_valid_review_state("commented"));
+    }
+
+    #[test]
+    fn test_is_valid_review_state_dismissed() {
+        assert!(is_valid_review_state("dismissed"));
+    }
+
+    #[test]
+    fn test_is_valid_review_state_invalid() {
+        assert!(!is_valid_review_state("invalid"));
+        assert!(!is_valid_review_state(""));
+    }
+}

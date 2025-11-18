@@ -436,7 +436,7 @@ impl CrossLayerStatusChecker {
             {
                 // Try to extract test counts from check run name
                 // Common patterns: "Tests (123 passed, 5 failed)" or "cargo test: 128 tests"
-                if let Some(count) = Self::extract_test_count_from_name(&check_run.name) {
+                if let Some(count) = Self::extract_test_count_from_name_impl(&check_run.name) {
                     tests_run += count;
                 } else {
                     // If we can't extract a count, assume at least 1 test was run
@@ -493,7 +493,13 @@ impl CrossLayerStatusChecker {
     
     /// Extract test count from check run name using regex patterns
     /// Looks for patterns like "123 tests", "Tests: 456", etc.
-    fn extract_test_count_from_name(name: &str) -> Option<usize> {
+    #[cfg(test)]
+    pub(crate) fn extract_test_count_from_name(name: &str) -> Option<usize> {
+        Self::extract_test_count_from_name_impl(name)
+    }
+    
+    #[cfg(test)]
+    pub(crate) fn extract_test_count_from_name_impl(name: &str) -> Option<usize> {
         use regex::Regex;
         
         // Pattern: "123 tests" or "Tests: 456" or "cargo test: 789"
@@ -656,6 +662,717 @@ impl CrossLayerStatusChecker {
 mod tests {
     use super::*;
     use crate::github::client::GitHubClient;
+
+    // Unit tests for extract_test_count_from_name
+    #[test]
+    fn test_extract_test_count_pattern_123_tests() {
+        assert_eq!(
+            CrossLayerStatusChecker::extract_test_count_from_name("123 tests"),
+            Some(123)
+        );
+    }
+
+    #[test]
+    fn test_extract_test_count_pattern_tests_456() {
+        assert_eq!(
+            CrossLayerStatusChecker::extract_test_count_from_name("Tests: 456"),
+            Some(456)
+        );
+    }
+
+    #[test]
+    fn test_extract_test_count_pattern_cargo_test_789() {
+        assert_eq!(
+            CrossLayerStatusChecker::extract_test_count_from_name("cargo test: 789"),
+            Some(789)
+        );
+    }
+
+    #[test]
+    fn test_extract_test_count_pattern_1000_passed() {
+        assert_eq!(
+            CrossLayerStatusChecker::extract_test_count_from_name("1000 passed"),
+            Some(1000)
+        );
+    }
+
+    #[test]
+    fn test_extract_test_count_pattern_passed_42() {
+        assert_eq!(
+            CrossLayerStatusChecker::extract_test_count_from_name("passed: 42"),
+            Some(42)
+        );
+    }
+
+    #[test]
+    fn test_extract_test_count_no_match() {
+        assert_eq!(
+            CrossLayerStatusChecker::extract_test_count_from_name("No numbers here"),
+            None
+        );
+    }
+
+    #[test]
+    fn test_extract_test_count_edge_case_zero() {
+        assert_eq!(
+            CrossLayerStatusChecker::extract_test_count_from_name("0 tests"),
+            Some(0)
+        );
+    }
+
+    #[test]
+    fn test_extract_test_count_edge_case_large_number() {
+        assert_eq!(
+            CrossLayerStatusChecker::extract_test_count_from_name("999999 tests"),
+            Some(999999)
+        );
+    }
+
+    #[test]
+    fn test_extract_test_count_case_insensitive() {
+        // Test that case doesn't matter for "test" keyword
+        assert_eq!(
+            CrossLayerStatusChecker::extract_test_count_from_name("TEST: 100"),
+            Some(100)
+        );
+    }
+
+    #[test]
+    fn test_extract_test_count_multiple_numbers() {
+        // Should extract first matching number
+        assert_eq!(
+            CrossLayerStatusChecker::extract_test_count_from_name("50 tests passed out of 100"),
+            Some(50)
+        );
+    }
+
+    #[test]
+    fn test_extract_test_count_real_world_examples() {
+        // Real-world CI check run name examples
+        assert_eq!(
+            CrossLayerStatusChecker::extract_test_count_from_name("cargo test --lib (123 tests)"),
+            Some(123)
+        );
+        assert_eq!(
+            CrossLayerStatusChecker::extract_test_count_from_name("Unit & Property Tests: 456"),
+            Some(456)
+        );
+        assert_eq!(
+            CrossLayerStatusChecker::extract_test_count_from_name("Kani Model Checking: 10 passed"),
+            Some(10)
+        );
+    }
+
+    // Helper function to create a test checker
+    fn create_test_checker() -> Option<CrossLayerStatusChecker> {
+        let temp_dir = tempfile::tempdir().ok()?;
+        let key_path = temp_dir.path().join("test_key.pem");
+        let valid_key = include_str!("../../test_fixtures/test_rsa_key.pem");
+        std::fs::write(&key_path, valid_key).ok()?;
+        
+        let github_client = GitHubClient::new(123456, key_path.to_str()?).ok()?;
+        Some(CrossLayerStatusChecker {
+            github_client,
+            content_hash_validator: ContentHashValidator::new(),
+            version_pinning_validator: VersionPinningValidator::default(),
+            equivalence_proof_validator: EquivalenceProofValidator::new(),
+        })
+    }
+
+    // Unit tests for determine_overall_status
+    #[test]
+    fn test_determine_overall_status_all_success() {
+        let checker = match create_test_checker() {
+            Some(c) => c,
+            None => return, // Skip if can't create client
+        };
+
+        let content_hash = ContentHashStatus {
+            status: StatusState::Success,
+            message: "All synced".to_string(),
+            files_checked: 10,
+            files_synced: 10,
+            files_missing: vec![],
+            files_outdated: vec![],
+        };
+
+        let version_pinning = VersionPinningStatus {
+            status: StatusState::Success,
+            message: "All valid".to_string(),
+            references_checked: 5,
+            references_valid: 5,
+            references_invalid: vec![],
+            latest_version: Some("v1.0.0".to_string()),
+        };
+
+        let equivalence_proof = EquivalenceProofStatus {
+            status: StatusState::Success,
+            message: "All passed".to_string(),
+            tests_run: 100,
+            tests_passed: 100,
+            tests_failed: vec![],
+            proof_verification: Some("Verified".to_string()),
+        };
+
+        let result = checker.determine_overall_status(&content_hash, &version_pinning, &equivalence_proof);
+        assert_eq!(result, StatusState::Success);
+    }
+
+    #[test]
+    fn test_determine_overall_status_any_failure() {
+        let checker = match create_test_checker() {
+            Some(c) => c,
+            None => return,
+        };
+
+        // Test: Content hash failure
+        let content_hash = ContentHashStatus {
+            status: StatusState::Failure,
+            message: "Missing files".to_string(),
+            files_checked: 10,
+            files_synced: 5,
+            files_missing: vec!["file1.md".to_string()],
+            files_outdated: vec![],
+        };
+
+        let version_pinning = VersionPinningStatus {
+            status: StatusState::Success,
+            message: "All valid".to_string(),
+            references_checked: 5,
+            references_valid: 5,
+            references_invalid: vec![],
+            latest_version: Some("v1.0.0".to_string()),
+        };
+
+        let equivalence_proof = EquivalenceProofStatus {
+            status: StatusState::Success,
+            message: "All passed".to_string(),
+            tests_run: 100,
+            tests_passed: 100,
+            tests_failed: vec![],
+            proof_verification: Some("Verified".to_string()),
+        };
+
+        let result = checker.determine_overall_status(&content_hash, &version_pinning, &equivalence_proof);
+        assert_eq!(result, StatusState::Failure);
+    }
+
+    #[test]
+    fn test_determine_overall_status_pending() {
+        let checker = match create_test_checker() {
+            Some(c) => c,
+            None => return,
+        };
+
+        // Test: All pending
+        let content_hash = ContentHashStatus {
+            status: StatusState::Pending,
+            message: "Checking...".to_string(),
+            files_checked: 0,
+            files_synced: 0,
+            files_missing: vec![],
+            files_outdated: vec![],
+        };
+
+        let version_pinning = VersionPinningStatus {
+            status: StatusState::Pending,
+            message: "Checking...".to_string(),
+            references_checked: 0,
+            references_valid: 0,
+            references_invalid: vec![],
+            latest_version: None,
+        };
+
+        let equivalence_proof = EquivalenceProofStatus {
+            status: StatusState::Pending,
+            message: "Checking...".to_string(),
+            tests_run: 0,
+            tests_passed: 0,
+            tests_failed: vec![],
+            proof_verification: None,
+        };
+
+        let result = checker.determine_overall_status(&content_hash, &version_pinning, &equivalence_proof);
+        assert_eq!(result, StatusState::Pending);
+    }
+
+    #[test]
+    fn test_determine_overall_status_mixed_pending_success() {
+        let checker = match create_test_checker() {
+            Some(c) => c,
+            None => return,
+        };
+
+        // Test: Success + Pending = Pending
+        let content_hash = ContentHashStatus {
+            status: StatusState::Success,
+            message: "All synced".to_string(),
+            files_checked: 10,
+            files_synced: 10,
+            files_missing: vec![],
+            files_outdated: vec![],
+        };
+
+        let version_pinning = VersionPinningStatus {
+            status: StatusState::Pending,
+            message: "Checking...".to_string(),
+            references_checked: 0,
+            references_valid: 0,
+            references_invalid: vec![],
+            latest_version: None,
+        };
+
+        let equivalence_proof = EquivalenceProofStatus {
+            status: StatusState::Success,
+            message: "All passed".to_string(),
+            tests_run: 100,
+            tests_passed: 100,
+            tests_failed: vec![],
+            proof_verification: Some("Verified".to_string()),
+        };
+
+        let result = checker.determine_overall_status(&content_hash, &version_pinning, &equivalence_proof);
+        assert_eq!(result, StatusState::Pending);
+    }
+
+    // Unit tests for generate_recommendations
+    #[test]
+    fn test_generate_recommendations_all_success() {
+        let checker = match create_test_checker() {
+            Some(c) => c,
+            None => return,
+        };
+
+        let content_hash = ContentHashStatus {
+            status: StatusState::Success,
+            message: "All synced".to_string(),
+            files_checked: 10,
+            files_synced: 10,
+            files_missing: vec![],
+            files_outdated: vec![],
+        };
+
+        let version_pinning = VersionPinningStatus {
+            status: StatusState::Success,
+            message: "All valid".to_string(),
+            references_checked: 5,
+            references_valid: 5,
+            references_invalid: vec![],
+            latest_version: Some("v1.0.0".to_string()),
+        };
+
+        let equivalence_proof = EquivalenceProofStatus {
+            status: StatusState::Success,
+            message: "All passed".to_string(),
+            tests_run: 100,
+            tests_passed: 100,
+            tests_failed: vec![],
+            proof_verification: Some("Verified".to_string()),
+        };
+
+        let recommendations = checker.generate_recommendations(&content_hash, &version_pinning, &equivalence_proof);
+        assert_eq!(recommendations.len(), 1);
+        assert!(recommendations[0].contains("All cross-layer checks passed"));
+    }
+
+    #[test]
+    fn test_generate_recommendations_content_hash_missing() {
+        let checker = match create_test_checker() {
+            Some(c) => c,
+            None => return,
+        };
+
+        let content_hash = ContentHashStatus {
+            status: StatusState::Failure,
+            message: "Missing files".to_string(),
+            files_checked: 10,
+            files_synced: 5,
+            files_missing: vec!["consensus-rules/block-validation.md".to_string()],
+            files_outdated: vec![],
+        };
+
+        let version_pinning = VersionPinningStatus {
+            status: StatusState::Success,
+            message: "All valid".to_string(),
+            references_checked: 5,
+            references_valid: 5,
+            references_invalid: vec![],
+            latest_version: Some("v1.0.0".to_string()),
+        };
+
+        let equivalence_proof = EquivalenceProofStatus {
+            status: StatusState::Success,
+            message: "All passed".to_string(),
+            tests_run: 100,
+            tests_passed: 100,
+            tests_failed: vec![],
+            proof_verification: Some("Verified".to_string()),
+        };
+
+        let recommendations = checker.generate_recommendations(&content_hash, &version_pinning, &equivalence_proof);
+        assert_eq!(recommendations.len(), 1);
+        assert!(recommendations[0].contains("Update corresponding Consensus Proof files"));
+        assert!(recommendations[0].contains("block-validation.md"));
+    }
+
+    #[test]
+    fn test_generate_recommendations_version_pinning_invalid() {
+        let checker = match create_test_checker() {
+            Some(c) => c,
+            None => return,
+        };
+
+        let content_hash = ContentHashStatus {
+            status: StatusState::Success,
+            message: "All synced".to_string(),
+            files_checked: 10,
+            files_synced: 10,
+            files_missing: vec![],
+            files_outdated: vec![],
+        };
+
+        let version_pinning = VersionPinningStatus {
+            status: StatusState::Failure,
+            message: "Invalid references".to_string(),
+            references_checked: 5,
+            references_valid: 3,
+            references_invalid: vec![VersionReferenceError {
+                file_path: "src/validation.rs".to_string(),
+                line_number: 42,
+                reference: VersionReference {
+                    file_path: "src/validation.rs".to_string(),
+                    line_number: 42,
+                    reference_type: crate::validation::version_pinning::VersionReferenceType::Version,
+                    version: "v9.9.9".to_string(),
+                    commit_sha: None,
+                    content_hash: None,
+                    raw_text: "v9.9.9".to_string(),
+                },
+                error_message: "Invalid version".to_string(),
+            }],
+            latest_version: Some("v1.0.0".to_string()),
+        };
+
+        let equivalence_proof = EquivalenceProofStatus {
+            status: StatusState::Success,
+            message: "All passed".to_string(),
+            tests_run: 100,
+            tests_passed: 100,
+            tests_failed: vec![],
+            proof_verification: Some("Verified".to_string()),
+        };
+
+        let recommendations = checker.generate_recommendations(&content_hash, &version_pinning, &equivalence_proof);
+        assert_eq!(recommendations.len(), 1);
+        assert!(recommendations[0].contains("Update version references"));
+        assert!(recommendations[0].contains("Orange Paper"));
+    }
+
+    #[test]
+    fn test_generate_recommendations_equivalence_proof_failed() {
+        let checker = match create_test_checker() {
+            Some(c) => c,
+            None => return,
+        };
+
+        let content_hash = ContentHashStatus {
+            status: StatusState::Success,
+            message: "All synced".to_string(),
+            files_checked: 10,
+            files_synced: 10,
+            files_missing: vec![],
+            files_outdated: vec![],
+        };
+
+        let version_pinning = VersionPinningStatus {
+            status: StatusState::Success,
+            message: "All valid".to_string(),
+            references_checked: 5,
+            references_valid: 5,
+            references_invalid: vec![],
+            latest_version: Some("v1.0.0".to_string()),
+        };
+
+        let equivalence_proof = EquivalenceProofStatus {
+            status: StatusState::Failure,
+            message: "Tests failed".to_string(),
+            tests_run: 100,
+            tests_passed: 95,
+            tests_failed: vec!["test_block_validation".to_string(), "test_tx_validation".to_string()],
+            proof_verification: Some("Failed".to_string()),
+        };
+
+        let recommendations = checker.generate_recommendations(&content_hash, &version_pinning, &equivalence_proof);
+        assert_eq!(recommendations.len(), 1);
+        assert!(recommendations[0].contains("Fix failing equivalence tests"));
+        assert!(recommendations[0].contains("implementation matches specification"));
+    }
+
+    #[test]
+    fn test_generate_recommendations_multiple_failures() {
+        let checker = match create_test_checker() {
+            Some(c) => c,
+            None => return,
+        };
+
+        let content_hash = ContentHashStatus {
+            status: StatusState::Failure,
+            message: "Missing files".to_string(),
+            files_checked: 10,
+            files_synced: 5,
+            files_missing: vec!["file1.md".to_string(), "file2.md".to_string()],
+            files_outdated: vec![],
+        };
+
+        let version_pinning = VersionPinningStatus {
+            status: StatusState::Failure,
+            message: "Invalid references".to_string(),
+            references_checked: 5,
+            references_valid: 3,
+            references_invalid: vec![VersionReferenceError {
+                file_path: "src/validation.rs".to_string(),
+                line_number: 42,
+                reference: VersionReference {
+                    file_path: "src/validation.rs".to_string(),
+                    line_number: 42,
+                    reference_type: crate::validation::version_pinning::VersionReferenceType::Version,
+                    version: "v9.9.9".to_string(),
+                    commit_sha: None,
+                    content_hash: None,
+                    raw_text: "v9.9.9".to_string(),
+                },
+                error_message: "Invalid version".to_string(),
+            }],
+            latest_version: Some("v1.0.0".to_string()),
+        };
+
+        let equivalence_proof = EquivalenceProofStatus {
+            status: StatusState::Failure,
+            message: "Tests failed".to_string(),
+            tests_run: 100,
+            tests_passed: 95,
+            tests_failed: vec!["test_block_validation".to_string()],
+            proof_verification: Some("Failed".to_string()),
+        };
+
+        let recommendations = checker.generate_recommendations(&content_hash, &version_pinning, &equivalence_proof);
+        assert_eq!(recommendations.len(), 3);
+        assert!(recommendations.iter().any(|r| r.contains("Update corresponding Consensus Proof files")));
+        assert!(recommendations.iter().any(|r| r.contains("Update version references")));
+        assert!(recommendations.iter().any(|r| r.contains("Fix failing equivalence tests")));
+    }
+
+    #[test]
+    fn test_generate_recommendations_content_hash_multiple_files() {
+        let checker = match create_test_checker() {
+            Some(c) => c,
+            None => return,
+        };
+
+        let content_hash = ContentHashStatus {
+            status: StatusState::Failure,
+            message: "Missing files".to_string(),
+            files_checked: 10,
+            files_synced: 5,
+            files_missing: vec![
+                "consensus-rules/block-validation.md".to_string(),
+                "consensus-rules/transaction-validation.md".to_string(),
+                "consensus-rules/script-execution.md".to_string(),
+            ],
+            files_outdated: vec![],
+        };
+
+        let version_pinning = VersionPinningStatus {
+            status: StatusState::Success,
+            message: "All valid".to_string(),
+            references_checked: 5,
+            references_valid: 5,
+            references_invalid: vec![],
+            latest_version: Some("v1.0.0".to_string()),
+        };
+
+        let equivalence_proof = EquivalenceProofStatus {
+            status: StatusState::Success,
+            message: "All passed".to_string(),
+            tests_run: 100,
+            tests_passed: 100,
+            tests_failed: vec![],
+            proof_verification: Some("Verified".to_string()),
+        };
+
+        let recommendations = checker.generate_recommendations(&content_hash, &version_pinning, &equivalence_proof);
+        assert_eq!(recommendations.len(), 1);
+        assert!(recommendations[0].contains("block-validation.md"));
+        assert!(recommendations[0].contains("transaction-validation.md"));
+        assert!(recommendations[0].contains("script-execution.md"));
+    }
+
+    // Unit tests for generate_status_description
+    #[test]
+    fn test_generate_status_description_all_success() {
+        let checker = match create_test_checker() {
+            Some(c) => c,
+            None => return,
+        };
+
+        let content_hash = ContentHashStatus {
+            status: StatusState::Success,
+            message: "All synced".to_string(),
+            files_checked: 10,
+            files_synced: 10,
+            files_missing: vec![],
+            files_outdated: vec![],
+        };
+
+        let version_pinning = VersionPinningStatus {
+            status: StatusState::Success,
+            message: "All valid".to_string(),
+            references_checked: 5,
+            references_valid: 5,
+            references_invalid: vec![],
+            latest_version: Some("v1.0.0".to_string()),
+        };
+
+        let equivalence_proof = EquivalenceProofStatus {
+            status: StatusState::Success,
+            message: "All passed".to_string(),
+            tests_run: 100,
+            tests_passed: 100,
+            tests_failed: vec![],
+            proof_verification: Some("Verified".to_string()),
+        };
+
+        let description = checker.generate_status_description(&content_hash, &version_pinning, &equivalence_proof);
+        assert!(description.contains("Content Hash: ✅"));
+        assert!(description.contains("Version Pinning: ✅"));
+        assert!(description.contains("Equivalence Proof: ✅"));
+        assert!(description.contains(" | ")); // Should have separators
+    }
+
+    #[test]
+    fn test_generate_status_description_all_failure() {
+        let checker = match create_test_checker() {
+            Some(c) => c,
+            None => return,
+        };
+
+        let content_hash = ContentHashStatus {
+            status: StatusState::Failure,
+            message: "Missing files".to_string(),
+            files_checked: 10,
+            files_synced: 5,
+            files_missing: vec!["file1.md".to_string()],
+            files_outdated: vec![],
+        };
+
+        let version_pinning = VersionPinningStatus {
+            status: StatusState::Failure,
+            message: "Invalid references".to_string(),
+            references_checked: 5,
+            references_valid: 3,
+            references_invalid: vec![],
+            latest_version: Some("v1.0.0".to_string()),
+        };
+
+        let equivalence_proof = EquivalenceProofStatus {
+            status: StatusState::Failure,
+            message: "Tests failed".to_string(),
+            tests_run: 100,
+            tests_passed: 95,
+            tests_failed: vec!["test1".to_string()],
+            proof_verification: Some("Failed".to_string()),
+        };
+
+        let description = checker.generate_status_description(&content_hash, &version_pinning, &equivalence_proof);
+        assert!(description.contains("Content Hash: ❌"));
+        assert!(description.contains("Version Pinning: ❌"));
+        assert!(description.contains("Equivalence Proof: ❌"));
+    }
+
+    #[test]
+    fn test_generate_status_description_mixed() {
+        let checker = match create_test_checker() {
+            Some(c) => c,
+            None => return,
+        };
+
+        let content_hash = ContentHashStatus {
+            status: StatusState::Success,
+            message: "All synced".to_string(),
+            files_checked: 10,
+            files_synced: 10,
+            files_missing: vec![],
+            files_outdated: vec![],
+        };
+
+        let version_pinning = VersionPinningStatus {
+            status: StatusState::Failure,
+            message: "Invalid references".to_string(),
+            references_checked: 5,
+            references_valid: 3,
+            references_invalid: vec![],
+            latest_version: Some("v1.0.0".to_string()),
+        };
+
+        let equivalence_proof = EquivalenceProofStatus {
+            status: StatusState::Pending,
+            message: "Checking...".to_string(),
+            tests_run: 0,
+            tests_passed: 0,
+            tests_failed: vec![],
+            proof_verification: None,
+        };
+
+        let description = checker.generate_status_description(&content_hash, &version_pinning, &equivalence_proof);
+        assert!(description.contains("Content Hash: ✅"));
+        assert!(description.contains("Version Pinning: ❌"));
+        assert!(description.contains("Equivalence Proof: ❌")); // Pending shows as ❌
+    }
+
+    // Unit tests for map_status_to_sync_status
+    #[test]
+    fn test_map_status_to_sync_status_success() {
+        let checker = match create_test_checker() {
+            Some(c) => c,
+            None => return,
+        };
+
+        let sync_status = checker.map_status_to_sync_status(StatusState::Success);
+        assert_eq!(sync_status, SyncStatus::Synchronized);
+    }
+
+    #[test]
+    fn test_map_status_to_sync_status_failure() {
+        let checker = match create_test_checker() {
+            Some(c) => c,
+            None => return,
+        };
+
+        let sync_status = checker.map_status_to_sync_status(StatusState::Failure);
+        assert_eq!(sync_status, SyncStatus::MissingUpdates);
+    }
+
+    #[test]
+    fn test_map_status_to_sync_status_pending() {
+        let checker = match create_test_checker() {
+            Some(c) => c,
+            None => return,
+        };
+
+        let sync_status = checker.map_status_to_sync_status(StatusState::Pending);
+        assert_eq!(sync_status, SyncStatus::SyncFailure);
+    }
+
+    #[test]
+    fn test_map_status_to_sync_status_error() {
+        let checker = match create_test_checker() {
+            Some(c) => c,
+            None => return,
+        };
+
+        let sync_status = checker.map_status_to_sync_status(StatusState::Error);
+        assert_eq!(sync_status, SyncStatus::SyncFailure);
+    }
 
     #[tokio::test]
     async fn test_cross_layer_status_generation() {

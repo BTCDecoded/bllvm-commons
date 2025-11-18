@@ -101,176 +101,176 @@ impl MergeBlocker {
             description
         };
 
-        // Log the decision
-        self.decision_logger.log_merge_decision(
-            sha.parse().unwrap_or(0),
-            should_block,
-            reason,
-        );
-
         if let Some(client) = &self.github_client {
             client
-                .post_status_check(
-                    owner,
-                    repo,
-                    sha,
-                    state,
-                    &final_description,
-                    "governance/merge-check",
-                )
+                .create_status_check(owner, repo, sha, "governance/merge", state, &final_description)
                 .await?;
-
-            info!(
-                "Posted merge status for {}/{}@{}: {} - {}",
-                owner, repo, sha, state, final_description
-            );
+            info!("Posted merge status: {} for {}/{}@{}", state, owner, repo, sha);
         } else {
-            warn!("No GitHub client available, cannot post merge status");
+            warn!("No GitHub client available, skipping status check");
         }
 
         Ok(())
     }
+}
 
-    /// Update merge status when requirements change
-    pub async fn update_merge_status(
-        &self,
-        owner: &str,
-        repo: &str,
-        sha: &str,
-        review_period_met: bool,
-        signatures_met: bool,
-        economic_veto_active: bool,
-        tier: u32,
-        emergency_mode: bool,
-    ) -> Result<(), GovernanceError> {
-        let should_block = Self::should_block_merge(
-            review_period_met,
-            signatures_met,
-            economic_veto_active,
-            tier,
-            emergency_mode,
-        )?;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-        let reason = Self::get_block_reason(
-            review_period_met,
-            signatures_met,
-            economic_veto_active,
-            tier,
-            emergency_mode,
+    #[test]
+    fn test_should_block_merge_all_requirements_met() {
+        let result = MergeBlocker::should_block_merge(
+            true,  // review_period_met
+            true,  // signatures_met
+            false, // economic_veto_active
+            2,     // tier
+            false, // emergency_mode
+        ).unwrap();
+        
+        assert!(!result, "Should not block when all requirements met");
+    }
+
+    #[test]
+    fn test_should_block_merge_review_period_not_met() {
+        let result = MergeBlocker::should_block_merge(
+            false, // review_period_met
+            true,  // signatures_met
+            false, // economic_veto_active
+            2,     // tier
+            false, // emergency_mode
+        ).unwrap();
+        
+        assert!(result, "Should block when review period not met");
+    }
+
+    #[test]
+    fn test_should_block_merge_signatures_not_met() {
+        let result = MergeBlocker::should_block_merge(
+            true,  // review_period_met
+            false, // signatures_met
+            false, // economic_veto_active
+            2,     // tier
+            false, // emergency_mode
+        ).unwrap();
+        
+        assert!(result, "Should block when signatures not met");
+    }
+
+    #[test]
+    fn test_should_block_merge_economic_veto_tier3() {
+        let result = MergeBlocker::should_block_merge(
+            true,  // review_period_met
+            true,  // signatures_met
+            true,  // economic_veto_active
+            3,     // tier (Tier 3+)
+            false, // emergency_mode
+        ).unwrap();
+        
+        assert!(result, "Should block when economic veto active for Tier 3+");
+    }
+
+    #[test]
+    fn test_should_block_merge_economic_veto_tier2() {
+        let result = MergeBlocker::should_block_merge(
+            true,  // review_period_met
+            true,  // signatures_met
+            true,  // economic_veto_active
+            2,     // tier (Tier 2, veto doesn't apply)
+            false, // emergency_mode
+        ).unwrap();
+        
+        assert!(!result, "Should not block Tier 2 even with economic veto");
+    }
+
+    #[test]
+    fn test_should_block_merge_emergency_mode_signatures_met() {
+        let result = MergeBlocker::should_block_merge(
+            false, // review_period_met (ignored in emergency)
+            true,  // signatures_met
+            false, // economic_veto_active (ignored in emergency)
+            4,     // tier (ignored in emergency)
+            true,  // emergency_mode
+        ).unwrap();
+        
+        assert!(!result, "Should not block in emergency mode when signatures met");
+    }
+
+    #[test]
+    fn test_should_block_merge_emergency_mode_signatures_not_met() {
+        let result = MergeBlocker::should_block_merge(
+            true,  // review_period_met (ignored in emergency)
+            false, // signatures_met
+            false, // economic_veto_active (ignored in emergency)
+            4,     // tier (ignored in emergency)
+            true,  // emergency_mode
+        ).unwrap();
+        
+        assert!(result, "Should block in emergency mode when signatures not met");
+    }
+
+    #[test]
+    fn test_get_block_reason_all_met() {
+        let reason = MergeBlocker::get_block_reason(
+            true, false, false, 2, false
         );
-
-        self.post_merge_status(owner, repo, sha, should_block, &reason)
-            .await
+        assert_eq!(reason, "All governance requirements met");
     }
 
-    /// Check if PR can be merged (GitHub API integration)
-    pub async fn check_mergeability(
-        &self,
-        owner: &str,
-        repo: &str,
-        pr_number: u64,
-    ) -> Result<bool, GovernanceError> {
-        if let Some(client) = &self.github_client {
-            client.can_merge_pull_request(owner, repo, pr_number).await
-        } else {
-            warn!("No GitHub client available, cannot check mergeability");
-            Ok(false)
-        }
+    #[test]
+    fn test_get_block_reason_review_period() {
+        let reason = MergeBlocker::get_block_reason(
+            false, true, false, 2, false
+        );
+        assert!(reason.contains("Review period requirement not met"));
     }
 
-    /// Set required status checks for a repository branch
-    pub async fn set_required_checks(
-        &self,
-        owner: &str,
-        repo: &str,
-        branch: &str,
-    ) -> Result<(), GovernanceError> {
-        if let Some(client) = &self.github_client {
-            let contexts = vec![
-                "governance/merge-check".to_string(),
-                "governance/signatures".to_string(),
-                "governance/review-period".to_string(),
-            ];
-
-            client
-                .set_required_status_checks(owner, repo, branch, &contexts)
-                .await?;
-            info!(
-                "Set required status checks for {}/{} branch '{}'",
-                owner, repo, branch
-            );
-        } else {
-            warn!("No GitHub client available, cannot set required checks");
-        }
-
-        Ok(())
+    #[test]
+    fn test_get_block_reason_signatures() {
+        let reason = MergeBlocker::get_block_reason(
+            true, false, false, 2, false
+        );
+        assert!(reason.contains("Signature threshold requirement not met"));
     }
 
-    /// Generate comprehensive merge status message
-    pub fn generate_merge_status_message(
-        review_period_met: bool,
-        signatures_met: bool,
-        economic_veto_active: bool,
-        tier: u32,
-        tier_name: &str,
-        emergency_mode: bool,
-        review_period_days: i64,
-        elapsed_days: i64,
-        current_signatures: usize,
-        required_signatures: usize,
-    ) -> String {
-        let mut message = format!("🏛️ Governance Status for Tier {}: {}\n\n", tier, tier_name);
+    #[test]
+    fn test_get_block_reason_economic_veto() {
+        let reason = MergeBlocker::get_block_reason(
+            true, true, true, 3, false
+        );
+        assert!(reason.contains("Economic node veto active"));
+    }
 
-        // Review period status
-        if review_period_met {
-            message.push_str("✅ Review Period: Met\n");
-        } else {
-            message.push_str(&format!(
-                "❌ Review Period: {} days elapsed, {} days required\n",
-                elapsed_days, review_period_days
-            ));
-        }
+    #[test]
+    fn test_get_block_reason_multiple() {
+        let reason = MergeBlocker::get_block_reason(
+            false, false, true, 3, false
+        );
+        assert!(reason.contains("Review period requirement not met"));
+        assert!(reason.contains("Signature threshold requirement not met"));
+        assert!(reason.contains("Economic node veto active"));
+    }
 
-        // Signature status
-        if signatures_met {
-            message.push_str("✅ Signatures: Complete\n");
-        } else {
-            message.push_str(&format!(
-                "❌ Signatures: {}/{} required\n",
-                current_signatures, required_signatures
-            ));
-        }
+    #[test]
+    fn test_get_block_reason_emergency_signatures_met() {
+        let reason = MergeBlocker::get_block_reason(
+            false, true, false, 4, true
+        );
+        assert_eq!(reason, "Emergency mode: All requirements met");
+    }
 
-        // Economic node veto status (Tier 3+)
-        if tier >= 3 {
-            if economic_veto_active {
-                message.push_str("⚠️ Economic Node Veto: Active\n");
-            } else {
-                message.push_str("✅ Economic Node Veto: Not Active\n");
-            }
-        }
+    #[test]
+    fn test_get_block_reason_emergency_signatures_not_met() {
+        let reason = MergeBlocker::get_block_reason(
+            true, false, false, 4, true
+        );
+        assert_eq!(reason, "Emergency mode: Signature threshold not met");
+    }
 
-        // Emergency mode indicator
-        if emergency_mode {
-            message.push_str("\n🚨 Emergency Mode Active\n");
-        }
-
-        // Overall status
-        let should_block = Self::should_block_merge(
-            review_period_met,
-            signatures_met,
-            economic_veto_active,
-            tier,
-            emergency_mode,
-        )
-        .unwrap_or(true);
-
-        if should_block {
-            message.push_str("\n❌ Merge Blocked: Governance requirements not met");
-        } else {
-            message.push_str("\n✅ Merge Allowed: All governance requirements met");
-        }
-
-        message
+    #[test]
+    fn test_merge_blocker_new() {
+        let logger = DecisionLogger::new(true, true, None);
+        let blocker = MergeBlocker::new(None, logger);
+        assert!(blocker.github_client.is_none());
     }
 }

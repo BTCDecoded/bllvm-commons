@@ -478,4 +478,448 @@ mod tests {
         assert!(emergency.can_extend()); // Urgent allows 1 extension
         assert!(emergency.calculate_extension_expiration().is_some());
     }
+
+    #[test]
+    fn test_emergency_tier_to_i32() {
+        assert_eq!(EmergencyTier::Critical.to_i32(), 1);
+        assert_eq!(EmergencyTier::Urgent.to_i32(), 2);
+        assert_eq!(EmergencyTier::Elevated.to_i32(), 3);
+    }
+
+    #[test]
+    fn test_emergency_tier_activation_threshold() {
+        // All tiers require 5-of-7 emergency keyholders to activate
+        assert_eq!(EmergencyTier::Critical.activation_threshold(), (5, 7));
+        assert_eq!(EmergencyTier::Urgent.activation_threshold(), (5, 7));
+        assert_eq!(EmergencyTier::Elevated.activation_threshold(), (5, 7));
+    }
+
+    #[test]
+    fn test_emergency_tier_max_extensions() {
+        assert_eq!(EmergencyTier::Critical.max_extensions(), 0);
+        assert_eq!(EmergencyTier::Urgent.max_extensions(), 1);
+        assert_eq!(EmergencyTier::Elevated.max_extensions(), 2);
+    }
+
+    #[test]
+    fn test_emergency_tier_extension_duration_days() {
+        assert_eq!(EmergencyTier::Critical.extension_duration_days(), 0);
+        assert_eq!(EmergencyTier::Urgent.extension_duration_days(), 30);
+        assert_eq!(EmergencyTier::Elevated.extension_duration_days(), 30);
+    }
+
+    #[test]
+    fn test_emergency_tier_extension_threshold() {
+        assert_eq!(EmergencyTier::Critical.extension_threshold(), (0, 0));
+        assert_eq!(EmergencyTier::Urgent.extension_threshold(), (6, 7));
+        assert_eq!(EmergencyTier::Elevated.extension_threshold(), (6, 7));
+    }
+
+    #[test]
+    fn test_emergency_tier_post_mortem_deadline_days() {
+        assert_eq!(EmergencyTier::Critical.post_mortem_deadline_days(), 30);
+        assert_eq!(EmergencyTier::Urgent.post_mortem_deadline_days(), 60);
+        assert_eq!(EmergencyTier::Elevated.post_mortem_deadline_days(), 90);
+    }
+
+    #[test]
+    fn test_emergency_tier_security_audit_deadline_days() {
+        assert_eq!(EmergencyTier::Critical.security_audit_deadline_days(), Some(60));
+        assert_eq!(EmergencyTier::Urgent.security_audit_deadline_days(), None);
+        assert_eq!(EmergencyTier::Elevated.security_audit_deadline_days(), None);
+    }
+
+    #[test]
+    fn test_emergency_tier_name() {
+        assert_eq!(EmergencyTier::Critical.name(), "Critical Emergency");
+        assert_eq!(EmergencyTier::Urgent.name(), "Urgent Security Issue");
+        assert_eq!(EmergencyTier::Elevated.name(), "Elevated Priority");
+    }
+
+    #[test]
+    fn test_emergency_tier_emoji() {
+        assert_eq!(EmergencyTier::Critical.emoji(), "🚨");
+        assert_eq!(EmergencyTier::Urgent.emoji(), "⚠️");
+        assert_eq!(EmergencyTier::Elevated.emoji(), "📢");
+    }
+
+    #[test]
+    fn test_emergency_tier_description() {
+        assert!(EmergencyTier::Critical.description().contains("Network-threatening"));
+        assert!(EmergencyTier::Urgent.description().contains("Serious security"));
+        assert!(EmergencyTier::Elevated.description().contains("Important priority"));
+    }
+
+    #[test]
+    fn test_active_emergency_remaining_duration() {
+        let emergency = ActiveEmergency {
+            id: 1,
+            tier: EmergencyTier::Critical,
+            activated_by: "alice".to_string(),
+            reason: "Test".to_string(),
+            activated_at: Utc::now(),
+            expires_at: Utc::now() + Duration::try_days(7).unwrap_or_default(),
+            extended: false,
+            extension_count: 0,
+        };
+
+        let remaining = emergency.remaining_duration();
+        assert!(remaining.num_days() >= 6);
+        assert!(remaining.num_days() <= 7);
+    }
+
+    #[test]
+    fn test_active_emergency_can_extend_critical() {
+        let emergency = ActiveEmergency {
+            id: 1,
+            tier: EmergencyTier::Critical,
+            activated_by: "alice".to_string(),
+            reason: "Test".to_string(),
+            activated_at: Utc::now(),
+            expires_at: Utc::now() + Duration::try_days(5).unwrap_or_default(),
+            extended: false,
+            extension_count: 0,
+        };
+
+        assert!(!emergency.can_extend()); // Critical doesn't allow extensions
+        assert!(emergency.calculate_extension_expiration().is_none());
+    }
+
+    #[test]
+    fn test_active_emergency_can_extend_urgent() {
+        let emergency = ActiveEmergency {
+            id: 1,
+            tier: EmergencyTier::Urgent,
+            activated_by: "alice".to_string(),
+            reason: "Test".to_string(),
+            activated_at: Utc::now(),
+            expires_at: Utc::now() + Duration::try_days(10).unwrap_or_default(),
+            extended: false,
+            extension_count: 0,
+        };
+
+        assert!(emergency.can_extend()); // Urgent allows 1 extension
+        assert!(emergency.calculate_extension_expiration().is_some());
+    }
+
+    #[test]
+    fn test_active_emergency_cannot_extend_when_max_reached() {
+        let emergency = ActiveEmergency {
+            id: 1,
+            tier: EmergencyTier::Urgent,
+            activated_by: "alice".to_string(),
+            reason: "Test".to_string(),
+            activated_at: Utc::now(),
+            expires_at: Utc::now() + Duration::try_days(10).unwrap_or_default(),
+            extended: true,
+            extension_count: 1, // Already at max
+        };
+
+        assert!(!emergency.can_extend()); // Max extensions reached
+        assert!(emergency.calculate_extension_expiration().is_none());
+    }
+
+    #[test]
+    fn test_active_emergency_cannot_extend_when_expired() {
+        let emergency = ActiveEmergency {
+            id: 1,
+            tier: EmergencyTier::Urgent,
+            activated_by: "alice".to_string(),
+            reason: "Test".to_string(),
+            activated_at: Utc::now() - Duration::try_days(40).unwrap_or_default(),
+            expires_at: Utc::now() - Duration::try_days(1).unwrap_or_default(),
+            extended: false,
+            extension_count: 0,
+        };
+
+        assert!(emergency.is_expired());
+        assert!(!emergency.can_extend()); // Can't extend expired emergency
+        assert!(emergency.calculate_extension_expiration().is_none());
+    }
+
+    #[test]
+    fn test_validate_activation_insufficient_evidence() {
+        let activation = EmergencyActivation {
+            tier: EmergencyTier::Critical,
+            activated_by: "alice".to_string(),
+            reason: "Test".to_string(),
+            evidence: "short".to_string(), // Less than 100 chars
+            signatures: vec![],
+        };
+
+        let result = EmergencyValidator::validate_activation(&activation);
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            GovernanceAppError::ValidationError(msg) => {
+                assert!(msg.contains("Insufficient evidence"));
+            }
+            _ => panic!("Expected InsufficientEvidence error"),
+        }
+    }
+
+    #[test]
+    fn test_validate_activation_insufficient_signatures() {
+        let activation = EmergencyActivation {
+            tier: EmergencyTier::Critical,
+            activated_by: "alice".to_string(),
+            reason: "Test".to_string(),
+            evidence: "x".repeat(100), // Sufficient evidence
+            signatures: vec![], // Need 5-of-7, have 0
+        };
+
+        let result = EmergencyValidator::validate_activation(&activation);
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            GovernanceAppError::ValidationError(msg) => {
+                assert!(msg.contains("Insufficient signatures"));
+            }
+            _ => panic!("Expected InsufficientSignatures error"),
+        }
+    }
+
+    #[test]
+    fn test_validate_extension_not_allowed() {
+        let emergency = ActiveEmergency {
+            id: 1,
+            tier: EmergencyTier::Critical, // Doesn't allow extensions
+            activated_by: "alice".to_string(),
+            reason: "Test".to_string(),
+            activated_at: Utc::now(),
+            expires_at: Utc::now() + Duration::try_days(5).unwrap_or_default(),
+            extended: false,
+            extension_count: 0,
+        };
+
+        let result = EmergencyValidator::validate_extension(&emergency, &[]);
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            GovernanceAppError::ValidationError(msg) => {
+                assert!(msg.contains("Extensions not allowed"));
+            }
+            _ => panic!("Expected ExtensionNotAllowed error"),
+        }
+    }
+
+    #[test]
+    fn test_validate_extension_max_reached() {
+        let emergency = ActiveEmergency {
+            id: 1,
+            tier: EmergencyTier::Urgent,
+            activated_by: "alice".to_string(),
+            reason: "Test".to_string(),
+            activated_at: Utc::now(),
+            expires_at: Utc::now() + Duration::try_days(10).unwrap_or_default(),
+            extended: true,
+            extension_count: 1, // Already at max
+        };
+
+        let result = EmergencyValidator::validate_extension(&emergency, &[]);
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            GovernanceAppError::ValidationError(msg) => {
+                assert!(msg.contains("Maximum extensions reached"));
+            }
+            _ => panic!("Expected MaxExtensionsReached error"),
+        }
+    }
+
+    #[test]
+    fn test_validate_extension_expired() {
+        let emergency = ActiveEmergency {
+            id: 1,
+            tier: EmergencyTier::Urgent,
+            activated_by: "alice".to_string(),
+            reason: "Test".to_string(),
+            activated_at: Utc::now() - Duration::try_days(40).unwrap_or_default(),
+            expires_at: Utc::now() - Duration::try_days(1).unwrap_or_default(),
+            extended: false,
+            extension_count: 0,
+        };
+
+        let result = EmergencyValidator::validate_extension(&emergency, &[]);
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            GovernanceAppError::ValidationError(msg) => {
+                assert!(msg.contains("expired"));
+            }
+            _ => panic!("Expected EmergencyExpired error"),
+        }
+    }
+
+    #[test]
+    fn test_validate_extension_insufficient_signatures() {
+        let emergency = ActiveEmergency {
+            id: 1,
+            tier: EmergencyTier::Urgent,
+            activated_by: "alice".to_string(),
+            reason: "Test".to_string(),
+            activated_at: Utc::now(),
+            expires_at: Utc::now() + Duration::try_days(10).unwrap_or_default(),
+            extended: false,
+            extension_count: 0,
+        };
+
+        // Need 6-of-7 signatures for extension, have 0
+        let result = EmergencyValidator::validate_extension(&emergency, &[]);
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            GovernanceAppError::ValidationError(msg) => {
+                assert!(msg.contains("Insufficient signatures"));
+            }
+            _ => panic!("Expected InsufficientSignatures error"),
+        }
+    }
+
+    #[test]
+    fn test_check_expiration() {
+        let active_emergencies = vec![
+            ActiveEmergency {
+                id: 1,
+                tier: EmergencyTier::Critical,
+                activated_by: "alice".to_string(),
+                reason: "Test 1".to_string(),
+                activated_at: Utc::now() - Duration::try_days(10).unwrap_or_default(),
+                expires_at: Utc::now() - Duration::try_days(1).unwrap_or_default(), // Expired
+                extended: false,
+                extension_count: 0,
+            },
+            ActiveEmergency {
+                id: 2,
+                tier: EmergencyTier::Urgent,
+                activated_by: "bob".to_string(),
+                reason: "Test 2".to_string(),
+                activated_at: Utc::now(),
+                expires_at: Utc::now() + Duration::try_days(10).unwrap_or_default(), // Not expired
+                extended: false,
+                extension_count: 0,
+            },
+            ActiveEmergency {
+                id: 3,
+                tier: EmergencyTier::Elevated,
+                activated_by: "charlie".to_string(),
+                reason: "Test 3".to_string(),
+                activated_at: Utc::now() - Duration::try_days(100).unwrap_or_default(),
+                expires_at: Utc::now() - Duration::try_days(1).unwrap_or_default(), // Expired
+                extended: false,
+                extension_count: 0,
+            },
+        ];
+
+        let expired = EmergencyValidator::check_expiration(&active_emergencies);
+        assert_eq!(expired.len(), 2);
+        assert!(expired.contains(&1));
+        assert!(expired.contains(&3));
+        assert!(!expired.contains(&2));
+    }
+
+    #[test]
+    fn test_check_expiration_empty() {
+        let expired = EmergencyValidator::check_expiration(&[]);
+        assert_eq!(expired.len(), 0);
+    }
+
+    #[test]
+    fn test_calculate_expiration() {
+        let expiration = EmergencyValidator::calculate_expiration(EmergencyTier::Critical);
+        let expected = Utc::now() + Duration::try_days(7).unwrap_or_default();
+        
+        // Allow small time difference
+        let diff = (expiration - expected).num_seconds().abs();
+        assert!(diff < 5);
+    }
+
+    #[test]
+    fn test_calculate_post_mortem_deadline() {
+        let activated_at = Utc::now();
+        let deadline = EmergencyValidator::calculate_post_mortem_deadline(
+            EmergencyTier::Critical,
+            activated_at,
+        );
+        
+        let expected = activated_at + Duration::try_days(30).unwrap_or_default();
+        let diff = (deadline - expected).num_seconds().abs();
+        assert!(diff < 5);
+    }
+
+    #[test]
+    fn test_calculate_security_audit_deadline_critical() {
+        let activated_at = Utc::now();
+        let deadline = EmergencyValidator::calculate_security_audit_deadline(
+            EmergencyTier::Critical,
+            activated_at,
+        );
+        
+        assert!(deadline.is_some());
+        let expected = activated_at + Duration::try_days(60).unwrap_or_default();
+        let diff = (deadline.unwrap() - expected).num_seconds().abs();
+        assert!(diff < 5);
+    }
+
+    #[test]
+    fn test_calculate_security_audit_deadline_urgent() {
+        let activated_at = Utc::now();
+        let deadline = EmergencyValidator::calculate_security_audit_deadline(
+            EmergencyTier::Urgent,
+            activated_at,
+        );
+        
+        assert!(deadline.is_none()); // Urgent doesn't require audit
+    }
+
+    #[test]
+    fn test_calculate_security_audit_deadline_elevated() {
+        let activated_at = Utc::now();
+        let deadline = EmergencyValidator::calculate_security_audit_deadline(
+            EmergencyTier::Elevated,
+            activated_at,
+        );
+        
+        assert!(deadline.is_none()); // Elevated doesn't require audit
+    }
+
+    #[test]
+    fn test_active_emergency_extension_expiration_calculation() {
+        let emergency = ActiveEmergency {
+            id: 1,
+            tier: EmergencyTier::Urgent,
+            activated_by: "alice".to_string(),
+            reason: "Test".to_string(),
+            activated_at: Utc::now(),
+            expires_at: Utc::now() + Duration::try_days(10).unwrap_or_default(),
+            extended: false,
+            extension_count: 0,
+        };
+
+        let extension_expiration = emergency.calculate_extension_expiration();
+        assert!(extension_expiration.is_some());
+        
+        let expected = emergency.expires_at + Duration::try_days(30).unwrap_or_default();
+        let diff = (extension_expiration.unwrap() - expected).num_seconds().abs();
+        assert!(diff < 5);
+    }
+
+    #[test]
+    fn test_elevated_tier_multiple_extensions() {
+        let mut emergency = ActiveEmergency {
+            id: 1,
+            tier: EmergencyTier::Elevated,
+            activated_by: "alice".to_string(),
+            reason: "Test".to_string(),
+            activated_at: Utc::now(),
+            expires_at: Utc::now() + Duration::try_days(50).unwrap_or_default(),
+            extended: false,
+            extension_count: 0,
+        };
+
+        // First extension allowed
+        assert!(emergency.can_extend());
+        
+        emergency.extension_count = 1;
+        // Second extension allowed
+        assert!(emergency.can_extend());
+        
+        emergency.extension_count = 2;
+        // Max extensions reached
+        assert!(!emergency.can_extend());
+    }
 }

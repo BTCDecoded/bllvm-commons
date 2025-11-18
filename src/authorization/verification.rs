@@ -413,4 +413,226 @@ mod tests {
 
         assert!(validate_server_config(&server).is_ok());
     }
+
+    #[test]
+    fn test_verify_server_authorization_not_found() {
+        let registry = create_test_registry();
+        let result = verify_server_authorization("non-existent", "npub1abc123", &registry);
+        assert!(result.is_ok());
+        assert!(!result.unwrap());
+    }
+
+    #[test]
+    fn test_verify_server_authorization_detailed_not_found() {
+        let registry = create_test_registry();
+        let result = verify_server_authorization_detailed("non-existent", "npub1abc123", &registry);
+        assert!(!result.is_authorized);
+        assert!(!result.is_active);
+        assert!(!result.is_compromised);
+        assert!(result.error_message.is_some());
+        assert!(result.error_message.unwrap().contains("not found"));
+    }
+
+    #[test]
+    fn test_verify_server_authorization_detailed_wrong_npub() {
+        let registry = create_test_registry();
+        let result = verify_server_authorization_detailed("governance-01", "npub1wrong", &registry);
+        assert!(!result.is_authorized);
+        assert!(result.is_active);
+        assert!(!result.is_compromised);
+        assert!(result.error_message.is_some());
+        assert!(result.error_message.unwrap().contains("NPUB"));
+    }
+
+    #[test]
+    fn test_verify_server_authorization_detailed_compromised() {
+        let registry = create_test_registry();
+        let result = verify_server_authorization_detailed("governance-02", "npub1def456", &registry);
+        assert!(!result.is_authorized);
+        assert!(!result.is_active);
+        assert!(result.is_compromised);
+        assert!(result.error_message.is_some());
+        assert!(result.error_message.unwrap().contains("compromised"));
+    }
+
+    #[test]
+    fn test_get_servers_by_status() {
+        let registry = create_test_registry();
+        
+        let active = get_servers_by_status(&registry, ServerStatus::Active);
+        assert_eq!(active.len(), 1);
+        assert_eq!(active[0].server_id, "governance-01");
+        
+        let compromised = get_servers_by_status(&registry, ServerStatus::Compromised);
+        assert_eq!(compromised.len(), 1);
+        assert_eq!(compromised[0].server_id, "governance-02");
+        
+        let inactive = get_servers_by_status(&registry, ServerStatus::Inactive);
+        assert_eq!(inactive.len(), 0);
+    }
+
+    #[test]
+    fn test_get_server_by_id() {
+        let registry = create_test_registry();
+        
+        let server = get_server_by_id(&registry, "governance-01");
+        assert!(server.is_some());
+        assert_eq!(server.unwrap().server_id, "governance-01");
+        
+        let not_found = get_server_by_id(&registry, "non-existent");
+        assert!(not_found.is_none());
+    }
+
+    #[test]
+    fn test_get_server_by_npub() {
+        let registry = create_test_registry();
+        
+        let server = get_server_by_npub(&registry, "npub1abc123");
+        assert!(server.is_some());
+        assert_eq!(server.unwrap().server_id, "governance-01");
+        
+        let not_found = get_server_by_npub(&registry, "npub1nonexistent");
+        assert!(not_found.is_none());
+    }
+
+    #[test]
+    fn test_server_exists() {
+        let registry = create_test_registry();
+        
+        assert!(server_exists(&registry, "governance-01"));
+        assert!(server_exists(&registry, "governance-02"));
+        assert!(!server_exists(&registry, "non-existent"));
+    }
+
+    #[test]
+    fn test_server_statistics_health_percentage() {
+        let registry = create_test_registry();
+        let stats = get_server_statistics(&registry);
+        
+        // 1 active out of 2 total = 50%
+        assert_eq!(stats.health_percentage(), 50.0);
+        
+        // Test with empty registry
+        let empty_registry = GovernanceRegistry {
+            version: "2025-01".to_string(),
+            timestamp: chrono::Utc::now(),
+            previous_registry_hash: "sha256:0000000000000000000000000000000000000000000000000000000000000000".to_string(),
+            maintainers: vec![],
+            authorized_servers: vec![],
+            audit_logs: HashMap::new(),
+            multisig_config: MultisigConfig {
+                required_signatures: 3,
+                total_maintainers: 5,
+            },
+        };
+        let empty_stats = get_server_statistics(&empty_registry);
+        assert_eq!(empty_stats.health_percentage(), 0.0);
+    }
+
+    #[test]
+    fn test_server_statistics_summary() {
+        let registry = create_test_registry();
+        let stats = get_server_statistics(&registry);
+        let summary = stats.summary();
+        
+        assert!(summary.contains("2 total"));
+        assert!(summary.contains("1 active"));
+        assert!(summary.contains("1 compromised"));
+    }
+
+    #[test]
+    fn test_validate_server_config_empty_fields() {
+        let server = crate::ots::anchor::AuthorizedServer {
+            server_id: "".to_string(),
+            operator: crate::ots::anchor::OperatorInfo {
+                name: "Test".to_string(),
+                jurisdiction: "Test".to_string(),
+                contact: None,
+            },
+            keys: crate::ots::anchor::ServerKeys {
+                nostr_npub: "npub1test".to_string(),
+                ssh_fingerprint: "SHA256:test".to_string(),
+            },
+            infrastructure: crate::ots::anchor::InfrastructureInfo {
+                vpn_ip: None,
+                github_runner: false,
+                ots_enabled: false,
+            },
+            status: "active".to_string(),
+            added_at: chrono::Utc::now(),
+        };
+
+        assert!(validate_server_config(&server).is_err());
+    }
+
+    #[test]
+    fn test_validate_server_config_invalid_npub() {
+        let server = crate::ots::anchor::AuthorizedServer {
+            server_id: "test".to_string(),
+            operator: crate::ots::anchor::OperatorInfo {
+                name: "Test".to_string(),
+                jurisdiction: "Test".to_string(),
+                contact: None,
+            },
+            keys: crate::ots::anchor::ServerKeys {
+                nostr_npub: "invalid".to_string(),
+                ssh_fingerprint: "SHA256:test".to_string(),
+            },
+            infrastructure: crate::ots::anchor::InfrastructureInfo {
+                vpn_ip: None,
+                github_runner: false,
+                ots_enabled: false,
+            },
+            status: "active".to_string(),
+            added_at: chrono::Utc::now(),
+        };
+
+        assert!(validate_server_config(&server).is_err());
+    }
+
+    #[test]
+    fn test_validate_server_config_invalid_ssh_fingerprint() {
+        let server = crate::ots::anchor::AuthorizedServer {
+            server_id: "test".to_string(),
+            operator: crate::ots::anchor::OperatorInfo {
+                name: "Test".to_string(),
+                jurisdiction: "Test".to_string(),
+                contact: None,
+            },
+            keys: crate::ots::anchor::ServerKeys {
+                nostr_npub: "npub1test".to_string(),
+                ssh_fingerprint: "invalid".to_string(),
+            },
+            infrastructure: crate::ots::anchor::InfrastructureInfo {
+                vpn_ip: None,
+                github_runner: false,
+                ots_enabled: false,
+            },
+            status: "active".to_string(),
+            added_at: chrono::Utc::now(),
+        };
+
+        assert!(validate_server_config(&server).is_err());
+    }
+
+    #[test]
+    fn test_server_verification_result_summary() {
+        let registry = create_test_registry();
+        let result = verify_server_authorization_detailed("governance-01", "npub1abc123", &registry);
+        let summary = result.summary();
+        
+        assert!(summary.contains("✅"));
+        assert!(summary.contains("authorized"));
+    }
+
+    #[test]
+    fn test_server_verification_result_detailed_status() {
+        let registry = create_test_registry();
+        let result = verify_server_authorization_detailed("governance-01", "npub1abc123", &registry);
+        let detailed = result.detailed_status();
+        
+        assert!(detailed.contains("Authorized"));
+        assert!(detailed.contains("Active"));
+        assert!(detailed.contains("Compromised"));
+    }
 }

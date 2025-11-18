@@ -248,114 +248,352 @@ impl EconomicNodeRegistry {
                     ))
                 })?;
 
+            let qualification_data: String = row.get("qualification_data");
+            let qualification_data: QualificationProof = serde_json::from_str(&qualification_data)
+                .map_err(|e| {
+                    GovernanceError::CryptoError(format!("Invalid qualification data: {}", e))
+                })?;
+
             nodes.push(EconomicNode {
-                id: Some(row.get::<i32, _>("id")),
+                id: row.get("id"),
                 node_type,
-                entity_name: row.get::<String, _>("entity_name"),
-                public_key: row.get::<String, _>("public_key"),
-                qualification_data: serde_json::from_str(
-                    &row.get::<String, _>("qualification_data"),
-                )?,
-                weight: row.get::<f64, _>("weight"),
+                entity_name: row.get("entity_name"),
+                public_key: row.get("public_key"),
+                qualification_data,
+                weight: row.get("weight"),
                 status,
-                registered_at: {
-                    let ts_str = row.get::<String, _>("registered_at");
-                    if ts_str.is_empty() {
-                        Utc::now() // Default to now if empty
-                    } else {
-                        // Try RFC3339 first, then SQLite format (YYYY-MM-DD HH:MM:SS)
-                        match DateTime::parse_from_rfc3339(&ts_str) {
-                            Ok(dt) => dt.with_timezone(&Utc),
-                            Err(_) => {
-                                // Try SQLite format: YYYY-MM-DD HH:MM:SS
-                                chrono::NaiveDateTime::parse_from_str(&ts_str, "%Y-%m-%d %H:%M:%S")
-                                    .map(|dt| dt.and_utc())
-                                    .map_err(|e| GovernanceError::CryptoError(format!("Invalid timestamp: {}", e)))?
-                            }
-                        }
-                    }
-                },
-                verified_at: row.get::<Option<String>, _>("verified_at").and_then(|t| {
-                    if t.is_empty() {
-                        None
-                    } else {
-                        match DateTime::parse_from_rfc3339(&t) {
-                            Ok(dt) => Some(dt.with_timezone(&Utc)),
-                            Err(_) => {
-                                chrono::NaiveDateTime::parse_from_str(&t, "%Y-%m-%d %H:%M:%S")
-                                    .map(|dt| dt.and_utc())
-                                    .ok()
-                            }
-                        }
-                    }
-                }),
-                last_verified_at: row.get::<Option<String>, _>("last_verified_at").and_then(|t| {
-                    if t.is_empty() {
-                        None
-                    } else {
-                        match DateTime::parse_from_rfc3339(&t) {
-                            Ok(dt) => Some(dt.with_timezone(&Utc)),
-                            Err(_) => {
-                                chrono::NaiveDateTime::parse_from_str(&t, "%Y-%m-%d %H:%M:%S")
-                                    .map(|dt| dt.and_utc())
-                                    .ok()
-                            }
-                        }
-                    }
-                }),
-                created_by: row.get::<Option<String>, _>("created_by"),
-                notes: row.get::<String, _>("notes"),
+                registered_at: row.get("registered_at"),
+                verified_at: row.get("verified_at"),
+                last_verified_at: row.get("last_verified_at"),
+                created_by: row.get("created_by"),
+                notes: row.get("notes"),
             });
         }
 
         Ok(nodes)
     }
 
-    /// Update node status
-    pub async fn update_node_status(
-        &self,
-        node_id: i32,
-        status: NodeStatus,
-    ) -> Result<(), GovernanceError> {
-        sqlx::query("UPDATE economic_nodes SET status = ? WHERE id = ?")
-            .bind(status.as_str())
-            .bind(node_id)
-            .execute(&self.pool)
-            .await
-            .map_err(|e| {
-                GovernanceError::DatabaseError(format!("Failed to update status: {}", e))
+    /// Get node by ID
+    pub async fn get_node_by_id(&self, node_id: i32) -> Result<EconomicNode, GovernanceError> {
+        let row = sqlx::query(
+            r#"
+            SELECT id, node_type, entity_name, public_key, qualification_data, 
+                   weight, status, registered_at, verified_at, last_verified_at, 
+                   created_by, notes
+            FROM economic_nodes 
+            WHERE id = ?
+            "#,
+        )
+        .bind(node_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| {
+            GovernanceError::DatabaseError(format!("Failed to fetch node: {}", e))
+        })?;
+
+        let row = row.ok_or_else(|| {
+            GovernanceError::CryptoError(format!("Node with ID {} not found", node_id))
+        })?;
+
+        let node_type =
+            NodeType::from_str(&row.get::<String, _>("node_type")).ok_or_else(|| {
+                GovernanceError::CryptoError(format!(
+                    "Invalid node type: {}",
+                    row.get::<String, _>("node_type")
+                ))
             })?;
 
-        info!("Updated node {} status to {}", node_id, status.as_str());
-        Ok(())
+        let status =
+            NodeStatus::from_str(&row.get::<String, _>("status")).ok_or_else(|| {
+                GovernanceError::CryptoError(format!(
+                    "Invalid status: {}",
+                    row.get::<String, _>("status")
+                ))
+            })?;
+
+        let qualification_data: String = row.get("qualification_data");
+        let qualification_data: QualificationProof = serde_json::from_str(&qualification_data)
+            .map_err(|e| {
+                GovernanceError::CryptoError(format!("Invalid qualification data: {}", e))
+            })?;
+
+        Ok(EconomicNode {
+            id: row.get("id"),
+            node_type,
+            entity_name: row.get("entity_name"),
+            public_key: row.get("public_key"),
+            qualification_data,
+            weight: row.get("weight"),
+            status,
+            registered_at: row.get("registered_at"),
+            verified_at: row.get("verified_at"),
+            last_verified_at: row.get("last_verified_at"),
+            created_by: row.get("created_by"),
+            notes: row.get("notes"),
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::database::Database;
+    use crate::economic_nodes::types::{QualificationProof, HashpowerProof, HoldingsProof, VolumeProof, ContactInfo};
+
+    async fn setup_test_registry() -> EconomicNodeRegistry {
+        let db = Database::new_in_memory().await.unwrap();
+        EconomicNodeRegistry::new(db.pool().unwrap().clone())
     }
 
-    /// Recalculate weights for all nodes (for periodic updates)
-    pub async fn recalculate_all_weights(&self) -> Result<(), GovernanceError> {
-        let nodes = self.get_active_nodes().await?;
-
-        for node in nodes {
-            if let Some(node_id) = node.id {
-                // Recalculate weight based on current qualification data
-                let qualification_data: QualificationProof =
-                    serde_json::from_value(node.qualification_data.clone())?;
-
-                let new_weight = self
-                    .calculate_weight(node.node_type.clone(), &qualification_data)
-                    .await?;
-
-                sqlx::query("UPDATE economic_nodes SET weight = ? WHERE id = ?")
-                    .bind(new_weight)
-                    .bind(node_id)
-                    .execute(&self.pool)
-                    .await
-                    .map_err(|e| {
-                        GovernanceError::DatabaseError(format!("Failed to update weight: {}", e))
-                    })?;
+    fn create_mining_pool_qualification(hashpower: f64) -> serde_json::Value {
+        serde_json::json!({
+            "node_type": "mining_pool",
+            "hashpower_proof": {
+                "blocks_mined": ["block1", "block2"],
+                "time_period_days": 30,
+                "total_network_blocks": 100,
+                "percentage": hashpower
+            },
+            "contact_info": {
+                "entity_name": "Test Pool",
+                "contact_email": "test@example.com"
             }
-        }
+        })
+    }
 
-        info!("Recalculated weights for all active nodes");
-        Ok(())
+    fn create_exchange_qualification(holdings_btc: f64, daily_volume_usd: f64) -> serde_json::Value {
+        serde_json::json!({
+            "node_type": "exchange",
+            "holdings_proof": {
+                "addresses": ["addr1"],
+                "total_btc": holdings_btc,
+                "signature_challenge": "challenge"
+            },
+            "volume_proof": {
+                "daily_volume_usd": daily_volume_usd,
+                "monthly_volume_usd": daily_volume_usd * 30.0,
+                "data_source": "test"
+            },
+            "contact_info": {
+                "entity_name": "Test Exchange",
+                "contact_email": "test@example.com"
+            }
+        })
+    }
+
+    #[tokio::test]
+    async fn test_calculate_weight_mining_pool() {
+        let registry = setup_test_registry().await;
+        let qual_json = create_mining_pool_qualification(35.0);
+        let qual: QualificationProof = serde_json::from_value(qual_json.clone()).unwrap();
+        
+        let weight = registry.calculate_weight(NodeType::MiningPool, &qual).await.unwrap();
+        assert_eq!(weight, 0.35, "Mining pool weight should be hashpower / 100");
+    }
+
+    #[tokio::test]
+    async fn test_calculate_weight_mining_pool_no_proof() {
+        let registry = setup_test_registry().await;
+        let qual = QualificationProof {
+            node_type: NodeType::MiningPool,
+            hashpower_proof: None,
+            holdings_proof: None,
+            volume_proof: None,
+            contact_info: ContactInfo {
+                entity_name: "Test".to_string(),
+                contact_email: "test@example.com".to_string(),
+                website: None,
+                github_username: None,
+            },
+        };
+        
+        let result = registry.calculate_weight(NodeType::MiningPool, &qual).await;
+        assert!(result.is_err(), "Should fail without hashpower proof");
+    }
+
+    #[tokio::test]
+    async fn test_calculate_weight_exchange() {
+        let registry = setup_test_registry().await;
+        let qual_json = create_exchange_qualification(5000.0, 50_000_000.0);
+        let qual: QualificationProof = serde_json::from_value(qual_json).unwrap();
+        
+        let weight = registry.calculate_weight(NodeType::Exchange, &qual).await.unwrap();
+        // holdings: 5000/10000 * 0.7 = 0.35
+        // volume: 50M/100M * 0.3 = 0.15
+        // total: 0.5
+        assert!((weight - 0.5).abs() < 0.01, "Exchange weight should be 0.5");
+    }
+
+    #[tokio::test]
+    async fn test_calculate_weight_exchange_capped() {
+        let registry = setup_test_registry().await;
+        let qual_json = create_exchange_qualification(20000.0, 200_000_000.0);
+        let qual: QualificationProof = serde_json::from_value(qual_json).unwrap();
+        
+        let weight = registry.calculate_weight(NodeType::Exchange, &qual).await.unwrap();
+        // Should be capped at 1.0
+        assert!(weight <= 1.0, "Weight should be capped at 1.0");
+    }
+
+    #[tokio::test]
+    async fn test_calculate_weight_custodian() {
+        let registry = setup_test_registry().await;
+        let qual = QualificationProof {
+            node_type: NodeType::Custodian,
+            hashpower_proof: None,
+            holdings_proof: Some(HoldingsProof {
+                addresses: vec!["addr1".to_string()],
+                total_btc: 5000.0,
+                signature_challenge: "challenge".to_string(),
+            }),
+            volume_proof: None,
+            contact_info: ContactInfo {
+                entity_name: "Test".to_string(),
+                contact_email: "test@example.com".to_string(),
+                website: None,
+                github_username: None,
+            },
+        };
+        
+        let weight = registry.calculate_weight(NodeType::Custodian, &qual).await.unwrap();
+        // 5000/10000 = 0.5
+        assert!((weight - 0.5).abs() < 0.01, "Custodian weight should be 0.5");
+    }
+
+    #[tokio::test]
+    async fn test_calculate_weight_payment_processor() {
+        let registry = setup_test_registry().await;
+        let qual = QualificationProof {
+            node_type: NodeType::PaymentProcessor,
+            hashpower_proof: None,
+            holdings_proof: None,
+            volume_proof: Some(VolumeProof {
+                daily_volume_usd: 0.0,
+                monthly_volume_usd: 25_000_000.0,
+                data_source: "test".to_string(),
+                verification_url: None,
+            }),
+            contact_info: ContactInfo {
+                entity_name: "Test".to_string(),
+                contact_email: "test@example.com".to_string(),
+                website: None,
+                github_username: None,
+            },
+        };
+        
+        let weight = registry.calculate_weight(NodeType::PaymentProcessor, &qual).await.unwrap();
+        // 25M/50M = 0.5
+        assert!((weight - 0.5).abs() < 0.01, "Payment processor weight should be 0.5");
+    }
+
+    #[tokio::test]
+    async fn test_calculate_weight_major_holder() {
+        let registry = setup_test_registry().await;
+        let qual = QualificationProof {
+            node_type: NodeType::MajorHolder,
+            hashpower_proof: None,
+            holdings_proof: Some(HoldingsProof {
+                addresses: vec!["addr1".to_string()],
+                total_btc: 2500.0,
+                signature_challenge: "challenge".to_string(),
+            }),
+            volume_proof: None,
+            contact_info: ContactInfo {
+                entity_name: "Test".to_string(),
+                contact_email: "test@example.com".to_string(),
+                website: None,
+                github_username: None,
+            },
+        };
+        
+        let weight = registry.calculate_weight(NodeType::MajorHolder, &qual).await.unwrap();
+        // 2500/5000 = 0.5
+        assert!((weight - 0.5).abs() < 0.01, "Major holder weight should be 0.5");
+    }
+
+    #[tokio::test]
+    async fn test_verify_qualification_mining_pool_meets_threshold() {
+        let registry = setup_test_registry().await;
+        let qual_json = create_mining_pool_qualification(35.0); // Above 1% threshold (from types.rs)
+        let qual: QualificationProof = serde_json::from_value(qual_json).unwrap();
+        
+        let verified = registry.verify_qualification(NodeType::MiningPool, &qual).await.unwrap();
+        assert!(verified, "Should verify when hashpower meets threshold");
+    }
+
+    #[tokio::test]
+    async fn test_verify_qualification_mining_pool_below_threshold() {
+        let registry = setup_test_registry().await;
+        let qual_json = create_mining_pool_qualification(0.5); // Below 1% threshold
+        let qual: QualificationProof = serde_json::from_value(qual_json).unwrap();
+        
+        let verified = registry.verify_qualification(NodeType::MiningPool, &qual).await.unwrap();
+        assert!(!verified, "Should not verify when hashpower below threshold");
+    }
+
+    #[tokio::test]
+    async fn test_verify_qualification_mining_pool_no_proof() {
+        let registry = setup_test_registry().await;
+        let qual = QualificationProof {
+            node_type: NodeType::MiningPool,
+            hashpower_proof: None,
+            holdings_proof: None,
+            volume_proof: None,
+            contact_info: ContactInfo {
+                entity_name: "Test".to_string(),
+                contact_email: "test@example.com".to_string(),
+                website: None,
+                github_username: None,
+            },
+        };
+        
+        let verified = registry.verify_qualification(NodeType::MiningPool, &qual).await.unwrap();
+        assert!(!verified, "Should not verify without hashpower proof");
+    }
+
+    #[tokio::test]
+    async fn test_verify_qualification_exchange_meets_threshold() {
+        let registry = setup_test_registry().await;
+        let qual_json = create_exchange_qualification(10000.0, 100_000_000.0); // Meets thresholds
+        let qual: QualificationProof = serde_json::from_value(qual_json).unwrap();
+        
+        let verified = registry.verify_qualification(NodeType::Exchange, &qual).await.unwrap();
+        assert!(verified, "Should verify when exchange meets thresholds");
+    }
+
+    #[tokio::test]
+    async fn test_verify_qualification_exchange_below_holdings() {
+        let registry = setup_test_registry().await;
+        let qual_json = create_exchange_qualification(9000.0, 100_000_000.0); // Below 10K BTC threshold
+        let qual: QualificationProof = serde_json::from_value(qual_json).unwrap();
+        
+        let verified = registry.verify_qualification(NodeType::Exchange, &qual).await.unwrap();
+        assert!(!verified, "Should not verify when holdings below threshold");
+    }
+
+    #[tokio::test]
+    async fn test_verify_qualification_exchange_below_volume() {
+        let registry = setup_test_registry().await;
+        let qual_json = create_exchange_qualification(10000.0, 90_000_000.0); // Below $100M daily threshold
+        let qual: QualificationProof = serde_json::from_value(qual_json).unwrap();
+        
+        let verified = registry.verify_qualification(NodeType::Exchange, &qual).await.unwrap();
+        assert!(!verified, "Should not verify when volume below threshold");
+    }
+
+    #[tokio::test]
+    async fn test_get_node_by_id_not_found() {
+        let registry = setup_test_registry().await;
+        
+        let result = registry.get_node_by_id(999).await;
+        assert!(result.is_err(), "Should fail for non-existent node");
+    }
+
+    #[tokio::test]
+    async fn test_get_active_nodes_empty() {
+        let registry = setup_test_registry().await;
+        
+        let nodes = registry.get_active_nodes().await.unwrap();
+        assert_eq!(nodes.len(), 0, "Should return empty list when no active nodes");
     }
 }
