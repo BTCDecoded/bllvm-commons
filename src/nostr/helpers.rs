@@ -130,9 +130,13 @@ async fn get_signatures_from_db(
             // Convert database signatures to Nostr format
             let mut nostr_sigs = Vec::new();
             for sig in &p.signatures {
+                // Determine keyholder type from maintainer registry
+                let keyholder_type = determine_keyholder_type(database, &sig.signer).await
+                    .unwrap_or_else(|_| "maintainer".to_string()); // Default to maintainer on error
+                
                 nostr_sigs.push(KeyholderSignature {
                     keyholder: sig.signer.clone(),
-                    keyholder_type: "maintainer".to_string(), // TODO: Determine from maintainer registry
+                    keyholder_type,
                     signature: sig.signature.clone(),
                     timestamp: sig.timestamp.timestamp(),
                 });
@@ -141,6 +145,29 @@ async fn get_signatures_from_db(
         }
         None => Ok(vec![]),
     }
+}
+
+/// Determine keyholder type from maintainer registry
+/// Checks if signer is a maintainer or emergency keyholder
+async fn determine_keyholder_type(
+    database: &Database,
+    signer: &str,
+) -> Result<String, anyhow::Error> {
+    // First check if it's a maintainer
+    if let Ok(Some(_)) = database.get_maintainer_by_username(signer).await {
+        return Ok("maintainer".to_string());
+    }
+    
+    // Then check if it's an emergency keyholder
+    let emergency_keyholders = database.get_emergency_keyholders().await
+        .map_err(|e| anyhow::anyhow!("Failed to get emergency keyholders: {}", e))?;
+    
+    if emergency_keyholders.iter().any(|ek| ek.github_username == signer) {
+        return Ok("emergency".to_string());
+    }
+    
+    // Default to maintainer if not found (for backward compatibility)
+    Ok("maintainer".to_string())
 }
 
 /// Publish review period notification when PR enters review period

@@ -76,7 +76,8 @@ pub async fn handle_release_event(
 /// Handle repository_dispatch events (build completion notifications)
 pub async fn handle_repository_dispatch(
     payload: &Value,
-    _orchestrator: &BuildOrchestrator,
+    orchestrator: &BuildOrchestrator,
+    database: &Database,
 ) -> Result<(StatusCode, Value), GovernanceError> {
     info!("Handling repository_dispatch event");
     
@@ -103,12 +104,74 @@ pub async fn handle_repository_dispatch(
                 .get("status")
                 .and_then(|v| v.as_str())
                 .unwrap_or("unknown");
+            let release_version = client_payload
+                .get("release_version")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown");
+            let workflow_run_id = client_payload
+                .get("workflow_run_id")
+                .and_then(|v| v.as_u64());
+            let error_message = client_payload
+                .get("error_message")
+                .and_then(|v| v.as_str());
             
-            info!("Build completed for {}: {}", repo, status);
+            info!("Build completed for {} (release {}): {}", repo, release_version, status);
             
-            // TODO: Update build state in database
-            // TODO: Check if all builds are complete
-            // TODO: Proceed to next step (artifact collection, etc.)
+            // Map GitHub status to our build status
+            let build_status = match status {
+                "success" => "success",
+                "failure" => "failure",
+                "cancelled" => "cancelled",
+                "timed_out" => "timed_out",
+                _ => "failure", // Unknown status treated as failure
+            };
+            
+            // Update build state in database
+            database.update_build_status(
+                release_version,
+                repo,
+                build_status,
+                error_message,
+            ).await?;
+            
+            // Check if all builds are complete
+            let all_complete = database.are_all_builds_complete(release_version).await?;
+            
+            if all_complete {
+                info!("All builds complete for release {}", release_version);
+                
+                // Proceed to next step: artifact collection and release creation
+                // Check if any builds failed - if so, don't proceed with release
+                let all_successful = database
+                    .get_build_runs_for_release(release_version)
+                    .await?
+                    .iter()
+                    .all(|run| run.status == "success");
+                
+                if all_successful {
+                    info!("All builds successful for release {} - proceeding with artifact collection", release_version);
+                    
+                    // Trigger artifact collection and release creation
+                    // This is done asynchronously to avoid blocking the webhook response
+                    let orchestrator_clone = orchestrator.clone();
+                    let release_version_clone = release_version.to_string();
+                    
+                    tokio::spawn(async move {
+                        if let Err(e) = orchestrator_clone
+                            .collect_and_create_release(&release_version_clone)
+                            .await
+                        {
+                            error!("Failed to collect artifacts and create release for {}: {}", release_version_clone, e);
+                        } else {
+                            info!("Successfully collected artifacts and created release for {}", release_version_clone);
+                        }
+                    });
+                } else {
+                    warn!("Some builds failed for release {} - skipping artifact collection and release creation", release_version);
+                }
+            } else {
+                info!("Waiting for remaining builds for release {}", release_version);
+            }
         }
         "build-request" => {
             // This is handled by the workflow, not the governance app

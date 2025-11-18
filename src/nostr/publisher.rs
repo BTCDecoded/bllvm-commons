@@ -104,20 +104,34 @@ impl StatusPublisher {
         // Calculate uptime
         let uptime_hours = (Utc::now() - self.start_time).num_hours() as u64;
 
-        // TODO: Implement these database methods
-        let _last_merge: Option<()> = None;
-        let last_merge_pr = None;
-        let last_merge_time = None;
-        let merges_today = 0;
+        // Get last merged PR information from database
+        let (last_merge_pr, last_merge_time) = match self.database.get_last_merged_pr().await {
+            Ok(Some((pr_number, timestamp))) => (pr_number, timestamp),
+            Ok(None) => (None, None),
+            Err(e) => {
+                warn!("Failed to get last merged PR: {}", e);
+                (None, None)
+            }
+        };
 
-        // TODO: Implement relay status tracking
-        let relay_status = HashMap::new();
+        // Count merges today
+        let merges_today = match self.database.count_merges_today().await {
+            Ok(count) => count,
+            Err(e) => {
+                warn!("Failed to count merges today: {}", e);
+                0
+            }
+        };
+
+        // Get relay status from Nostr client
+        // Note: Relay status tracking is already implemented in NostrClient
+        let relay_status = self.client.get_relay_status().await;
 
         Ok(ServerHealth {
             uptime_hours,
             last_merge_pr,
             last_merge: last_merge_time,
-            merges_today,
+            merges_today: merges_today as i64,
             relay_status,
         })
     }

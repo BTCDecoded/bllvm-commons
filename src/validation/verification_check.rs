@@ -6,10 +6,70 @@
 
 use crate::error::{Result, GovernanceError};
 use crate::github::client::GitHubClient;
+use crate::github::types::{CheckRun, WorkflowStatus};
 use crate::database::models::PullRequest;
 use crate::validation::ValidationResult;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+
+/// Trait for GitHub operations needed by verification checks
+/// This allows for easy mocking in tests
+#[async_trait::async_trait]
+pub trait GitHubVerificationClient: Send + Sync {
+    async fn get_workflow_status(
+        &self,
+        owner: &str,
+        repo: &str,
+        pr_number: u64,
+        workflow_file: &str,
+    ) -> Result<WorkflowStatus>;
+    
+    async fn get_check_runs(
+        &self,
+        owner: &str,
+        repo: &str,
+        sha: &str,
+    ) -> Result<Vec<CheckRun>>;
+    
+    async fn workflow_exists(
+        &self,
+        owner: &str,
+        repo: &str,
+        workflow_file: &str,
+    ) -> Result<bool>;
+}
+
+/// Implement the trait for GitHubClient
+#[async_trait::async_trait]
+impl GitHubVerificationClient for GitHubClient {
+    async fn get_workflow_status(
+        &self,
+        owner: &str,
+        repo: &str,
+        pr_number: u64,
+        workflow_file: &str,
+    ) -> Result<WorkflowStatus> {
+        GitHubClient::get_workflow_status(self, owner, repo, pr_number, workflow_file).await
+    }
+    
+    async fn get_check_runs(
+        &self,
+        owner: &str,
+        repo: &str,
+        sha: &str,
+    ) -> Result<Vec<CheckRun>> {
+        GitHubClient::get_check_runs(self, owner, repo, sha).await
+    }
+    
+    async fn workflow_exists(
+        &self,
+        owner: &str,
+        repo: &str,
+        workflow_file: &str,
+    ) -> Result<bool> {
+        GitHubClient::workflow_exists(self, owner, repo, workflow_file).await
+    }
+}
 
 /// Verification configuration loaded from governance config
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -41,8 +101,8 @@ pub struct GovernanceConfig {
 }
 
 /// Check if PR has passed formal verification
-pub async fn check_verification_status(
-    client: &GitHubClient,
+pub async fn check_verification_status<C: GitHubVerificationClient>(
+    client: &C,
     pr: &PullRequest,
 ) -> Result<ValidationResult> {
     // Parse repository name to extract owner and repo
@@ -122,8 +182,8 @@ fn parse_repo_name(repo_name: &str) -> crate::error::Result<(String, String)> {
 }
 
 /// Check specific tool status
-async fn check_tool_status(
-    client: &GitHubClient,
+async fn check_tool_status<C: GitHubVerificationClient>(
+    client: &C,
     pr: &PullRequest,
     tool_name: &str,
 ) -> Result<bool> {
@@ -172,8 +232,8 @@ fn load_governance_config() -> Result<GovernanceConfig> {
 }
 
 /// Validate verification requirements for a repository
-pub async fn validate_verification_requirements(
-    client: &GitHubClient,
+pub async fn validate_verification_requirements<C: GitHubVerificationClient>(
+    client: &C,
     repo: &str,
     pr_number: u64,
 ) -> Result<VerificationValidationResult> {
@@ -274,6 +334,7 @@ mod tests {
     struct MockGitHubClient {
         workflow_status: WorkflowStatus,
         check_runs: Vec<CheckRun>,
+        workflow_exists_result: bool,
     }
     
     impl MockGitHubClient {
@@ -281,41 +342,95 @@ mod tests {
             Self {
                 workflow_status,
                 check_runs,
+                workflow_exists_result: true,
             }
+        }
+        
+        fn with_workflow_exists(mut self, exists: bool) -> Self {
+            self.workflow_exists_result = exists;
+            self
         }
     }
     
-    // Note: GitHubClient is a struct, not a trait, so we can't implement it for MockGitHubClient.
-    // This test needs to be refactored to work with the actual GitHubClient struct.
-    // For now, we'll skip this test implementation.
-    /*
-    impl MockGitHubClient {
-        async fn get_workflow_status(&self, _repo: &str, _pr_number: u64, _workflow: &str) -> Result<WorkflowStatus> {
+    #[async_trait::async_trait]
+    impl GitHubVerificationClient for MockGitHubClient {
+        async fn get_workflow_status(
+            &self,
+            _owner: &str,
+            _repo: &str,
+            _pr_number: u64,
+            _workflow_file: &str,
+        ) -> Result<WorkflowStatus> {
             Ok(self.workflow_status.clone())
         }
         
-        async fn get_check_runs(&self, _repo: &str, _sha: &str) -> Result<Vec<CheckRun>> {
+        async fn get_check_runs(
+            &self,
+            _owner: &str,
+            _repo: &str,
+            _sha: &str,
+        ) -> Result<Vec<CheckRun>> {
             Ok(self.check_runs.clone())
         }
         
-        async fn workflow_exists(&self, _repo: &str, _workflow: &str) -> Result<bool> {
-            Ok(true)
+        async fn workflow_exists(
+            &self,
+            _owner: &str,
+            _repo: &str,
+            _workflow_file: &str,
+        ) -> Result<bool> {
+            Ok(self.workflow_exists_result)
         }
     }
-    */
     
-    // TODO: Fix this test - GitHubClient is a struct, not a trait, so we need to refactor
-    // the test to work with the actual GitHubClient or create a proper mock.
-    /*
     #[tokio::test]
     async fn test_verification_check_passes() {
-        // This test needs to be refactored to work with the actual GitHubClient struct
-        // or use a different testing approach (e.g., integration tests with a real client)
+        let client = MockGitHubClient::new(
+            WorkflowStatus {
+                conclusion: Some("success".to_string()),
+                status: Some("completed".to_string()),
+            },
+            vec![
+                CheckRun {
+                    name: "Kani Model Checking".to_string(),
+                    conclusion: Some("success".to_string()),
+                    status: "completed".to_string(),
+                    html_url: None,
+                },
+                CheckRun {
+                    name: "Unit & Property Tests".to_string(),
+                    conclusion: Some("success".to_string()),
+                    status: "completed".to_string(),
+                    html_url: None,
+                },
+            ],
+        );
+        
+        let pr = PullRequest {
+            id: 0,
+            repo_name: "BTCDecoded/bllvm-consensus".to_string(),
+            pr_number: 123,
+            opened_at: chrono::Utc::now(),
+            layer: 2,
+            head_sha: "abc123".to_string(),
+            signatures: vec![],
+            governance_status: "pending".to_string(),
+            linked_prs: vec![],
+            emergency_mode: false,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        };
+        
+        let result = check_verification_status(&client, &pr).await.unwrap();
+        
+        match result {
+            ValidationResult::Valid { message } => {
+                assert!(message.contains("Formal verification passed"));
+            },
+            _ => panic!("Expected Valid result, got {:?}", result),
+        }
     }
-    */
     
-    // TODO: Fix this test - needs proper mocking
-    /*
     #[tokio::test]
     async fn test_verification_check_blocks_unverified() {
         let client = MockGitHubClient::new(
@@ -348,7 +463,7 @@ mod tests {
                 assert!(message.contains("Formal verification failed"));
                 assert!(blocking);
             },
-            _ => panic!("Expected Invalid result"),
+            _ => panic!("Expected Invalid result, got {:?}", result),
         }
     }
     
@@ -383,10 +498,45 @@ mod tests {
             ValidationResult::Pending { message } => {
                 assert!(message.contains("Verification is still running"));
             },
-            _ => panic!("Expected Pending result"),
+            _ => panic!("Expected Pending result, got {:?}", result),
         }
     }
-    */
+    
+    #[tokio::test]
+    async fn test_verification_check_not_applicable() {
+        let client = MockGitHubClient::new(
+            WorkflowStatus {
+                conclusion: Some("success".to_string()),
+                status: Some("completed".to_string()),
+            },
+            vec![],
+        );
+        
+        // Use a repo that doesn't require verification
+        let pr = PullRequest {
+            id: 0,
+            repo_name: "BTCDecoded/some-other-repo".to_string(),
+            pr_number: 123,
+            opened_at: chrono::Utc::now(),
+            layer: 1,
+            head_sha: "abc123".to_string(),
+            signatures: vec![],
+            governance_status: "pending".to_string(),
+            linked_prs: vec![],
+            emergency_mode: false,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        };
+        
+        let result = check_verification_status(&client, &pr).await.unwrap();
+        
+        match result {
+            ValidationResult::NotApplicable => {
+                // Expected - verification not required for this repo
+            },
+            _ => panic!("Expected NotApplicable result, got {:?}", result),
+        }
+    }
     
     #[test]
     fn test_requires_verification() {

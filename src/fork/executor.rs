@@ -10,12 +10,15 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use tracing::{info, warn};
+use secp256k1::SecretKey;
+use hex;
 
 use crate::error::GovernanceError;
 use super::types::*;
 use super::export::GovernanceExporter;
 use super::adoption::AdoptionTracker;
 use super::versioning::RulesetVersioning;
+use bllvm_sdk::governance::sign_message;
 
 /// Executes governance forks and manages ruleset transitions
 pub struct ForkExecutor {
@@ -25,6 +28,7 @@ pub struct ForkExecutor {
     exporter: GovernanceExporter,
     versioning: RulesetVersioning,
     fork_thresholds: ForkThresholds,
+    executor_secret_key: Option<SecretKey>,
 }
 
 impl ForkExecutor {
@@ -33,6 +37,16 @@ impl ForkExecutor {
         export_path: &str,
         pool: sqlx::SqlitePool,
         fork_thresholds: Option<ForkThresholds>,
+    ) -> Result<Self, GovernanceError> {
+        Self::new_with_key(export_path, pool, fork_thresholds, None)
+    }
+
+    /// Create a new fork executor with optional secret key for signing fork decisions
+    pub fn new_with_key(
+        export_path: &str,
+        pool: sqlx::SqlitePool,
+        fork_thresholds: Option<ForkThresholds>,
+        executor_secret_key: Option<SecretKey>,
     ) -> Result<Self, GovernanceError> {
         let exporter = GovernanceExporter::new(export_path);
         let adoption_tracker = AdoptionTracker::new(pool);
@@ -45,7 +59,13 @@ impl ForkExecutor {
             exporter,
             versioning,
             fork_thresholds: fork_thresholds.unwrap_or_default(),
+            executor_secret_key,
         })
+    }
+
+    /// Set the executor secret key for signing fork decisions
+    pub fn set_secret_key(&mut self, secret_key: SecretKey) {
+        self.executor_secret_key = Some(secret_key);
     }
 
     /// Initialize the fork executor with current governance state
@@ -333,16 +353,32 @@ impl ForkExecutor {
         // Update available rulesets
         self.available_rulesets.insert("current".to_string(), target_ruleset.clone());
         
-        // Notify adoption tracker
-        let decision = ForkDecision {
+        // Create fork decision
+        let mut decision = ForkDecision {
             node_id: "bllvm-commons".to_string(),
-            node_type: "full_node".to_string(),
+            node_type: "governance-app".to_string(),
             chosen_ruleset: target_ruleset.id.clone(),
             decision_reason: "Fork executed by bllvm-commons".to_string(),
             weight: 1.0,
             timestamp: Utc::now(),
-            signature: "".to_string(), // TODO: Add proper signature
+            signature: String::new(), // Will be filled below if key is available
         };
+
+        // Sign the fork decision if secret key is available
+        if let Some(ref secret_key) = self.executor_secret_key {
+            let message = Self::serialize_decision_for_signing(&decision);
+            match sign_message(secret_key, &message) {
+                Ok(signature) => {
+                    decision.signature = hex::encode(signature.to_bytes());
+                    info!("Fork decision signed successfully");
+                }
+                Err(e) => {
+                    warn!("Failed to sign fork decision: {}. Decision will be unsigned.", e);
+                }
+            }
+        } else {
+            warn!("Fork executor has no secret key - decision will be unsigned");
+        }
         self.adoption_tracker.record_fork_decision(
             &target_ruleset.id,
             "bllvm-commons",
@@ -417,6 +453,20 @@ impl ForkExecutor {
             fork_in_progress: self.is_fork_in_progress(),
             last_check: Utc::now(),
         }
+    }
+
+    /// Serialize fork decision for signing (excludes signature field)
+    pub(crate) fn serialize_decision_for_signing(decision: &ForkDecision) -> Vec<u8> {
+        // Serialize all fields except signature
+        let data = serde_json::json!({
+            "node_id": decision.node_id,
+            "node_type": decision.node_type,
+            "chosen_ruleset": decision.chosen_ruleset,
+            "decision_reason": decision.decision_reason,
+            "weight": decision.weight,
+            "timestamp": decision.timestamp.to_rfc3339(),
+        });
+        serde_json::to_vec(&data).unwrap_or_default()
     }
 }
 

@@ -4,6 +4,8 @@ use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 use tracing::{info, warn, error};
 use serde_json::json;
+use sha2::{Sha256, Digest};
+use hex;
 
 use crate::error::GovernanceError;
 use crate::github::client::GitHubClient;
@@ -14,6 +16,7 @@ use super::monitor::{BuildMonitor, BuildStatus};
 use super::artifacts::ArtifactCollector;
 
 /// Build orchestrator for coordinating cross-repository builds
+#[derive(Clone)]
 pub struct BuildOrchestrator {
     github_client: GitHubClient,
     database: Database,
@@ -101,6 +104,14 @@ impl BuildOrchestrator {
                 info!("Triggering build for {}", repo);
                 let workflow_run_id = self.trigger_build(repo, version).await?;
                 triggered_builds.insert(repo.clone(), workflow_run_id);
+                
+                // Track build state in database
+                self.database.upsert_build_run(
+                    version,
+                    repo,
+                    Some(workflow_run_id),
+                    "in_progress",
+                ).await?;
             }
         }
         
@@ -131,6 +142,61 @@ impl BuildOrchestrator {
         self.create_github_release(version, prerelease, &artifacts).await?;
         
         info!("Release orchestration completed successfully for version {}", version);
+        Ok(())
+    }
+    
+    /// Collect artifacts and create release after all builds complete
+    /// This is called from the webhook handler when all builds are done
+    pub async fn collect_and_create_release(
+        &self,
+        release_version: &str,
+    ) -> Result<(), GovernanceError> {
+        info!("Collecting artifacts and creating release for {}", release_version);
+        
+        // Get all build runs with workflow_run_ids
+        let build_runs = self.database
+            .get_build_runs_with_ids_for_release(release_version)
+            .await?;
+        
+        // Filter to only successful builds with workflow_run_ids
+        let mut triggered_builds = HashMap::new();
+        for (repo, workflow_run_id, status) in build_runs {
+            if status == "success" {
+                if let Some(run_id) = workflow_run_id {
+                    triggered_builds.insert(repo, run_id);
+                } else {
+                    warn!("Build for {} completed successfully but has no workflow_run_id", repo);
+                }
+            } else {
+                warn!("Skipping build for {} with status {}", repo, status);
+            }
+        }
+        
+        if triggered_builds.is_empty() {
+            return Err(GovernanceError::BuildError(
+                format!("No successful builds found for release {}", release_version)
+            ));
+        }
+        
+        // Collect artifacts
+        info!("Collecting artifacts from {} builds", triggered_builds.len());
+        let mut artifacts = self.artifact_collector.collect_all_artifacts(&triggered_builds).await?;
+        
+        // Download artifacts
+        info!("Downloading artifacts from all repositories");
+        self.artifact_collector.download_all_artifacts(&mut artifacts).await?;
+        
+        // Determine if this is a prerelease (check if version contains alpha, beta, rc, etc.)
+        let prerelease = release_version.contains("alpha") 
+            || release_version.contains("beta")
+            || release_version.contains("rc")
+            || release_version.contains("dev");
+        
+        // Create GitHub release
+        info!("Creating GitHub release for version {}", release_version);
+        self.create_github_release(release_version, prerelease, &artifacts).await?;
+        
+        info!("Successfully collected artifacts and created release for {}", release_version);
         Ok(())
     }
     
@@ -283,7 +349,70 @@ impl BuildOrchestrator {
             warn!("No artifacts were uploaded successfully");
         }
         
+        // Generate and upload SHA256SUMS file
+        if uploaded_count > 0 {
+            info!("Generating SHA256SUMS file");
+            let sha256sums_content = self.generate_sha256sums(artifacts);
+            let sha256sums_bytes = sha256sums_content.as_bytes();
+            
+            match self.github_client
+                .upload_release_asset(
+                    &self.organization,
+                    "bllvm",
+                    release.id.0,
+                    "SHA256SUMS",
+                    sha256sums_bytes,
+                    "text/plain",
+                )
+                .await
+            {
+                Ok(()) => {
+                    info!("Successfully uploaded SHA256SUMS file");
+                }
+                Err(e) => {
+                    error!("Failed to upload SHA256SUMS file: {}", e);
+                    // Don't fail the entire release if SHA256SUMS upload fails
+                    warn!("Release created but SHA256SUMS upload failed");
+                }
+            }
+        } else {
+            warn!("Skipping SHA256SUMS generation - no artifacts were uploaded");
+        }
+        
         Ok(())
+    }
+    
+    /// Generate SHA256SUMS file content from artifacts
+    fn generate_sha256sums(
+        &self,
+        artifacts: &HashMap<String, Vec<super::artifacts::Artifact>>,
+    ) -> String {
+        let mut lines = Vec::new();
+        
+        // Sort by repo name for deterministic output
+        let mut repos: Vec<_> = artifacts.keys().collect();
+        repos.sort();
+        
+        for repo in repos {
+            let repo_artifacts = &artifacts[repo];
+            for artifact in repo_artifacts {
+                // Only include artifacts that have data
+                if let Some(ref data) = artifact.data {
+                    // Calculate SHA256 hash
+                    let mut hasher = Sha256::new();
+                    hasher.update(data);
+                    let hash = hasher.finalize();
+                    let hash_hex = hex::encode(hash);
+                    
+                    // Format: hash  filename
+                    // Use repo-prefixed name to match uploaded artifacts
+                    let asset_name = format!("{}-{}", repo, artifact.name);
+                    lines.push(format!("{}  {}", hash_hex, asset_name));
+                }
+            }
+        }
+        
+        lines.join("\n") + "\n"
     }
 }
 

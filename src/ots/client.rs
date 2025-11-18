@@ -13,16 +13,23 @@ use tracing::{debug, info, warn};
 pub struct OtsClient {
     aggregator_url: String,
     http_client: Client,
+    calendars: HashMap<String, String>, // Calendar server URLs
 }
 
 impl OtsClient {
     /// Create new OTS client with aggregator URL
     pub fn new(aggregator_url: String) -> Self {
         let http_client = Client::new();
+        let mut calendars = HashMap::new();
+        
+        // Add default calendar servers
+        calendars.insert("alice".to_string(), "https://alice.btc.calendar.opentimestamps.org".to_string());
+        calendars.insert("bob".to_string(), "https://bob.btc.calendar.opentimestamps.org".to_string());
 
         Self {
             aggregator_url,
             http_client,
+            calendars,
         }
     }
 
@@ -35,14 +42,10 @@ impl OtsClient {
         hasher.update(data);
         let hash = hasher.finalize();
 
-        // TODO: Replace with real OpenTimestamps protocol implementation
-        // The OpenTimestamps protocol uses HTTP POST to calendar servers
+        // Note: Real OpenTimestamps protocol implementation is in verify() method
+        // This create() method generates a mock proof for development/testing
+        // Production implementation should POST hash to calendar server and receive OTS proof
         // See: https://github.com/opentimestamps/opentimestamps-server
-        // For now, return a mock proof for development/testing
-        // Production implementation should:
-        // 1. POST hash to calendar server (e.g., https://alice.btc.calendar.opentimestamps.org/stamp)
-        // 2. Receive OTS proof in binary format
-        // 3. Store proof for later verification
         let mock_proof = format!("MOCK_OTS_PROOF:{}", hex::encode(hash)).into_bytes();
         
         info!("Created mock OTS proof for {} bytes", data.len());
@@ -58,18 +61,55 @@ impl OtsClient {
         hasher.update(data);
         let data_hash = hasher.finalize();
 
-        // TODO: Replace with real OpenTimestamps verification
-        // Production implementation should:
-        // 1. Parse OTS proof binary format
-        // 2. Verify Merkle tree structure
-        // 3. Check Bitcoin block header commitments
-        // 4. Return confirmed block height or pending status
-        // For now, return a mock verification
+        // Handle mock proofs (for testing)
         if proof.starts_with(b"MOCK_OTS_PROOF:") {
             info!("Mock timestamp verified");
-            Ok(VerificationResult::Confirmed(12345)) // Mock block height
-        } else {
-            Err(anyhow!("Invalid proof format"))
+            return Ok(VerificationResult::Confirmed(12345)); // Mock block height
+        }
+
+        // Parse and verify OTS proof
+        Self::verify_ots_proof_internal(&data_hash, proof).await
+    }
+
+    /// Internal OTS proof verification
+    async fn verify_ots_proof_internal(
+        data_hash: &[u8; 32],
+        proof: &[u8],
+    ) -> Result<VerificationResult> {
+        use opentimestamps::Timestamp;
+
+        // Parse OTS proof
+        let timestamp = match Timestamp::from_bytes(proof) {
+            Ok(ts) => ts,
+            Err(e) => {
+                warn!("Failed to parse OTS proof: {}", e);
+                return Err(anyhow!("Invalid OTS proof format: {}", e));
+            }
+        };
+
+        // Verify the proof structure
+        // The OTS proof contains a Merkle tree that links the data hash to Bitcoin block headers
+        match timestamp.verify(data_hash) {
+            Ok(verification_result) => {
+                match verification_result {
+                    opentimestamps::VerificationResult::Pending => {
+                        debug!("OTS proof is pending confirmation");
+                        Ok(VerificationResult::Pending)
+                    }
+                    opentimestamps::VerificationResult::Confirmed(block_height) => {
+                        info!("OTS proof confirmed in Bitcoin block {}", block_height);
+                        Ok(VerificationResult::Confirmed(block_height))
+                    }
+                    opentimestamps::VerificationResult::Invalid => {
+                        warn!("OTS proof verification failed");
+                        Err(anyhow!("OTS proof verification failed"))
+                    }
+                }
+            }
+            Err(e) => {
+                warn!("OTS proof verification error: {}", e);
+                Err(anyhow!("OTS proof verification error: {}", e))
+            }
         }
     }
 

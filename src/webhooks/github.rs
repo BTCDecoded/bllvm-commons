@@ -28,7 +28,7 @@ pub async fn handle_webhook(
         "pull_request" => {
             match action {
                 "opened" | "synchronize" | "reopened" => {
-                    match pull_request::handle_pull_request_event(&database, &payload).await {
+                    match pull_request::handle_pull_request_event(&config, &database, &payload).await {
                         Ok(response) => (StatusCode::OK, response),
                         Err(status) => (status, Json(serde_json::json!({"error": "failed"}))),
                     }
@@ -128,7 +128,7 @@ pub async fn handle_webhook(
                 organization,
             );
             
-            match release::handle_repository_dispatch(&payload, &orchestrator).await {
+            match release::handle_repository_dispatch(&payload, &orchestrator, &database).await {
                 Ok((status, response)) => (status, Json(response)),
                 Err(e) => {
                     warn!("Failed to handle repository_dispatch: {}", e);

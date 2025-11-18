@@ -3,6 +3,9 @@
 use std::collections::HashMap;
 use tracing::{info, warn, error};
 use serde::{Deserialize, Serialize};
+use sha2::{Sha256, Digest};
+use hex;
+use chrono;
 
 use crate::error::GovernanceError;
 use crate::github::client::GitHubClient;
@@ -15,6 +18,8 @@ pub struct Artifact {
     pub download_url: String,
     pub content_type: String,
     pub data: Option<Vec<u8>>, // Downloaded artifact data
+    pub sha256: Option<String>, // SHA256 hash of artifact data (calculated after download)
+    pub expires_at: Option<chrono::DateTime<chrono::Utc>>, // Artifact expiration time from GitHub
 }
 
 /// Artifact collector for gathering build artifacts from repositories
@@ -64,12 +69,21 @@ impl ArtifactCollector {
                 .unwrap_or("")
                 .to_string();
             
+            // Parse expiration time if available
+            let expires_at = artifact_json
+                .get("expires_at")
+                .and_then(|v| v.as_str())
+                .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+                .map(|dt| dt.with_timezone(&chrono::Utc));
+            
             artifacts.push(Artifact {
                 name,
                 size,
                 download_url,
                 content_type: "application/zip".to_string(), // GitHub artifacts are zipped
                 data: None, // Will be downloaded later
+                sha256: None, // Will be calculated after download
+                expires_at,
             });
         }
         
@@ -115,13 +129,34 @@ impl ArtifactCollector {
                 continue;
             }
             
+            // Check if artifact has expired
+            if let Some(expires_at) = artifact.expires_at {
+                let now = chrono::Utc::now();
+                if now > expires_at {
+                    warn!("Skipping expired artifact '{}' (expired at {})", artifact.name, expires_at);
+                    continue;
+                }
+                let time_until_expiry = expires_at - now;
+                info!("Artifact '{}' expires in {} hours", artifact.name, time_until_expiry.num_hours());
+            }
+            
             match self.github_client
                 .download_artifact(&artifact.download_url, &self.organization)
                 .await
             {
                 Ok(data) => {
                     info!("Downloaded artifact '{}': {} bytes", artifact.name, data.len());
+                    
+                    // Calculate SHA256 hash
+                    let mut hasher = Sha256::new();
+                    hasher.update(&data);
+                    let hash = hasher.finalize();
+                    let hash_hex = hex::encode(hash);
+                    
                     artifact.data = Some(data);
+                    artifact.sha256 = Some(hash_hex.clone());
+                    
+                    info!("Calculated SHA256 for '{}': {}", artifact.name, hash_hex);
                 }
                 Err(e) => {
                     error!("Failed to download artifact '{}': {}", artifact.name, e);

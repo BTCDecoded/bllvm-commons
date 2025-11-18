@@ -5,8 +5,10 @@
 
 use crate::error::GovernanceError;
 use octocrab::Octocrab;
+use octocrab::models::Content;
 use std::collections::HashMap;
 use tracing::{info, warn, error, debug};
+use base64;
 
 /// Represents a file in a GitHub repository
 #[derive(Debug, Clone)]
@@ -84,16 +86,39 @@ impl GitHubFileOperations {
             .await
             .map_err(|e| GovernanceError::GitHubError(format!("Failed to fetch file: {}", e)))?;
 
-        // For now, we'll implement a simplified version that works with the current octocrab API
-        // In a real implementation, we would handle the response properly based on the actual API structure
-        
-        // This is a placeholder implementation - in practice, you would:
-        // 1. Check the response type
-        // 2. Extract file content based on encoding
-        // 3. Return the appropriate GitHubFile struct
-        
-        // For now, return an error indicating this needs proper implementation
-        Err(GovernanceError::GitHubError("File content fetching not fully implemented - requires proper octocrab API integration".to_string()))
+        // Handle the response - octocrab 0.38 returns Content enum
+        match response {
+            Content::File(file) => {
+                // Decode base64 content
+                let content_bytes = match file.content {
+                    Some(encoded) => {
+                        base64::engine::general_purpose::STANDARD
+                            .decode(encoded.trim_end_matches('\n'))
+                            .map_err(|e| GovernanceError::GitHubError(format!("Failed to decode base64 content: {}", e)))?
+                    }
+                    None => {
+                        return Err(GovernanceError::GitHubError("File content is empty".to_string()));
+                    }
+                };
+                
+                Ok(GitHubFile {
+                    path: file.path,
+                    content: content_bytes,
+                    sha: file.sha,
+                    size: file.size as u64,
+                    download_url: file.download_url.map(|u| u.to_string()),
+                })
+            }
+            Content::Directory(_) => {
+                Err(GovernanceError::GitHubError(format!("Path '{}' is a directory, not a file", file_path)))
+            }
+            Content::Symlink(_) => {
+                Err(GovernanceError::GitHubError(format!("Path '{}' is a symlink, not a file", file_path)))
+            }
+            Content::Submodule(_) => {
+                Err(GovernanceError::GitHubError(format!("Path '{}' is a submodule, not a file", file_path)))
+            }
+        }
     }
 
     /// Fetch directory tree from GitHub repository
@@ -118,14 +143,67 @@ impl GitHubFileOperations {
             .await
             .map_err(|e| GovernanceError::GitHubError(format!("Failed to fetch directory: {}", e)))?;
 
-        // For now, we'll implement a simplified version
-        // In a real implementation, we would handle the directory response properly
-        
-        // This is a placeholder implementation
-        Err(GovernanceError::GitHubError("Directory tree fetching not fully implemented - requires proper octocrab API integration".to_string()))
+        // Handle the response - octocrab 0.38 returns Content enum
+        match response {
+            Content::Directory(items) => {
+                let mut files = Vec::new();
+                let mut subdirectories = Vec::new();
+                let mut total_size = 0u64;
+                
+                // Process each item in the directory
+                // Content::Directory contains Vec<Content> where each Content has type and path
+                for item in items {
+                    match item {
+                        Content::File(file) => {
+                            // For files, create GitHubFile with metadata
+                            // Content can be fetched later if needed via fetch_file_content()
+                            let size = file.size as u64;
+                            total_size += size;
+                            
+                            files.push(GitHubFile {
+                                path: file.path.clone(),
+                                content: Vec::new(), // Content not loaded by default (can fetch later)
+                                sha: file.sha,
+                                size,
+                                download_url: file.download_url.map(|u| u.to_string()),
+                            });
+                        }
+                        Content::Directory(_) => {
+                            // For subdirectories, we need to extract the path
+                            // In octocrab 0.38, Content::Directory in items list doesn't directly expose path
+                            // We need to make another API call to get the directory
+                            // For now, skip nested directories - they can be fetched separately if needed
+                            // This can be enhanced later to extract path from ContentItem metadata
+                            debug!("Skipping nested directory - fetch separately if needed");
+                        }
+                        Content::Symlink(_) | Content::Submodule(_) => {
+                            // Skip symlinks and submodules
+                            debug!("Skipping symlink/submodule in directory: {}", directory_path);
+                        }
+                    }
+                }
+                
+                Ok(GitHubDirectory {
+                    path: directory_path.to_string(),
+                    files,
+                    subdirectories,
+                    total_size,
+                })
+            }
+            Content::File(_) => {
+                Err(GovernanceError::GitHubError(format!("Path '{}' is a file, not a directory", directory_path)))
+            }
+            Content::Symlink(_) => {
+                Err(GovernanceError::GitHubError(format!("Path '{}' is a symlink, not a directory", directory_path)))
+            }
+            Content::Submodule(_) => {
+                Err(GovernanceError::GitHubError(format!("Path '{}' is a submodule, not a directory", directory_path)))
+            }
+        }
     }
 
     /// Compute hash of entire repository state
+    /// Returns the SHA of the latest commit on the specified branch
     pub async fn compute_repo_hash(
         &self,
         owner: &str,
@@ -136,11 +214,20 @@ impl GitHubFileOperations {
 
         let branch = branch.unwrap_or("main");
         
-        // For now, we'll implement a simplified version
-        // In a real implementation, we would get the actual commit SHA
+        // Get the branch reference to get the latest commit SHA
+        let branch_ref = self
+            .client
+            .repos(owner, repo)
+            .get_branch(branch)
+            .await
+            .map_err(|e| GovernanceError::GitHubError(format!("Failed to get branch: {}", e)))?;
         
-        // This is a placeholder implementation
-        Err(GovernanceError::GitHubError("Repository hash computation not fully implemented - requires proper octocrab API integration".to_string()))
+        // Extract commit SHA from branch reference
+        let commit_sha = branch_ref.commit.sha;
+        
+        info!("Repository hash for {}/{}:{} = {}", owner, repo, branch, commit_sha);
+        
+        Ok(commit_sha)
     }
 
     /// Compare file versions across repositories
@@ -211,11 +298,24 @@ impl GitHubFileOperations {
     ) -> Result<GitHubRepo, GovernanceError> {
         info!("Getting repository info: {}/{}", owner, repo);
 
-        // For now, we'll implement a simplified version
-        // In a real implementation, we would get the actual repository information
+        // Get repository information using octocrab API
+        let repository = self
+            .client
+            .repos(owner, repo)
+            .get()
+            .await
+            .map_err(|e| GovernanceError::GitHubError(format!("Failed to get repository info: {}", e)))?;
         
-        // This is a placeholder implementation
-        Err(GovernanceError::GitHubError("Repository info fetching not fully implemented - requires proper octocrab API integration".to_string()))
+        // Get the default branch's latest commit SHA
+        let default_branch = repository.default_branch.as_deref().unwrap_or("main");
+        let last_commit_sha = self.compute_repo_hash(owner, repo, Some(default_branch)).await?;
+        
+        Ok(GitHubRepo {
+            owner: repository.owner.login.clone(),
+            name: repository.name.clone(),
+            default_branch: default_branch.to_string(),
+            last_commit_sha,
+        })
     }
 
     /// Fetch multiple files in parallel
@@ -280,11 +380,39 @@ impl GitHubFileOperations {
             .await
             .map_err(|e| GovernanceError::GitHubError(format!("Failed to fetch file: {}", e)))?;
 
-        // For now, we'll implement a simplified version
-        // In a real implementation, we would handle the response properly
-        
-        // This is a placeholder implementation
-        Err(GovernanceError::GitHubError("File content fetching not fully implemented - requires proper octocrab API integration".to_string()))
+        // Handle the response - octocrab 0.38 returns Content enum
+        match response {
+            Content::File(file) => {
+                // Decode base64 content
+                let content_bytes = match file.content {
+                    Some(encoded) => {
+                        base64::engine::general_purpose::STANDARD
+                            .decode(encoded.trim_end_matches('\n'))
+                            .map_err(|e| GovernanceError::GitHubError(format!("Failed to decode base64 content: {}", e)))?
+                    }
+                    None => {
+                        return Err(GovernanceError::GitHubError("File content is empty".to_string()));
+                    }
+                };
+                
+                Ok(GitHubFile {
+                    path: file.path,
+                    content: content_bytes,
+                    sha: file.sha,
+                    size: file.size as u64,
+                    download_url: file.download_url.map(|u| u.to_string()),
+                })
+            }
+            Content::Directory(_) => {
+                Err(GovernanceError::GitHubError(format!("Path '{}' is a directory, not a file", file_path)))
+            }
+            Content::Symlink(_) => {
+                Err(GovernanceError::GitHubError(format!("Path '{}' is a symlink, not a file", file_path)))
+            }
+            Content::Submodule(_) => {
+                Err(GovernanceError::GitHubError(format!("Path '{}' is a submodule, not a file", file_path)))
+            }
+        }
     }
 }
 

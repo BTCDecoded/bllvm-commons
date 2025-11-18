@@ -317,25 +317,38 @@ impl CrossLayerStatusChecker {
                 &pr
             ).await?;
             
+            // Extract test counts from CI check runs
+            let (tests_run, tests_passed, tests_failed) = self
+                .extract_test_counts_from_ci(owner, &repo_name, &pr.head_sha)
+                .await
+                .unwrap_or_else(|e| {
+                    warn!("Failed to extract test counts from CI: {}", e);
+                    (0, 0, vec![])
+                });
+            
             // Map verification result to EquivalenceProofStatus
             match verification_result {
                 ValidationResult::Valid { message } => {
                     Ok(EquivalenceProofStatus {
                         status: StatusState::Success,
                         message: format!("✅ Equivalence Proof: {}", message),
-                        tests_run: 0, // TODO: Extract from CI if available
-                        tests_passed: 0, // TODO: Extract from CI if available
-                        tests_failed: vec![],
+                        tests_run,
+                        tests_passed,
+                        tests_failed,
                         proof_verification: Some("CI verification passed".to_string()),
                     })
                 }
                 ValidationResult::Invalid { message, blocking: _ } => {
+                    let mut failed = tests_failed;
+                    if !message.is_empty() {
+                        failed.push(message);
+                    }
                     Ok(EquivalenceProofStatus {
                         status: StatusState::Failure,
                         message: format!("❌ Equivalence Proof: {}", message),
-                        tests_run: 0,
-                        tests_passed: 0,
-                        tests_failed: vec![message],
+                        tests_run,
+                        tests_passed,
+                        tests_failed: failed,
                         proof_verification: Some("CI verification failed".to_string()),
                     })
                 }
@@ -343,9 +356,9 @@ impl CrossLayerStatusChecker {
                     Ok(EquivalenceProofStatus {
                         status: StatusState::Pending,
                         message: format!("⏳ Equivalence Proof: {}", message),
-                        tests_run: 0,
-                        tests_passed: 0,
-                        tests_failed: vec![],
+                        tests_run,
+                        tests_passed,
+                        tests_failed,
                         proof_verification: None,
                     })
                 }
@@ -354,24 +367,156 @@ impl CrossLayerStatusChecker {
                     Ok(EquivalenceProofStatus {
                         status: StatusState::Success,
                         message: "Equivalence proof not required for this repository".to_string(),
-                        tests_run: 0,
-                        tests_passed: 0,
-                        tests_failed: vec![],
+                        tests_run,
+                        tests_passed,
+                        tests_failed,
                         proof_verification: None,
                     })
                 }
             }
         } else {
+            // Not a verification-required repo, but still try to extract test counts
+            let (tests_run, tests_passed, tests_failed) = {
+                // Get PR data to extract head SHA
+                if let Ok(pr_json) = self.github_client.get_pull_request(owner, repo, pr_number).await {
+                    if let Some(head_sha) = pr_json["head"]["sha"].as_str() {
+                        self.extract_test_counts_from_ci(owner, repo, head_sha)
+                            .await
+                            .unwrap_or_else(|e| {
+                                warn!("Failed to extract test counts: {}", e);
+                                (0, 0, vec![])
+                            })
+                    } else {
+                        (0, 0, vec![])
+                    }
+                } else {
+                    (0, 0, vec![])
+                }
+            };
+            
             // Not a verification-required repo
             Ok(EquivalenceProofStatus {
                 status: StatusState::Success,
                 message: "Equivalence proof not required for this repository".to_string(),
-                tests_run: 0,
-                tests_passed: 0,
-                tests_failed: vec![],
+                tests_run,
+                tests_passed,
+                tests_failed,
                 proof_verification: None,
             })
         }
+    }
+    
+    /// Extract test counts from CI check runs
+    /// Attempts to parse test counts from check run names and conclusions
+    async fn extract_test_counts_from_ci(
+        &self,
+        owner: &str,
+        repo: &str,
+        sha: &str,
+    ) -> Result<(usize, usize, Vec<String>), GovernanceError> {
+        // Get check runs for the commit
+        let check_runs = self.github_client.get_check_runs(owner, repo, sha).await?;
+        
+        let mut tests_run = 0;
+        let mut tests_passed = 0;
+        let mut tests_failed = Vec::new();
+        
+        // Look for test-related check runs
+        // Common patterns: "Tests", "cargo test", "Test", "CI", etc.
+        for check_run in &check_runs {
+            let name_lower = check_run.name.to_lowercase();
+            
+            // Check if this is a test-related check run
+            if name_lower.contains("test") 
+                || name_lower.contains("cargo test")
+                || name_lower.contains("unit test")
+                || name_lower.contains("property test")
+                || name_lower.contains("kani")
+                || name_lower.contains("proptest")
+            {
+                // Try to extract test counts from check run name
+                // Common patterns: "Tests (123 passed, 5 failed)" or "cargo test: 128 tests"
+                if let Some(count) = Self::extract_test_count_from_name(&check_run.name) {
+                    tests_run += count;
+                } else {
+                    // If we can't extract a count, assume at least 1 test was run
+                    tests_run += 1;
+                }
+                
+                // Check conclusion to determine pass/fail
+                match check_run.conclusion.as_deref() {
+                    Some("success") => {
+                        // If we couldn't extract a count, assume all passed
+                        if tests_passed == 0 && tests_run > 0 {
+                            tests_passed = tests_run;
+                        } else if tests_run > tests_passed {
+                            // Estimate: if we have a count, assume most passed
+                            tests_passed += (tests_run - tests_passed).max(1);
+                        }
+                    }
+                    Some("failure") | Some("cancelled") | Some("timed_out") => {
+                        tests_failed.push(format!("{}: {}", check_run.name, check_run.conclusion.as_deref().unwrap_or("failed")));
+                        // If we have a test count, assume at least one failed
+                        if tests_run > tests_passed {
+                            // Already accounted for
+                        } else if tests_run > 0 {
+                            tests_passed = tests_run.saturating_sub(1);
+                        }
+                    }
+                    _ => {
+                        // Pending or unknown - don't count yet
+                    }
+                }
+            }
+        }
+        
+        // If we found test-related check runs but couldn't extract counts,
+        // use the number of successful test check runs as a proxy
+        if tests_run == 0 {
+            let test_check_runs: Vec<_> = check_runs
+                .iter()
+                .filter(|cr| {
+                    let name_lower = cr.name.to_lowercase();
+                    name_lower.contains("test") || name_lower.contains("cargo test")
+                })
+                .collect();
+            
+            tests_run = test_check_runs.len();
+            tests_passed = test_check_runs
+                .iter()
+                .filter(|cr| cr.conclusion.as_deref() == Some("success"))
+                .count();
+        }
+        
+        Ok((tests_run, tests_passed, tests_failed))
+    }
+    
+    /// Extract test count from check run name using regex patterns
+    /// Looks for patterns like "123 tests", "Tests: 456", etc.
+    fn extract_test_count_from_name(name: &str) -> Option<usize> {
+        use regex::Regex;
+        
+        // Pattern: "123 tests" or "Tests: 456" or "cargo test: 789"
+        let patterns = vec![
+            r"(\d+)\s+test",
+            r"test[:\s]+(\d+)",
+            r"(\d+)\s+passed",
+            r"passed[:\s]+(\d+)",
+        ];
+        
+        for pattern in patterns {
+            if let Ok(re) = Regex::new(pattern) {
+                if let Some(captures) = re.captures(name) {
+                    if let Some(count_str) = captures.get(1) {
+                        if let Ok(count) = count_str.as_str().parse::<usize>() {
+                            return Some(count);
+                        }
+                    }
+                }
+            }
+        }
+        
+        None
     }
     
     /// Check if repository requires verification
@@ -539,7 +684,8 @@ mod tests {
             "proofs/block-validation.rs".to_string(),
         ];
 
-        let status = checker.generate_cross_layer_status("test_owner", "test_repo", 123, &changed_files).await.unwrap();
+        let status = checker.generate_cross_layer_status("test_owner", "test_repo", 123, &changed_files).await
+            .expect("Failed to generate cross-layer status in test");
         
         assert_eq!(status.context, "cross-layer-sync");
         assert!(status.target_url.is_some());

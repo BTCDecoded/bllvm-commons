@@ -8,6 +8,7 @@ use crate::validation::tier_classification;
 use crate::validation::threshold::ThresholdValidator;
 
 pub async fn handle_pull_request_event(
+    config: &AppConfig,
     database: &Database,
     payload: &Value,
 ) -> Result<axum::response::Json<serde_json::Value>, axum::http::StatusCode> {
@@ -80,9 +81,24 @@ pub async fn handle_pull_request_event(
                 .await;
 
             // Publish review period notification to Nostr (if enabled)
-            // Note: This requires config to be passed, which we don't have here
-            // For now, we'll publish from the status check handler instead
-            // TODO: Pass config to this handler or publish from status check handler
+            if config.nostr.enabled {
+                // Calculate review period end date
+                let review_days = ThresholdValidator::get_combined_requirements(layer, tier).2;
+                let review_period_ends = chrono::Utc::now() + chrono::Duration::days(review_days as i64);
+                
+                // Publish review period notification
+                if let Err(e) = publish_review_period_notification(
+                    config,
+                    repo_name,
+                    pr_number as i32,
+                    layer,
+                    tier,
+                    review_period_ends,
+                ).await {
+                    warn!("Failed to publish review period notification to Nostr: {}", e);
+                    // Don't fail the webhook if Nostr publishing fails
+                }
+            }
 
             Ok(axum::response::Json(serde_json::json!({
                 "status": "stored",

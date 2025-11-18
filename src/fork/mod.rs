@@ -9,6 +9,7 @@ pub mod executor;
 pub mod export;
 pub mod types;
 pub mod versioning;
+pub mod verification;
 
 pub use adoption::AdoptionTracker;
 pub use dashboard::AdoptionDashboard;
@@ -17,6 +18,7 @@ pub use executor::{ForkExecutor, ForkStatus};
 pub use export::GovernanceExporter;
 pub use types::*;
 pub use versioning::RulesetVersioning;
+pub use verification::verify_fork_decision_signature;
 
 
 
