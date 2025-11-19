@@ -72,6 +72,10 @@ pub struct GovernanceConfig {
     #[serde(default)]
     pub commons_addresses: Vec<String>,
     
+    /// Bitcoin network (mainnet, testnet, regtest)
+    #[serde(default = "default_network")]
+    pub network: String,
+    
     /// Enable governance contribution tracking
     #[serde(default = "default_true")]
     pub contribution_tracking_enabled: bool,
@@ -93,10 +97,15 @@ fn default_weight_update_interval() -> u64 {
     86400  // Daily
 }
 
+fn default_network() -> String {
+    "mainnet".to_string()
+}
+
 impl Default for GovernanceConfig {
     fn default() -> Self {
         Self {
             commons_addresses: Vec::new(),
+            network: "mainnet".to_string(),
             contribution_tracking_enabled: true,
             weight_updates_enabled: true,
             weight_update_interval_secs: 86400,
@@ -237,7 +246,34 @@ impl AppConfig {
                 log_path: audit_log_path,
                 rotation_interval_days: audit_rotation_interval,
             },
-            governance: GovernanceConfig::default(),
+            governance: {
+                let commons_addresses = env::var("GOVERNANCE_COMMONS_ADDRESSES")
+                    .unwrap_or_else(|_| "".to_string())
+                    .split(',')
+                    .filter(|s| !s.is_empty())
+                    .map(|s| s.trim().to_string())
+                    .collect();
+                
+                let network = env::var("GOVERNANCE_NETWORK")
+                    .unwrap_or_else(|_| "mainnet".to_string());
+                
+                GovernanceConfig {
+                    commons_addresses,
+                    network,
+                    contribution_tracking_enabled: env::var("GOVERNANCE_CONTRIBUTION_TRACKING_ENABLED")
+                        .unwrap_or_else(|_| "true".to_string())
+                        .parse()
+                        .unwrap_or(true),
+                    weight_updates_enabled: env::var("GOVERNANCE_WEIGHT_UPDATES_ENABLED")
+                        .unwrap_or_else(|_| "true".to_string())
+                        .parse()
+                        .unwrap_or(true),
+                    weight_update_interval_secs: env::var("GOVERNANCE_WEIGHT_UPDATE_INTERVAL_SECS")
+                        .unwrap_or_else(|_| "86400".to_string())
+                        .parse()
+                        .unwrap_or(86400),
+                }
+            },
         })
     }
 }

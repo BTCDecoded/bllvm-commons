@@ -14,5 +14,6 @@ pub mod webhooks;
 pub mod build;
 pub mod nostr;
 pub mod resilience;
+pub mod node_registry;
 
 pub use error::GovernanceError;

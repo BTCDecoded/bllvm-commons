@@ -33,7 +33,7 @@ mod governance;
 use config::AppConfig;
 use database::Database;
 use nostr::{NostrClient, StatusPublisher, ZapTracker};
-use governance::{ContributionAggregator, WeightCalculator};
+use governance::{ContributionAggregator, WeightCalculator, FeeForwardingTracker};
 use ots::{OtsClient, RegistryAnchorer};
 use audit::AuditLogger;
 
@@ -261,6 +261,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
     
+    // Initialize fee forwarding tracker (if Commons addresses configured)
+    let fee_forwarding_tracker = if !config.governance.commons_addresses.is_empty() {
+        Some(FeeForwardingTracker::from_network_string(
+            pool.clone(),
+            config.governance.commons_addresses.clone(),
+            &config.governance.network,
+        ))
+    } else {
+        None
+    };
+    
+    if fee_forwarding_tracker.is_some() {
+        info!("Fee forwarding tracker initialized for {} Commons addresses on {}", 
+              config.governance.commons_addresses.len(), config.governance.network);
+    }
+    
     // Start periodic weight update task (if enabled)
     if config.governance.weight_updates_enabled {
         let pool_for_weights = pool.clone();
@@ -284,10 +300,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Build application
     let port = config.server_port;
+    // Add node registry API routes
     let app = Router::new()
         .route("/health", get(health_check))
         .route("/webhooks/github", post(webhooks::github::handle_webhook))
+        .route("/webhooks/block", post(webhooks::block::handle_block_notification))
         .route("/status", get(status_endpoint))
+        .merge(node_registry::api::create_router())
         .layer(
             ServiceBuilder::new()
                 .layer(TraceLayer::new_for_http())
