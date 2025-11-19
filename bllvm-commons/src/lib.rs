@@ -1,0 +1,18 @@
+pub mod audit;
+pub mod backup;
+pub mod config;
+pub mod crypto;
+pub mod database;
+pub mod economic_nodes;
+pub mod enforcement;
+pub mod error;
+pub mod fork;
+pub mod github;
+pub mod governance;
+pub mod validation;
+pub mod webhooks;
+pub mod build;
+pub mod nostr;
+pub mod resilience;
+
+pub use error::GovernanceError;
