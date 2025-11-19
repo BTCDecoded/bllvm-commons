@@ -29,19 +29,19 @@ impl ContributionTracker {
         timestamp: DateTime<Utc>,
     ) -> Result<()> {
         // Record in unified contributions table
-        sqlx::query!(
+        sqlx::query(
             r#"
             INSERT INTO unified_contributions
             (contributor_id, contributor_type, contribution_type, amount_btc, timestamp, contribution_age_days, period_type, verified)
             VALUES (?, ?, ?, ?, ?, 0, 'monthly', ?)
             "#,
-            contributor_id,
-            "merge_miner",
-            format!("merge_mining:{}", chain_id),
-            contribution_amount_btc,
-            timestamp,
-            true  // Verified (on-chain)
         )
+        .bind(contributor_id)
+        .bind("merge_miner")
+        .bind(format!("merge_mining:{}", chain_id))
+        .bind(contribution_amount_btc)
+        .bind(timestamp)
+        .bind(true)  // Verified (on-chain)
         .execute(&self.pool)
         .await?;
         
@@ -67,37 +67,37 @@ impl ContributionTracker {
         timestamp: DateTime<Utc>,
     ) -> Result<()> {
         // First record in fee_forwarding_contributions table
-        sqlx::query!(
+        sqlx::query(
             r#"
             INSERT INTO fee_forwarding_contributions
             (contributor_id, tx_hash, block_height, amount_btc, commons_address, timestamp, verified)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             "#,
-            contributor_id,
-            tx_hash,
-            block_height,
-            amount_btc,
-            commons_address,
-            timestamp,
-            true  // Verified (on-chain)
         )
+        .bind(contributor_id)
+        .bind(tx_hash)
+        .bind(block_height)
+        .bind(amount_btc)
+        .bind(commons_address)
+        .bind(timestamp)
+        .bind(true)  // Verified (on-chain)
         .execute(&self.pool)
         .await?;
         
         // Also record in unified contributions table
-        sqlx::query!(
+        sqlx::query(
             r#"
             INSERT INTO unified_contributions
             (contributor_id, contributor_type, contribution_type, amount_btc, timestamp, contribution_age_days, period_type, verified)
             VALUES (?, ?, ?, ?, ?, 0, 'monthly', ?)
             "#,
-            contributor_id,
-            "fee_forwarder",
-            "fee_forwarding",
-            amount_btc,
-            timestamp,
-            true  // Verified (on-chain)
         )
+        .bind(contributor_id)
+        .bind("fee_forwarder")
+        .bind("fee_forwarding")
+        .bind(amount_btc)
+        .bind(timestamp)
+        .bind(true)  // Verified (on-chain)
         .execute(&self.pool)
         .await?;
         
@@ -120,20 +120,21 @@ impl ContributionTracker {
         is_proposal_zap: bool,
     ) -> Result<()> {
         // Record in unified contributions table
-        sqlx::query!(
+        let contribution_type = if is_proposal_zap { "zap:proposal" } else { "zap:general" };
+        sqlx::query(
             r#"
             INSERT INTO unified_contributions
             (contributor_id, contributor_type, contribution_type, amount_btc, timestamp, contribution_age_days, period_type, verified)
             VALUES (?, ?, ?, ?, ?, 0, ?, ?)
             "#,
-            contributor_id,
-            "zap_user",
-            if is_proposal_zap { "zap:proposal" } else { "zap:general" },
-            amount_btc,
-            timestamp,
-            if is_proposal_zap { "cumulative" } else { "cumulative" },
-            true  // Verified (Nostr event)
         )
+        .bind(contributor_id)
+        .bind("zap_user")
+        .bind(contribution_type)
+        .bind(amount_btc)
+        .bind(timestamp)
+        .bind("cumulative")
+        .bind(true)  // Verified (Nostr event)
         .execute(&self.pool)
         .await?;
         
@@ -147,7 +148,7 @@ impl ContributionTracker {
         start_time: DateTime<Utc>,
         end_time: DateTime<Utc>,
     ) -> Result<ContributorTotal> {
-        let rows = sqlx::query!(
+        let rows = sqlx::query_as::<_, (String, Option<f64>)>(
             r#"
             SELECT 
                 contribution_type,
@@ -158,10 +159,10 @@ impl ContributionTracker {
               AND timestamp <= ?
             GROUP BY contribution_type
             "#,
-            contributor_id,
-            start_time,
-            end_time
         )
+        .bind(contributor_id)
+        .bind(start_time)
+        .bind(end_time)
         .fetch_all(&self.pool)
         .await?;
         
@@ -169,13 +170,13 @@ impl ContributionTracker {
         let mut fee_forwarding_btc = 0.0;
         let mut zaps_btc = 0.0;
         
-        for row in rows {
-            let total = row.total_btc.unwrap_or(0.0);
-            if row.contribution_type.starts_with("merge_mining:") {
+        for (contribution_type, total_btc) in rows {
+            let total = total_btc.unwrap_or(0.0);
+            if contribution_type.starts_with("merge_mining:") {
                 merge_mining_btc += total;
-            } else if row.contribution_type == "fee_forwarding" {
+            } else if contribution_type == "fee_forwarding" {
                 fee_forwarding_btc += total;
-            } else if row.contribution_type.starts_with("zap:") {
+            } else if contribution_type.starts_with("zap:") {
                 zaps_btc += total;
             }
         }
@@ -190,7 +191,7 @@ impl ContributionTracker {
     
     /// Update contribution age for cooling-off period calculation
     pub async fn update_contribution_ages(&self) -> Result<()> {
-        sqlx::query!(
+        sqlx::query(
             r#"
             UPDATE unified_contributions
             SET contribution_age_days = CAST(
@@ -199,7 +200,7 @@ impl ContributionTracker {
             WHERE contribution_age_days != CAST(
                 (julianday('now') - julianday(timestamp)) AS INTEGER
             )
-            "#
+            "#,
         )
         .execute(&self.pool)
         .await?;

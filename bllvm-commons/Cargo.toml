@@ -8,6 +8,8 @@ description = "Bitcoin Commons governance enforcement - GitHub App for cryptogra
 repository = "https://github.com/BTCDecoded/bllvm-commons"
 
 [dependencies]
+# Protocol layer for Block and Transaction types
+bllvm-protocol = { path = "../bllvm-protocol", package = "bllvm-protocol" }
 # Web framework
 axum = "0.7"
 tokio = { version = "1", features = ["full"] }

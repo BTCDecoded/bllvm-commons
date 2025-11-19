@@ -66,23 +66,25 @@ impl ZapTracker {
         let is_proposal_zap = zap.zapped_event_id.is_some();
         
         // Record zap in database
-        sqlx::query!(
+        let invoice_hash = zap.invoice.as_ref().and_then(|i| Self::extract_payment_hash(i));
+        let governance_event_id = zap.zapped_event_id.clone();
+        sqlx::query(
             r#"
             INSERT INTO zap_contributions
             (recipient_pubkey, sender_pubkey, amount_msat, amount_btc, timestamp, invoice_hash, message, zapped_event_id, is_proposal_zap, governance_event_id)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
-            recipient_pubkey,
-            zap.sender_pubkey,
-            zap.amount_msat as i64,
-            amount_btc,
-            timestamp,
-            zap.invoice.as_ref().map(|i| Self::extract_payment_hash(i)),
-            zap.message,
-            zap.zapped_event_id,
-            is_proposal_zap,
-            zap.zapped_event_id.as_ref().map(|_| zap.zapped_event_id.clone().unwrap_or_default())
         )
+        .bind(recipient_pubkey)
+        .bind(zap.sender_pubkey.as_deref())
+        .bind(zap.amount_msat as i64)
+        .bind(amount_btc)
+        .bind(timestamp)
+        .bind(invoice_hash.as_deref())
+        .bind(zap.message.as_deref())
+        .bind(zap.zapped_event_id.as_deref())
+        .bind(is_proposal_zap)
+        .bind(governance_event_id.as_deref())
         .execute(pool)
         .await?;
         
@@ -128,7 +130,7 @@ impl ZapTracker {
         start_time: DateTime<Utc>,
         end_time: DateTime<Utc>,
     ) -> Result<f64> {
-        let result = sqlx::query_scalar!(
+        let result: Option<f64> = sqlx::query_scalar(
             r#"
             SELECT SUM(amount_btc) as total
             FROM zap_contributions
@@ -136,10 +138,10 @@ impl ZapTracker {
               AND timestamp >= ? 
               AND timestamp <= ?
             "#,
-            pubkey,
-            start_time,
-            end_time
         )
+        .bind(pubkey)
+        .bind(start_time)
+        .bind(end_time)
         .fetch_one(&self.pool)
         .await?;
         
@@ -153,7 +155,22 @@ impl ZapTracker {
         start_time: DateTime<Utc>,
         end_time: DateTime<Utc>,
     ) -> Result<Vec<ZapContribution>> {
-        let rows = sqlx::query!(
+        #[derive(sqlx::FromRow)]
+        struct ZapRow {
+            id: i32,
+            recipient_pubkey: String,
+            sender_pubkey: Option<String>,
+            amount_msat: i64,
+            amount_btc: f64,
+            timestamp: DateTime<Utc>,
+            invoice_hash: Option<String>,
+            message: Option<String>,
+            zapped_event_id: Option<String>,
+            is_proposal_zap: bool,
+            governance_event_id: Option<String>,
+        }
+        
+        let rows = sqlx::query_as::<_, ZapRow>(
             r#"
             SELECT id, recipient_pubkey, sender_pubkey, amount_msat, amount_btc, timestamp, invoice_hash, message, zapped_event_id, is_proposal_zap, governance_event_id
             FROM zap_contributions
@@ -162,10 +179,10 @@ impl ZapTracker {
               AND timestamp <= ?
             ORDER BY timestamp DESC
             "#,
-            sender_pubkey,
-            start_time,
-            end_time
         )
+        .bind(sender_pubkey)
+        .bind(start_time)
+        .bind(end_time)
         .fetch_all(&self.pool)
         .await?;
         
@@ -179,7 +196,7 @@ impl ZapTracker {
             invoice_hash: row.invoice_hash,
             message: row.message,
             zapped_event_id: row.zapped_event_id,
-            is_proposal_zap: row.is_proposal_zap != 0,
+            is_proposal_zap: row.is_proposal_zap,
             governance_event_id: row.governance_event_id,
         }).collect())
     }
@@ -189,15 +206,30 @@ impl ZapTracker {
         &self,
         governance_event_id: &str,
     ) -> Result<Vec<ZapContribution>> {
-        let rows = sqlx::query!(
+        #[derive(sqlx::FromRow)]
+        struct ZapRow {
+            id: i32,
+            recipient_pubkey: String,
+            sender_pubkey: Option<String>,
+            amount_msat: i64,
+            amount_btc: f64,
+            timestamp: DateTime<Utc>,
+            invoice_hash: Option<String>,
+            message: Option<String>,
+            zapped_event_id: Option<String>,
+            is_proposal_zap: bool,
+            governance_event_id: Option<String>,
+        }
+        
+        let rows = sqlx::query_as::<_, ZapRow>(
             r#"
             SELECT id, recipient_pubkey, sender_pubkey, amount_msat, amount_btc, timestamp, invoice_hash, message, zapped_event_id, is_proposal_zap, governance_event_id
             FROM zap_contributions
             WHERE governance_event_id = ?
             ORDER BY timestamp DESC
             "#,
-            governance_event_id
         )
+        .bind(governance_event_id)
         .fetch_all(&self.pool)
         .await?;
         
@@ -211,7 +243,7 @@ impl ZapTracker {
             invoice_hash: row.invoice_hash,
             message: row.message,
             zapped_event_id: row.zapped_event_id,
-            is_proposal_zap: row.is_proposal_zap != 0,
+            is_proposal_zap: row.is_proposal_zap,
             governance_event_id: row.governance_event_id,
         }).collect())
     }

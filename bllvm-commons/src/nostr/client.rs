@@ -6,7 +6,9 @@
 use anyhow::{anyhow, Result};
 use nostr_sdk::prelude::*;
 use std::collections::HashMap;
+use std::str::FromStr;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::Mutex;
 use tracing::{debug, error, info, warn};
 
@@ -132,12 +134,8 @@ impl NostrClient {
         
         // Spawn task to handle incoming zap events
         tokio::spawn(async move {
-            // Subscribe to the filter
-            let subscription_id = SubscriptionId::generate();
-            if let Err(e) = client_handle.subscribe(vec![filter], Some(subscription_id.clone())).await {
-                error!("Failed to subscribe to zap events: {}", e);
-                return;
-            }
+            // Subscribe to the filter (subscribe only takes filters, not subscription_id)
+            client_handle.subscribe(vec![filter]).await;
             
             // Listen for events using get_events_of
             loop {
@@ -193,35 +191,56 @@ fn parse_zap_event(event: &nostr_sdk::prelude::Event) -> Result<ZapEvent> {
     let recipient = event
         .tags
         .iter()
-        .find(|tag| tag.as_vec().get(0).map(|s| s.as_str()) == Some("p"))
-        .and_then(|tag| tag.as_vec().get(1))
+        .find(|tag| {
+            let vec = tag.as_vec();
+            vec.get(0).map(|s| s.as_str()) == Some("p")
+        })
+        .and_then(|tag| {
+            let vec = tag.as_vec();
+            vec.get(1).map(|s| s.to_string())
+        })
         .ok_or_else(|| anyhow!("Missing p tag in zap event"))?;
     
     // Extract amount (amount tag)
     let amount_msat = event
         .tags
         .iter()
-        .find(|tag| tag.as_vec().get(0).map(|s| s.as_str()) == Some("amount"))
-        .and_then(|tag| tag.as_vec().get(1))
-        .and_then(|amt| amt.parse::<u64>().ok())
+        .find(|tag| {
+            let vec = tag.as_vec();
+            vec.get(0).map(|s| s.as_str()) == Some("amount")
+        })
+        .and_then(|tag| {
+            let vec = tag.as_vec();
+            vec.get(1).and_then(|amt| amt.parse::<u64>().ok())
+        })
         .unwrap_or(0);
     
     // Extract invoice (bolt11 tag)
     let invoice = event
         .tags
         .iter()
-        .find(|tag| tag.as_vec().get(0).map(|s| s.as_str()) == Some("bolt11"))
-        .and_then(|tag| tag.as_vec().get(1))
-        .map(|s| s.to_string());
+        .find(|tag| {
+            let vec = tag.as_vec();
+            vec.get(0).map(|s| s.as_str()) == Some("bolt11")
+        })
+        .and_then(|tag| {
+            let vec = tag.as_vec();
+            vec.get(1).map(|s| s.to_string())
+        });
     
     // Extract description (contains sender info as JSON)
     let (sender_pubkey, message) = event
         .tags
         .iter()
-        .find(|tag| tag.as_vec().get(0).map(|s| s.as_str()) == Some("description"))
-        .and_then(|tag| tag.as_vec().get(1))
-        .and_then(|desc| {
-            serde_json::from_str::<serde_json::Value>(desc).ok()
+        .find(|tag| {
+            let vec = tag.as_vec();
+            vec.get(0).map(|s| s.as_str()) == Some("description")
+        })
+        .and_then(|tag| {
+            let vec = tag.as_vec();
+            vec.get(1).and_then(|desc| {
+                serde_json::from_str::<serde_json::Value>(desc).ok()
+            })
         })
         .map(|desc| {
             let sender = desc.get("pubkey")
@@ -238,12 +257,17 @@ fn parse_zap_event(event: &nostr_sdk::prelude::Event) -> Result<ZapEvent> {
     let zapped_event_id = event
         .tags
         .iter()
-        .find(|tag| tag.as_vec().get(0).map(|s| s.as_str()) == Some("e"))
-        .and_then(|tag| tag.as_vec().get(1))
-        .map(|s| s.to_string());
+        .find(|tag| {
+            let vec = tag.as_vec();
+            vec.get(0).map(|s| s.as_str()) == Some("e")
+        })
+        .and_then(|tag| {
+            let vec = tag.as_vec();
+            vec.get(1).map(|s| s.to_string())
+        });
     
     Ok(ZapEvent {
-        recipient_pubkey: recipient.to_string(),
+        recipient_pubkey: recipient,
         sender_pubkey,
         amount_msat,
         timestamp: event.created_at.as_i64(),

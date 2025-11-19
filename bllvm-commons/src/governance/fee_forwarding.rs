@@ -59,13 +59,13 @@ impl FeeForwardingTracker {
                         let tx_hash = self.calculate_tx_hash(tx);
                         
                         // Check if we've already recorded this transaction
-                        let existing = sqlx::query!(
+                        let existing: Option<i64> = sqlx::query_scalar(
                             r#"
                             SELECT id FROM fee_forwarding_contributions
                             WHERE tx_hash = ?
                             "#,
-                            tx_hash
                         )
+                        .bind(&tx_hash)
                         .fetch_optional(&self.pool)
                         .await?;
                         
@@ -85,18 +85,21 @@ impl FeeForwardingTracker {
                             )
                             .await?;
                         
+                        let tx_hash_clone = tx_hash.clone();
+                        let address_clone = address.clone();
+                        
                         contributions.push(FeeForwardingContribution {
                             contributor_id: contributor_id.to_string(),
-                            tx_hash,
+                            tx_hash: tx_hash_clone.clone(),
                             block_height,
                             amount_btc,
-                            commons_address: address,
+                            commons_address: address_clone.clone(),
                             timestamp: Utc::now(),
                         });
                         
                         info!(
                             "Recorded fee forwarding: {} BTC (tx: {}) from {} to Commons address {}",
-                            amount_btc, tx_hash, contributor_id, address
+                            amount_btc, tx_hash_clone, contributor_id, address_clone
                         );
                     }
                 }
@@ -146,7 +149,17 @@ impl FeeForwardingTracker {
         start_time: DateTime<Utc>,
         end_time: DateTime<Utc>,
     ) -> Result<Vec<FeeForwardingContribution>> {
-        let rows = sqlx::query!(
+        #[derive(sqlx::FromRow)]
+        struct FeeForwardingRow {
+            contributor_id: String,
+            tx_hash: String,
+            block_height: i32,
+            amount_btc: f64,
+            commons_address: String,
+            timestamp: DateTime<Utc>,
+        }
+        
+        let rows = sqlx::query_as::<_, FeeForwardingRow>(
             r#"
             SELECT contributor_id, tx_hash, block_height, amount_btc, commons_address, timestamp
             FROM fee_forwarding_contributions
@@ -155,10 +168,10 @@ impl FeeForwardingTracker {
               AND timestamp <= ?
             ORDER BY timestamp DESC
             "#,
-            contributor_id,
-            start_time,
-            end_time
         )
+        .bind(contributor_id)
+        .bind(start_time)
+        .bind(end_time)
         .fetch_all(&self.pool)
         .await?;
         

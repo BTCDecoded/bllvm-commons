@@ -96,7 +96,7 @@ impl WeightCalculator {
     /// Calculate and update participation weights for all contributors
     pub async fn update_participation_weights(&self) -> Result<()> {
         // First, update contribution ages (for cooling-off calculation)
-        sqlx::query!(
+        sqlx::query(
             r#"
             UPDATE unified_contributions
             SET contribution_age_days = CAST(
@@ -105,23 +105,32 @@ impl WeightCalculator {
             WHERE contribution_age_days != CAST(
                 (julianday('now') - julianday(timestamp)) AS INTEGER
             )
-            "#
+            "#,
         )
         .execute(&self.pool)
         .await?;
         
         // Get all unique contributors
-        let contributors = sqlx::query!(
+        #[derive(sqlx::FromRow)]
+        struct ContributorRow {
+            contributor_id: String,
+            contributor_type: String,
+        }
+        
+        let contributors = sqlx::query_as::<_, ContributorRow>(
             r#"
             SELECT DISTINCT contributor_id, contributor_type
             FROM unified_contributions
-            "#
+            "#,
         )
         .fetch_all(&self.pool)
         .await?;
         
         // Calculate total system weight first (needed for caps)
         let total_system_weight = self.calculate_total_system_weight().await?;
+        
+        // Save contributor count before moving
+        let contributor_count = contributors.len();
         
         // Update weights for each contributor
         for contributor in contributors {
@@ -132,7 +141,7 @@ impl WeightCalculator {
             let thirty_days_ago = now - chrono::Duration::days(30);
             
             // Merge mining (30-day rolling)
-            let merge_mining_btc: f64 = sqlx::query_scalar!(
+            let merge_mining_btc: Option<f64> = sqlx::query_scalar(
                 r#"
                 SELECT COALESCE(SUM(amount_btc), 0.0) as total
                 FROM unified_contributions
@@ -140,15 +149,15 @@ impl WeightCalculator {
                   AND contribution_type LIKE 'merge_mining:%'
                   AND timestamp >= ?
                 "#,
-                contributor_id,
-                thirty_days_ago
             )
+            .bind(&contributor_id)
+            .bind(thirty_days_ago)
             .fetch_one(&self.pool)
-            .await?
-            .unwrap_or(0.0);
+            .await?;
+            let merge_mining_btc = merge_mining_btc.unwrap_or(0.0);
             
             // Fee forwarding (30-day rolling)
-            let fee_forwarding_btc: f64 = sqlx::query_scalar!(
+            let fee_forwarding_btc: Option<f64> = sqlx::query_scalar(
                 r#"
                 SELECT COALESCE(SUM(amount_btc), 0.0) as total
                 FROM unified_contributions
@@ -156,26 +165,26 @@ impl WeightCalculator {
                   AND contribution_type = 'fee_forwarding'
                   AND timestamp >= ?
                 "#,
-                contributor_id,
-                thirty_days_ago
             )
+            .bind(&contributor_id)
+            .bind(thirty_days_ago)
             .fetch_one(&self.pool)
-            .await?
-            .unwrap_or(0.0);
+            .await?;
+            let fee_forwarding_btc = fee_forwarding_btc.unwrap_or(0.0);
             
             // Zaps (cumulative - all time)
-            let cumulative_zaps_btc: f64 = sqlx::query_scalar!(
+            let cumulative_zaps_btc: Option<f64> = sqlx::query_scalar(
                 r#"
                 SELECT COALESCE(SUM(amount_btc), 0.0) as total
                 FROM unified_contributions
                 WHERE contributor_id = ?
                   AND contribution_type LIKE 'zap:%'
                 "#,
-                contributor_id
             )
+            .bind(&contributor_id)
             .fetch_one(&self.pool)
-            .await?
-            .unwrap_or(0.0);
+            .await?;
+            let cumulative_zaps_btc = cumulative_zaps_btc.unwrap_or(0.0);
             
             // Calculate base weight (quadratic)
             let total_contribution_btc = merge_mining_btc + fee_forwarding_btc + cumulative_zaps_btc;
@@ -189,11 +198,11 @@ impl WeightCalculator {
             let capped_weight = self.apply_weight_cap(base_weight, total_system_weight);
             
             // Update or insert participation weight
-            sqlx::query!(
+            sqlx::query(
                 r#"
                 INSERT INTO participation_weights
                 (contributor_id, contributor_type, merge_mining_btc, fee_forwarding_btc, cumulative_zaps_btc, total_contribution_btc, base_weight, capped_weight, total_system_weight, last_updated)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                 ON CONFLICT(contributor_id) DO UPDATE SET
                     contributor_type = excluded.contributor_type,
                     merge_mining_btc = excluded.merge_mining_btc,
@@ -203,19 +212,18 @@ impl WeightCalculator {
                     base_weight = excluded.base_weight,
                     capped_weight = excluded.capped_weight,
                     total_system_weight = excluded.total_system_weight,
-                    last_updated = excluded.last_updated
+                    last_updated = CURRENT_TIMESTAMP
                 "#,
-                contributor_id,
-                contributor.contributor_type,
-                merge_mining_btc,
-                fee_forwarding_btc,
-                cumulative_zaps_btc,
-                total_contribution_btc,
-                base_weight,
-                capped_weight,
-                total_system_weight,
-                now
             )
+            .bind(&contributor_id)
+            .bind(&contributor.contributor_type)
+            .bind(merge_mining_btc)
+            .bind(fee_forwarding_btc)
+            .bind(cumulative_zaps_btc)
+            .bind(total_contribution_btc)
+            .bind(base_weight)
+            .bind(capped_weight)
+            .bind(total_system_weight)
             .execute(&self.pool)
             .await?;
             
@@ -225,17 +233,17 @@ impl WeightCalculator {
             );
         }
         
-        info!("Updated participation weights for {} contributors", contributors.len());
+        info!("Updated participation weights for {} contributors", contributor_count);
         Ok(())
     }
     
     /// Calculate total system weight (sum of all capped weights)
     pub async fn calculate_total_system_weight(&self) -> Result<f64> {
-        let total: Option<f64> = sqlx::query_scalar!(
+        let total: Option<f64> = sqlx::query_scalar(
             r#"
             SELECT SUM(capped_weight) as total
             FROM participation_weights
-            "#
+            "#,
         )
         .fetch_one(&self.pool)
         .await?;
@@ -248,15 +256,15 @@ impl WeightCalculator {
         &self,
         contributor_id: &str,
     ) -> Result<Option<f64>> {
-        let weight: Option<f64> = sqlx::query_scalar!(
+        let weight: Option<f64> = sqlx::query_scalar(
             r#"
             SELECT capped_weight
             FROM participation_weights
             WHERE contributor_id = ?
             "#,
-            contributor_id
         )
-        .fetch_one(&self.pool)
+        .bind(contributor_id)
+        .fetch_optional(&self.pool)
         .await?;
         
         Ok(weight)

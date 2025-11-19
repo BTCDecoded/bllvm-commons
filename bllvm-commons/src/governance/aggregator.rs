@@ -35,7 +35,7 @@ impl ContributionAggregator {
         let now = Utc::now();
         let thirty_days_ago = now - chrono::Duration::days(30);
         
-        let total: Option<f64> = sqlx::query_scalar!(
+        let total: Option<f64> = sqlx::query_scalar(
             r#"
             SELECT COALESCE(SUM(amount_btc), 0.0) as total
             FROM unified_contributions
@@ -43,9 +43,9 @@ impl ContributionAggregator {
               AND contribution_type LIKE 'merge_mining:%'
               AND timestamp >= ?
             "#,
-            contributor_id,
-            thirty_days_ago
         )
+        .bind(contributor_id)
+        .bind(thirty_days_ago)
         .fetch_one(&self.pool)
         .await?;
         
@@ -61,7 +61,7 @@ impl ContributionAggregator {
         let now = Utc::now();
         let thirty_days_ago = now - chrono::Duration::days(30);
         
-        let total: Option<f64> = sqlx::query_scalar!(
+        let total: Option<f64> = sqlx::query_scalar(
             r#"
             SELECT COALESCE(SUM(amount_btc), 0.0) as total
             FROM unified_contributions
@@ -69,9 +69,9 @@ impl ContributionAggregator {
               AND contribution_type = 'fee_forwarding'
               AND timestamp >= ?
             "#,
-            contributor_id,
-            thirty_days_ago
         )
+        .bind(contributor_id)
+        .bind(thirty_days_ago)
         .fetch_one(&self.pool)
         .await?;
         
@@ -84,15 +84,15 @@ impl ContributionAggregator {
         &self,
         contributor_id: &str,
     ) -> Result<f64> {
-        let total: Option<f64> = sqlx::query_scalar!(
+        let total: Option<f64> = sqlx::query_scalar(
             r#"
             SELECT COALESCE(SUM(amount_btc), 0.0) as total
             FROM unified_contributions
             WHERE contributor_id = ?
               AND contribution_type LIKE 'zap:%'
             "#,
-            contributor_id
         )
+        .bind(contributor_id)
         .fetch_one(&self.pool)
         .await?;
         

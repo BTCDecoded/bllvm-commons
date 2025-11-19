@@ -237,6 +237,7 @@ impl AppConfig {
                 log_path: audit_log_path,
                 rotation_interval_days: audit_rotation_interval,
             },
+            governance: GovernanceConfig::default(),
         })
     }
 }

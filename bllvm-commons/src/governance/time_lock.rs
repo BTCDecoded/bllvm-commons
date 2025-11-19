@@ -5,6 +5,7 @@
 
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
+use serde_json;
 use sqlx::FromRow;
 use std::collections::HashMap;
 use tracing::{debug, info, warn};
@@ -49,7 +50,7 @@ impl Default for TimeLockConfig {
 }
 
 /// Time-locked governance change
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TimeLockedChange {
     /// Unique identifier for the change
     pub change_id: String,
@@ -73,6 +74,62 @@ pub struct TimeLockedChange {
     pub created_at: DateTime<Utc>,
     /// Updated timestamp
     pub updated_at: DateTime<Utc>,
+}
+
+// Custom FromRow implementation to handle JSON deserialization
+impl<'r> sqlx::FromRow<'r, sqlx::sqlite::SqliteRow> for TimeLockedChange {
+    fn from_row(row: &'r sqlx::sqlite::SqliteRow) -> Result<Self, sqlx::Error> {
+        use sqlx::Row;
+        
+        let override_signals_json: Option<String> = row.try_get("override_signals")?;
+        let override_signals: HashMap<String, DateTime<Utc>> = if let Some(json_str) = override_signals_json {
+            serde_json::from_str(&json_str).unwrap_or_default()
+        } else {
+            HashMap::new()
+        };
+        
+        Ok(TimeLockedChange {
+            change_id: row.try_get("change_id")?,
+            tier: row.try_get::<i64, _>("tier")? as u8,
+            description: row.try_get("description")?,
+            pr_number: row.try_get("pr_number")?,
+            lock_start: row.try_get("lock_start")?,
+            min_duration_hours: row.try_get("min_duration_hours")?,
+            lock_end: row.try_get("lock_end")?,
+            status: row.try_get("status")?,
+            override_signals,
+            created_at: row.try_get("created_at")?,
+            updated_at: row.try_get("updated_at")?,
+        })
+    }
+}
+
+#[cfg(feature = "postgres")]
+impl<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow> for TimeLockedChange {
+    fn from_row(row: &'r sqlx::postgres::PgRow) -> Result<Self, sqlx::Error> {
+        use sqlx::Row;
+        
+        let override_signals_json: Option<serde_json::Value> = row.try_get("override_signals")?;
+        let override_signals: HashMap<String, DateTime<Utc>> = if let Some(json_val) = override_signals_json {
+            serde_json::from_value(json_val).unwrap_or_default()
+        } else {
+            HashMap::new()
+        };
+        
+        Ok(TimeLockedChange {
+            change_id: row.try_get("change_id")?,
+            tier: row.try_get::<i16, _>("tier")? as u8,
+            description: row.try_get("description")?,
+            pr_number: row.try_get("pr_number")?,
+            lock_start: row.try_get("lock_start")?,
+            min_duration_hours: row.try_get("min_duration_hours")?,
+            lock_end: row.try_get("lock_end")?,
+            status: row.try_get("status")?,
+            override_signals,
+            created_at: row.try_get("created_at")?,
+            updated_at: row.try_get("updated_at")?,
+        })
+    }
 }
 
 /// Time lock manager

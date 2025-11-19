@@ -91,14 +91,14 @@ impl ZapVotingProcessor {
         };
         
         // Check if vote already exists (prevent duplicates)
-        let existing = sqlx::query!(
+        let existing: Option<i32> = sqlx::query_scalar(
             r#"
             SELECT id FROM proposal_zap_votes
             WHERE governance_event_id = ? AND sender_pubkey = ?
             "#,
-            governance_event_id,
-            sender_pubkey
         )
+        .bind(governance_event_id)
+        .bind(sender_pubkey)
         .fetch_optional(&self.pool)
         .await?;
         
@@ -108,22 +108,22 @@ impl ZapVotingProcessor {
         }
         
         // Record vote in database
-        sqlx::query!(
+        sqlx::query(
             r#"
             INSERT INTO proposal_zap_votes
             (pr_id, governance_event_id, sender_pubkey, amount_msat, amount_btc, vote_weight, vote_type, timestamp, verified)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
-            pr_id,
-            governance_event_id,
-            sender_pubkey,
-            zap.amount_msat as i64,
-            zap.amount_btc,
-            vote_weight,
-            vote_type.as_str(),
-            zap.timestamp,
-            true  // Verified if it came from zap tracker
         )
+        .bind(pr_id)
+        .bind(governance_event_id)
+        .bind(sender_pubkey)
+        .bind(zap.amount_msat as i64)
+        .bind(zap.amount_btc)
+        .bind(vote_weight)
+        .bind(vote_type.as_str())
+        .bind(zap.timestamp)
+        .bind(true)  // Verified if it came from zap tracker
         .execute(&self.pool)
         .await?;
         
@@ -167,15 +167,27 @@ impl ZapVotingProcessor {
         &self,
         pr_id: i32,
     ) -> Result<Vec<ZapVote>> {
-        let rows = sqlx::query!(
+        #[derive(sqlx::FromRow)]
+        struct ZapVoteRow {
+            governance_event_id: String,
+            sender_pubkey: String,
+            amount_msat: i64,
+            amount_btc: f64,
+            vote_weight: f64,
+            vote_type: String,
+            timestamp: DateTime<Utc>,
+            pr_id: i32,
+        }
+        
+        let rows = sqlx::query_as::<_, ZapVoteRow>(
             r#"
             SELECT governance_event_id, sender_pubkey, amount_msat, amount_btc, vote_weight, vote_type, timestamp, pr_id
             FROM proposal_zap_votes
             WHERE pr_id = ?
             ORDER BY timestamp DESC
             "#,
-            pr_id
         )
+        .bind(pr_id)
         .fetch_all(&self.pool)
         .await?;
         
@@ -185,7 +197,12 @@ impl ZapVotingProcessor {
             amount_msat: row.amount_msat as u64,
             amount_btc: row.amount_btc,
             vote_weight: row.vote_weight,
-            vote_type: VoteType::from_str(&row.vote_type),
+            vote_type: match row.vote_type.as_str() {
+                "support" => VoteType::Support,
+                "veto" => VoteType::Veto,
+                "abstain" => VoteType::Abstain,
+                _ => VoteType::Support,
+            },
             timestamp: row.timestamp,
             pr_id: row.pr_id,
         }).collect())
@@ -196,15 +213,22 @@ impl ZapVotingProcessor {
         &self,
         pr_id: i32,
     ) -> Result<VoteTotals> {
-        let rows = sqlx::query!(
+        #[derive(sqlx::FromRow)]
+        struct VoteTotalsRow {
+            vote_type: String,
+            total_weight: Option<f64>,
+            vote_count: i64,
+        }
+        
+        let rows = sqlx::query_as::<_, VoteTotalsRow>(
             r#"
             SELECT vote_type, SUM(vote_weight) as total_weight, COUNT(*) as vote_count
             FROM proposal_zap_votes
             WHERE pr_id = ?
             GROUP BY vote_type
             "#,
-            pr_id
         )
+        .bind(pr_id)
         .fetch_all(&self.pool)
         .await?;
         

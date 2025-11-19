@@ -122,7 +122,7 @@ impl GovernanceActionPublisher {
 
         // Calculate voting window
         let voting_start = Utc::now();
-        let voting_end = voting_start + chrono::Duration::days(voting_window_days as i64);
+        let voting_end = voting_start + chrono::TimeDelta::try_days(voting_window_days as i64).unwrap_or_default();
 
         // Create event tags
         let mut tags = vec![
