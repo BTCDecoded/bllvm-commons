@@ -62,7 +62,7 @@ impl BackupManager {
                 ))
             })?;
 
-        let timestamp = Utc::now().format("%Y%m%d_%H%M%S");
+        let timestamp = Utc::now().format("%Y%m%d_%H%M%S_%3f"); // Include milliseconds for uniqueness
         let backup_filename = format!("governance_backup_{}.db", timestamp);
         let backup_path = self.config.directory.join(&backup_filename);
 
@@ -104,8 +104,51 @@ impl BackupManager {
         // SQLite backup using VACUUM INTO (SQLite 3.27+)
         // This creates a clean copy of the database
         if let Some(pool) = self.database.get_sqlite_pool() {
+            // Check if this is an in-memory database
+            // VACUUM INTO doesn't work with :memory: databases, so we need a different approach
+            // Try VACUUM INTO first, and if it fails, fall back to ATTACH method
+            let use_attach_method = {
+                // Check by trying to get the database file - in-memory DBs return empty
+                let result: Result<Vec<(i32, String, String)>, _> = sqlx::query_as("PRAGMA database_list")
+                    .fetch_all(pool)
+                    .await;
+                match result {
+                    Ok(list) => {
+                        // If main database file is empty or :memory:, use ATTACH method
+                        list.iter().any(|(_, name, file)| name == "main" && (file.is_empty() || file.contains(":memory:")))
+                    },
+                    _ => true, // If we can't check, assume in-memory and use ATTACH
+                }
+            };
+            
+            if use_attach_method {
+                // For in-memory databases, use ATTACH DATABASE approach
+                // Create a new file-based database and copy data
+                return self.backup_in_memory_sqlite(pool, backup_path).await;
+            }
+            
+            // Get absolute path (required for VACUUM INTO)
+            let absolute_path = if backup_path.is_absolute() {
+                backup_path.to_path_buf()
+            } else {
+                // Get current directory and join with relative path
+                std::env::current_dir()
+                    .unwrap_or_else(|_| PathBuf::from("."))
+                    .join(backup_path)
+            };
+            
+            // Ensure parent directory exists
+            if let Some(parent) = absolute_path.parent() {
+                fs::create_dir_all(parent).await.map_err(|e| {
+                    GovernanceError::ConfigError(format!("Failed to create backup directory: {}", e))
+                })?;
+            }
+            
             // Escape the path for SQL (replace single quotes with double single quotes)
-            let escaped_path = backup_path.to_string_lossy().replace("'", "''");
+            // Also escape backslashes on Windows
+            let escaped_path = absolute_path.to_string_lossy()
+                .replace("'", "''")
+                .replace("\\", "\\\\");
             
             // Use sqlx to execute VACUUM INTO
             sqlx::query(&format!(
@@ -115,8 +158,16 @@ impl BackupManager {
             .execute(pool)
             .await
             .map_err(|e| {
-                GovernanceError::DatabaseError(format!("SQLite backup failed: {}", e))
+                GovernanceError::DatabaseError(format!("SQLite backup failed: {} (path: {})", e, absolute_path.display()))
             })?;
+
+            // Verify the backup file was created
+            if !absolute_path.exists() {
+                return Err(GovernanceError::DatabaseError(format!(
+                    "Backup file was not created: {}",
+                    absolute_path.display()
+                )));
+            }
 
             info!("SQLite backup created: {}", backup_path.display());
             Ok(())
@@ -126,18 +177,136 @@ impl BackupManager {
             ))
         }
     }
+    
+    /// Backup in-memory SQLite database by creating a new file-based database and copying data
+    async fn backup_in_memory_sqlite(&self, pool: &sqlx::SqlitePool, backup_path: &Path) -> Result<(), GovernanceError> {
+        // Get absolute path
+        let absolute_path = if backup_path.is_absolute() {
+            backup_path.to_path_buf()
+        } else {
+            std::env::current_dir()
+                .unwrap_or_else(|_| PathBuf::from("."))
+                .join(backup_path)
+        };
+        
+        // Ensure parent directory exists
+        if let Some(parent) = absolute_path.parent() {
+            fs::create_dir_all(parent).await.map_err(|e| {
+                GovernanceError::ConfigError(format!("Failed to create backup directory: {}", e))
+            })?;
+        }
+        
+        // Create an empty backup database file first to ensure it exists
+        // SQLite will create the file on connect, but we want to ensure the directory is writable
+        fs::File::create(&absolute_path).await.map_err(|e| {
+            GovernanceError::ConfigError(format!("Failed to create backup file: {}", e))
+        })?;
+        
+        // Create backup database file first by connecting to it briefly
+        // sqlx uses "sqlite:" prefix for file paths (not "sqlite://")
+        let backup_url = format!("sqlite:{}", absolute_path.to_string_lossy());
+        
+        let backup_pool = sqlx::sqlite::SqlitePool::connect(&backup_url).await.map_err(|e| {
+            GovernanceError::DatabaseError(format!("Failed to create backup database: {} (path: {}, url: {})", e, absolute_path.display(), backup_url))
+        })?;
+        
+        // Use a single connection from the source pool for the entire backup operation
+        let mut source_conn = pool.acquire().await.map_err(|e| {
+            GovernanceError::DatabaseError(format!("Failed to acquire source connection: {}", e))
+        })?;
+        
+        // Run migrations on backup database to create schema
+        sqlx::migrate!("./migrations")
+            .run(&backup_pool)
+            .await
+            .map_err(|e| {
+                GovernanceError::DatabaseError(format!("Failed to migrate backup database: {}", e))
+            })?;
+        
+        // Close backup pool before attaching (SQLite doesn't allow attaching an open database)
+        backup_pool.close().await;
+        
+        // Attach backup database to source connection
+        let escaped_path = absolute_path.to_string_lossy().replace("'", "''").replace("\\", "/");
+        sqlx::query(&format!("ATTACH DATABASE '{}' AS backup", escaped_path))
+            .execute(&mut *source_conn)
+            .await
+            .map_err(|e| {
+                GovernanceError::DatabaseError(format!("Failed to attach backup database: {}", e))
+            })?;
+        
+        // Get all table names from main (in-memory) database
+        let tables: Vec<(String,)> = sqlx::query_as("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
+            .fetch_all(&mut *source_conn)
+            .await
+            .map_err(|e| {
+                GovernanceError::DatabaseError(format!("Failed to get table names: {}", e))
+            })?;
+        
+        // Copy each table to backup database
+        for (table_name,) in tables {
+            let quoted_table = format!("\"{}\"", table_name.replace("\"", "\"\""));
+            
+            // Drop existing table in backup (from migrations) and recreate with data
+            // CREATE TABLE AS SELECT doesn't work with IF NOT EXISTS, so we drop first
+            let _ = sqlx::query(&format!("DROP TABLE IF EXISTS backup.{}", quoted_table))
+                .execute(&mut *source_conn)
+                .await;
+            
+            // Create table and copy data in one operation
+            sqlx::query(&format!(
+                "CREATE TABLE backup.{} AS SELECT * FROM main.{}",
+                quoted_table, quoted_table
+            ))
+            .execute(&mut *source_conn)
+            .await
+            .map_err(|e| {
+                GovernanceError::DatabaseError(format!("Failed to create and copy table {} in backup: {}", table_name, e))
+            })?;
+        }
+        
+        // Detach backup database (this flushes writes)
+        sqlx::query("DETACH DATABASE backup")
+            .execute(&mut *source_conn)
+            .await
+            .map_err(|e| {
+                GovernanceError::DatabaseError(format!("Failed to detach backup database: {}", e))
+            })?;
+        
+        // Verify the backup file was created
+        if !absolute_path.exists() {
+            return Err(GovernanceError::DatabaseError(format!(
+                "Backup file was not created: {}",
+                absolute_path.display()
+            )));
+        }
+        
+        info!("In-memory SQLite backup created: {}", backup_path.display());
+        Ok(())
+    }
 
     /// Verify backup integrity
     async fn verify_backup(&self, backup_path: &Path) -> Result<(), GovernanceError> {
         if self.database.is_sqlite() {
+            // Check if backup file exists
+            if !backup_path.exists() {
+                return Err(GovernanceError::DatabaseError(format!(
+                    "Backup file does not exist: {}",
+                    backup_path.display()
+                )));
+            }
+            
             // Verify SQLite backup by opening it and running integrity_check
-            let backup_url = format!("sqlite:{}", backup_path.to_string_lossy());
+            // Use absolute path for connection
+            let absolute_backup_path = backup_path.canonicalize()
+                .unwrap_or_else(|_| backup_path.to_path_buf());
+            let backup_url = format!("sqlite:{}", absolute_backup_path.to_string_lossy());
             let backup_pool = sqlx::sqlite::SqlitePool::connect(&backup_url)
                 .await
                 .map_err(|e| {
                     GovernanceError::DatabaseError(format!(
-                        "Failed to open backup for verification: {}",
-                        e
+                        "Failed to open backup for verification: {} (path: {})",
+                        e, absolute_backup_path.display()
                     ))
                 })?;
 
@@ -338,7 +507,10 @@ mod tests {
         
         // Create a backup
         let backup_path = manager.create_backup().await;
-        assert!(backup_path.is_ok());
+        if let Err(ref e) = backup_path {
+            eprintln!("Backup creation failed: {:?}", e);
+        }
+        assert!(backup_path.is_ok(), "Backup creation should succeed, got: {:?}", backup_path);
         let backup_path = backup_path.unwrap();
         
         // Verify backup file exists
@@ -438,16 +610,16 @@ mod tests {
         fs::write(&old_backup_path, b"fake backup data").await.unwrap();
         
         // Set file modification time to 2 days ago
-        let two_days_ago = Utc::now() - chrono::Duration::days(2);
+        let two_days_ago = Utc::now() - chrono::Duration::try_days(2).unwrap_or(chrono::Duration::zero());
         let system_time: std::time::SystemTime = two_days_ago.into();
         #[cfg(unix)]
         {
-            use std::os::unix::fs::FileTimeExt;
+            use std::fs::FileTimes;
             let file = std::fs::File::create(&old_backup_path).unwrap();
-            file.set_times(
-                std::time::SystemTime::UNIX_EPOCH,
-                system_time,
-            ).unwrap();
+            let file_times = FileTimes::new()
+                .set_modified(system_time)
+                .set_accessed(system_time);
+            file.set_times(file_times).unwrap();
         }
         
         // Cleanup should delete old backup

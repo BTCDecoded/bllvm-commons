@@ -146,7 +146,7 @@ pub async fn handle_repository_dispatch(
                     .get_build_runs_for_release(release_version)
                     .await?
                     .iter()
-                    .all(|run| run.status == "success");
+                    .all(|run| run.1 == "success"); // Access tuple field by index
                 
                 if all_successful {
                     info!("All builds successful for release {} - proceeding with artifact collection", release_version);

@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 /// Types of economic nodes that can participate in governance
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum NodeType {
     MiningPool,
     Exchange,

@@ -6,10 +6,11 @@ use axum::{
 };
 use chrono::Datelike;
 use std::net::SocketAddr;
+use std::sync::Arc;
 use tokio::time::Duration;
 use tower::ServiceBuilder;
 use tower_http::trace::TraceLayer;
-use tracing::{error, info};
+use tracing::{debug, error, info, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod config;
@@ -26,6 +27,7 @@ mod audit;
 mod authorization;
 mod build;
 mod backup;
+mod resilience;
 
 use config::AppConfig;
 use database::Database;

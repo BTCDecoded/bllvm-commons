@@ -33,13 +33,14 @@ pub async fn handle_pull_request_event(
     info!("Processing PR #{} in {}", pr_number, repo_name);
 
     // Determine layer based on repository
+    // Check more specific patterns first to avoid false matches
     let layer = match repo_name {
         repo if repo.contains("bllvm-spec") || repo.contains("orange-paper") => 1,
         repo if repo.contains("bllvm-consensus") || repo.contains("consensus-proof") => 2,
         repo if repo.contains("bllvm-protocol") || repo.contains("protocol-engine") => 3,
-        repo if repo.contains("bllvm-node") || repo.contains("reference-node") || repo.contains("/bllvm") => 4,
         repo if repo.contains("bllvm-sdk") || repo.contains("developer-sdk") => 5,
         repo if repo.contains("bllvm-commons") || repo.contains("governance-app") => 6,
+        repo if repo.contains("bllvm-node") || repo.contains("reference-node") || repo.contains("/bllvm") => 4,
         _ => {
             warn!("Unknown repository: {}", repo_name);
             return Ok(axum::response::Json(
@@ -87,7 +88,7 @@ pub async fn handle_pull_request_event(
                 let review_period_ends = chrono::Utc::now() + chrono::Duration::days(review_days as i64);
                 
                 // Publish review period notification
-                if let Err(e) = publish_review_period_notification(
+                if let Err(e) = crate::nostr::helpers::publish_review_period_notification(
                     config,
                     repo_name,
                     pr_number as i32,
@@ -158,7 +159,7 @@ pub async fn handle_pr_merged(
         // Publish merge action to Nostr
         publish_merge_action(
             config,
-            database,
+            &database,
             repo_name,
             pr_number,
             commit_hash,
@@ -176,18 +177,19 @@ pub async fn handle_pr_merged(
 
 /// Determine layer from repository name
 pub fn determine_layer(repo_name: &str) -> Option<i32> {
+    // Check more specific patterns first to avoid false matches
     if repo_name.contains("bllvm-spec") || repo_name.contains("orange-paper") {
         Some(1)
     } else if repo_name.contains("bllvm-consensus") || repo_name.contains("consensus-proof") {
         Some(2)
     } else if repo_name.contains("bllvm-protocol") || repo_name.contains("protocol-engine") {
         Some(3)
-    } else if repo_name.contains("bllvm-node") || repo_name.contains("reference-node") || repo_name.contains("/bllvm") {
-        Some(4)
     } else if repo_name.contains("bllvm-sdk") || repo_name.contains("developer-sdk") {
         Some(5)
     } else if repo_name.contains("bllvm-commons") || repo_name.contains("governance-app") {
         Some(6)
+    } else if repo_name.contains("bllvm-node") || repo_name.contains("reference-node") || repo_name.contains("/bllvm") {
+        Some(4)
     } else {
         None
     }

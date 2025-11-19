@@ -73,19 +73,26 @@ impl CircuitBreaker {
 
     /// Check if request is allowed
     pub async fn is_open(&self) -> bool {
+        // Check state first without holding lock for long
         let state = *self.state.lock().await;
         
         match state {
             CircuitState::Closed => false,
             CircuitState::Open => {
                 // Check if timeout has elapsed - transition to half-open
+                // Acquire locks in consistent order: last_failure_time, then state, then successes
                 let last_failure = *self.last_failure_time.lock().await;
                 if let Some(last_failure_time) = last_failure {
                     if last_failure_time.elapsed() >= self.config.timeout {
                         info!("Circuit breaker '{}' transitioning to half-open state", self.name);
-                        *self.state.lock().await = CircuitState::HalfOpen;
-                        *self.successes.lock().await = 0;
-                        return false; // Allow request in half-open state
+                        // Release last_failure_time lock before acquiring state lock
+                        let mut state_guard = self.state.lock().await;
+                        // Double-check state hasn't changed
+                        if *state_guard == CircuitState::Open {
+                            *state_guard = CircuitState::HalfOpen;
+                            *self.successes.lock().await = 0;
+                            return false; // Allow request in half-open state
+                        }
                     }
                 }
                 true // Reject request in open state
@@ -102,6 +109,9 @@ impl CircuitBreaker {
         match *state {
             CircuitState::Closed => {
                 // Clean up old failures outside the window
+                // Release state and successes locks first to avoid potential deadlock
+                drop(state);
+                drop(successes);
                 self.cleanup_old_failures().await;
             }
             CircuitState::HalfOpen => {
@@ -110,6 +120,9 @@ impl CircuitBreaker {
                     info!("Circuit breaker '{}' transitioning to closed state (recovered)", self.name);
                     *state = CircuitState::Closed;
                     *successes = 0;
+                    // Release locks before cleanup to avoid deadlock
+                    drop(state);
+                    drop(successes);
                     self.cleanup_old_failures().await;
                 }
             }
@@ -130,8 +143,10 @@ impl CircuitBreaker {
         failures.push(now);
         *last_failure_time = Some(now);
         
-        // Clean up old failures outside the window
-        self.cleanup_old_failures().await;
+        // Clean up old failures outside the window (inline to avoid deadlock)
+        failures.retain(|&failure_time| {
+            now.duration_since(failure_time) < self.config.window_duration
+        });
         
         // Re-count failures after cleanup
         let failure_count = failures.len() as u32;
@@ -169,7 +184,25 @@ impl CircuitBreaker {
 
     /// Get current state
     pub async fn state(&self) -> CircuitState {
-        *self.state.lock().await
+        // Check if we need to transition from Open to HalfOpen based on timeout
+        // This ensures state() reflects the current state including timeout transitions
+        let current_state = *self.state.lock().await;
+        if current_state == CircuitState::Open {
+            let last_failure = *self.last_failure_time.lock().await;
+            if let Some(last_failure_time) = last_failure {
+                if last_failure_time.elapsed() >= self.config.timeout {
+                    // Release locks before re-acquiring to avoid deadlock
+                    let mut state_guard = self.state.lock().await;
+                    // Double-check state hasn't changed
+                    if *state_guard == CircuitState::Open {
+                        *state_guard = CircuitState::HalfOpen;
+                        *self.successes.lock().await = 0;
+                        return CircuitState::HalfOpen;
+                    }
+                }
+            }
+        }
+        current_state
     }
 
     /// Get failure count in current window

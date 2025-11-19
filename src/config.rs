@@ -201,3 +201,61 @@ impl AppConfig {
         })
     }
 }
+
+impl Default for AppConfig {
+    fn default() -> Self {
+        AppConfig {
+            database_url: "sqlite://governance.db".to_string(),
+            github_app_id: 0,
+            github_private_key_path: "/path/to/private-key.pem".to_string(),
+            github_webhook_secret: "your_webhook_secret_here".to_string(),
+            governance_repo: "BTCDecoded/governance".to_string(),
+            server_host: "0.0.0.0".to_string(),
+            server_port: 3000,
+            dry_run_mode: false,
+            log_enforcement_decisions: true,
+            enforcement_log_path: None,
+            server_id: "governance-01".to_string(),
+            nostr: NostrConfig::default(),
+            ots: OtsConfig::default(),
+            audit: AuditConfig::default(),
+        }
+    }
+}
+
+impl Default for NostrConfig {
+    fn default() -> Self {
+        NostrConfig {
+            enabled: false,
+            server_nsec_path: "/etc/governance/server.nsec".to_string(),
+            relays: vec!["wss://relay.damus.io".to_string(), "wss://nos.lol".to_string()],
+            publish_interval_secs: 3600,
+            governance_config: "commons_mainnet".to_string(),
+            zap_address: None,
+            logo_url: Some("https://btcdecoded.org/assets/bitcoin-commons-logo.png".to_string()),
+            bots: std::collections::HashMap::new(),
+        }
+    }
+}
+
+impl Default for OtsConfig {
+    fn default() -> Self {
+        OtsConfig {
+            enabled: false,
+            aggregator_url: "https://alice.btc.calendar.opentimestamps.org".to_string(),
+            monthly_anchor_day: 1,
+            registry_path: "/var/lib/governance/registries".to_string(),
+            proofs_path: "/var/lib/governance/ots-proofs".to_string(),
+        }
+    }
+}
+
+impl Default for AuditConfig {
+    fn default() -> Self {
+        AuditConfig {
+            enabled: true,
+            log_path: "/var/lib/governance/audit-log.jsonl".to_string(),
+            rotation_interval_days: 30,
+        }
+    }
+}

@@ -259,7 +259,7 @@ impl EconomicNodeRegistry {
                 node_type,
                 entity_name: row.get("entity_name"),
                 public_key: row.get("public_key"),
-                qualification_data,
+                qualification_data: serde_json::to_value(&qualification_data).unwrap_or_else(|_| serde_json::json!({})),
                 weight: row.get("weight"),
                 status,
                 registered_at: row.get("registered_at"),
@@ -322,7 +322,7 @@ impl EconomicNodeRegistry {
             node_type,
             entity_name: row.get("entity_name"),
             public_key: row.get("public_key"),
-            qualification_data,
+            qualification_data: serde_json::to_value(&qualification_data).unwrap_or_else(|_| serde_json::json!({})),
             weight: row.get("weight"),
             status,
             registered_at: row.get("registered_at"),
@@ -331,6 +331,63 @@ impl EconomicNodeRegistry {
             created_by: row.get("created_by"),
             notes: row.get("notes"),
         })
+    }
+
+    /// Update node status
+    pub async fn update_node_status(
+        &self,
+        node_id: i32,
+        status: NodeStatus,
+    ) -> Result<(), GovernanceError> {
+        sqlx::query("UPDATE economic_nodes SET status = ? WHERE id = ?")
+            .bind(status.as_str())
+            .bind(node_id)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| {
+                GovernanceError::DatabaseError(format!("Failed to update node status: {}", e))
+            })?;
+        
+        info!("Updated node {} status to {}", node_id, status.as_str());
+        Ok(())
+    }
+
+    /// Recalculate weights for all nodes based on current qualification data
+    pub async fn recalculate_all_weights(&self) -> Result<(), GovernanceError> {
+        let nodes = sqlx::query("SELECT id, node_type, qualification_data FROM economic_nodes")
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| {
+                GovernanceError::DatabaseError(format!("Failed to fetch nodes: {}", e))
+            })?;
+
+        for row in nodes {
+            let node_id: i32 = row.get("id");
+            let node_type_str: String = row.get("node_type");
+            let node_type = NodeType::from_str(&node_type_str).ok_or_else(|| {
+                GovernanceError::CryptoError(format!("Invalid node type: {}", node_type_str))
+            })?;
+            
+            let qualification_data_str: String = row.get("qualification_data");
+            let qualification_data: QualificationProof = serde_json::from_str(&qualification_data_str)
+                .map_err(|e| {
+                    GovernanceError::CryptoError(format!("Invalid qualification data: {}", e))
+                })?;
+
+            let new_weight = self.calculate_weight(node_type, &qualification_data).await?;
+
+            sqlx::query("UPDATE economic_nodes SET weight = ? WHERE id = ?")
+                .bind(new_weight)
+                .bind(node_id)
+                .execute(&self.pool)
+                .await
+                .map_err(|e| {
+                    GovernanceError::DatabaseError(format!("Failed to update weight: {}", e))
+                })?;
+        }
+
+        info!("Recalculated weights for all nodes");
+        Ok(())
     }
 }
 

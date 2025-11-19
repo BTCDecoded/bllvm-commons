@@ -40,14 +40,13 @@ pub fn verify_fork_decision_signature(
 
     // Verify
     verify_signature(&signature, &message, public_key)
-        .map_err(|e| GovernanceError::Cryptographic(format!("Verification error: {}", e)))
+        .map_err(|e| GovernanceError::CryptoError(format!("Verification error: {}", e)))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bllvm_sdk::governance::GovernanceKeypair;
-    use bllvm_sdk::governance::sign_message;
+    use bllvm_sdk::governance::{GovernanceKeypair, signatures::sign_message};
     use chrono::Utc;
 
     #[test]

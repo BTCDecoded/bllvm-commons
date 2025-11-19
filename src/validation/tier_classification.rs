@@ -365,8 +365,9 @@ pub async fn classify_pr_tier_detailed(
         // 2. Confidence is significantly higher (more than 0.1 difference)
         // Since we iterate in descending order, higher tiers are checked first,
         // so we only override with lower tiers if they have significantly higher confidence
+        // For governance (tier 5), we want to prioritize it even with lower confidence
         let should_update = if confidence >= rule.confidence_threshold {
-            if best_confidence == 0.0 || confidence > best_confidence + 0.1 {
+            if best_confidence == 0.0 || confidence > best_confidence + 0.1 || (tier_num == 5 && confidence > 0.0) {
                 true
             } else {
                 false
@@ -385,7 +386,8 @@ pub async fn classify_pr_tier_detailed(
     }
 
     // Check if confidence meets fallback threshold
-    if best_confidence < config.fallback.confidence_threshold {
+    // Don't override tier 5 (governance) with fallback if it has any confidence
+    if best_confidence < config.fallback.confidence_threshold && best_tier != 5 {
         best_tier = config.fallback.default_tier;
         rationale = format!("Confidence {:.2} below threshold {:.2}, using fallback Tier {}", 
                            best_confidence, config.fallback.confidence_threshold, best_tier);
@@ -407,7 +409,7 @@ fn get_default_config() -> TierClassificationConfig {
     // Tier 5: Governance
     rules.insert("tier_5_governance".to_string(), TierRule {
         name: "Governance Changes".to_string(),
-        confidence_threshold: 0.5, // Lower threshold to catch explicit markers
+        confidence_threshold: 0.2, // Lower threshold to catch governance keywords
         file_patterns: vec![
             "governance/**".to_string(),
             "maintainers/**".to_string(),
@@ -586,18 +588,31 @@ fn get_default_config() -> TierClassificationConfig {
 fn matches_pattern(file: &str, pattern: &str) -> bool {
     // Simple glob matching - handles common cases
     if pattern.contains("**") {
+        // Handle **/pattern/** case (match anywhere in path)
+        if pattern.starts_with("**/") && pattern.ends_with("/**") {
+            // Extract the pattern between **/ and /**
+            let pattern_clean = pattern.strip_prefix("**/").unwrap_or(pattern)
+                .strip_suffix("/**").unwrap_or(pattern);
+            // Match if file path contains /pattern/
+            return file.contains(&format!("/{}/", pattern_clean)) || 
+                   file.ends_with(&format!("/{}", pattern_clean)) ||
+                   file.starts_with(&format!("{}/", pattern_clean));
+        }
+        
         let parts: Vec<&str> = pattern.split("**").collect();
         if parts.len() == 2 {
             let prefix = parts[0];
             let suffix = parts[1];
             
             // Handle **/pattern case (match anywhere in path)
-            if prefix.is_empty() {
+            if prefix.is_empty() && suffix.starts_with('/') {
                 // For **/pattern, match if file path ends with pattern or contains /pattern
-                if suffix.starts_with('/') {
-                    let suffix_clean = &suffix[1..];
-                    return file.ends_with(suffix_clean) || file.contains(&format!("/{}", suffix_clean));
-                }
+                let suffix_clean = &suffix[1..];
+                return file.ends_with(suffix_clean) || file.contains(&format!("/{}", suffix_clean));
+            }
+            
+            // Handle **/pattern case (match anywhere in path, no leading /)
+            if prefix.is_empty() {
                 return file.contains(suffix);
             }
             // Handle pattern/** case

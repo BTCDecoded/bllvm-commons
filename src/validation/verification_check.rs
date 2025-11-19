@@ -205,6 +205,7 @@ fn load_governance_config() -> Result<GovernanceConfig> {
     // For now, we'll return a hardcoded config for bllvm-consensus
     let mut repos = HashMap::new();
     
+    // Add both "bllvm-consensus" and "BTCDecoded/bllvm-consensus" for compatibility
     let consensus_proof_config = RepositoryConfig {
         verification: Some(VerificationConfig {
             required: true,
@@ -226,7 +227,9 @@ fn load_governance_config() -> Result<GovernanceConfig> {
         }),
     };
     
-    repos.insert("bllvm-consensus".to_string(), consensus_proof_config);
+    // Add both formats for compatibility
+    repos.insert("bllvm-consensus".to_string(), consensus_proof_config.clone());
+    repos.insert("BTCDecoded/bllvm-consensus".to_string(), consensus_proof_config);
     
     Ok(GovernanceConfig { repos })
 }

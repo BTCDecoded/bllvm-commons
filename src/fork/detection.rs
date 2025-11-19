@@ -256,7 +256,7 @@ impl ForkDetector {
 
     /// Get recent detections
     pub fn get_recent_detections(&self, hours: i64) -> Vec<&ForkDetectionEvent> {
-        let cutoff = Utc::now() - chrono::Duration::hours(hours);
+        let cutoff = Utc::now() - chrono::Duration::try_hours(hours).unwrap_or(chrono::Duration::zero());
         
         self.detection_history
             .iter()

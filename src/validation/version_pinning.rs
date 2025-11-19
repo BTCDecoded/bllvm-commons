@@ -544,7 +544,7 @@ mod tests {
                     version: "v1.2.3".to_string(),
                     commit_sha: "abc123".to_string(),
                     content_hash: "sha256:def456".to_string(),
-                    created_at: chrono::Utc::now() - chrono::Duration::days(1),
+                    created_at: chrono::Utc::now() - chrono::Duration::try_days(1).unwrap_or(chrono::Duration::zero()),
                     signatures: vec![],
                     ots_timestamp: None,
                     is_stable: true,

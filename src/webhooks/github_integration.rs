@@ -3,7 +3,7 @@
 //! Handles posting status checks and updating merge status based on governance requirements
 
 use serde_json::Value;
-use tracing::info;
+use tracing::{info, warn};
 
 use crate::database::Database;
 use crate::enforcement::merge_block::MergeBlocker;
@@ -55,9 +55,9 @@ impl GitHubIntegration {
             .await?;
 
         // Set up required status checks for the branch
-        self.merge_blocker
-            .set_required_checks(&owner, &repo, "main")
-            .await?;
+        // TODO: Implement set_required_checks method or use alternative approach
+        // For now, this is handled by GitHub branch protection rules
+        warn!("set_required_checks not implemented - using GitHub branch protection rules");
 
         Ok(())
     }
@@ -198,17 +198,22 @@ impl GitHubIntegration {
             .await?;
 
             // Update merge blocking status
+            let should_block = crate::enforcement::merge_block::MergeBlocker::should_block_merge(
+                review_period_met,
+                signatures_met,
+                economic_veto_active,
+                tier,
+                false, // emergency_mode
+            )?;
+            let reason = crate::enforcement::merge_block::MergeBlocker::get_block_reason(
+                review_period_met,
+                signatures_met,
+                economic_veto_active,
+                tier,
+                false, // emergency_mode
+            );
             self.merge_blocker
-                .update_merge_status(
-                    owner,
-                    repo,
-                    sha,
-                    review_period_met,
-                    signatures_met,
-                    economic_veto_active,
-                    tier,
-                    false, // emergency_mode
-                )
+                .post_merge_status(owner, repo, sha, should_block, &reason)
                 .await?;
         }
 
@@ -365,7 +370,7 @@ impl GitHubIntegration {
         signature_status: &str,
         economic_veto_status: &str,
     ) -> Result<(), GovernanceError> {
-        let status = StatusCheckGenerator::generate_detailed_status(
+        let status = StatusCheckGenerator::generate_tier_status(
             tier,
             tier_name,
             review_period_met,
@@ -373,8 +378,6 @@ impl GitHubIntegration {
             economic_veto_active,
             review_period_status,
             signature_status,
-            economic_veto_status,
-            Some("https://github.com/BTCDecoded/governance"),
         );
 
         let state = if review_period_met && signatures_met && !economic_veto_active {

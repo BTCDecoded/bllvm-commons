@@ -18,7 +18,7 @@ use super::types::*;
 use super::export::GovernanceExporter;
 use super::adoption::AdoptionTracker;
 use super::versioning::RulesetVersioning;
-use bllvm_sdk::governance::sign_message;
+use crate::crypto::signatures::SignatureManager;
 
 /// Executes governance forks and manages ruleset transitions
 pub struct ForkExecutor {
@@ -334,7 +334,13 @@ impl ForkExecutor {
     /// Log a fork event
     async fn log_fork_event(&self, event: &ForkEvent) -> Result<(), GovernanceError> {
         // Store fork event in database via adoption tracker
-        self.adoption_tracker.record_fork_event(event).await?;
+        // Extract fields from ForkEvent struct - use details field
+        self.adoption_tracker.log_fork_event(
+            event.event_type.clone(),
+            &event.ruleset_id,
+            &event.node_id,
+            &event.details,
+        ).await?;
         Ok(())
     }
 
@@ -480,6 +486,7 @@ mod tests {
             hashpower_percentage: 35.0,
             economic_activity_percentage: 45.0,
             total_weight: 50.0,
+            last_updated: chrono::Utc::now(),
         };
         
         // Default thresholds are 0, so should pass
@@ -497,6 +504,7 @@ mod tests {
             minimum_hashpower_percentage: 0.0,
             minimum_economic_activity_percentage: 0.0,
             minimum_adoption_percentage: 0.0,
+            grace_period_days: 30,
         };
         
         let executor = ForkExecutor::new(export_path.to_str().unwrap(), pool, Some(thresholds)).unwrap();
@@ -507,6 +515,7 @@ mod tests {
             hashpower_percentage: 35.0,
             economic_activity_percentage: 45.0,
             total_weight: 50.0,
+            last_updated: chrono::Utc::now(),
         };
         
         assert!(!executor.should_execute_fork(&metrics), "Should not execute fork when node count below threshold");
@@ -523,6 +532,7 @@ mod tests {
             minimum_hashpower_percentage: 30.0,
             minimum_economic_activity_percentage: 0.0,
             minimum_adoption_percentage: 0.0,
+            grace_period_days: 30,
         };
         
         let executor = ForkExecutor::new(export_path.to_str().unwrap(), pool, Some(thresholds)).unwrap();
@@ -533,6 +543,7 @@ mod tests {
             hashpower_percentage: 25.0, // Below threshold
             economic_activity_percentage: 45.0,
             total_weight: 50.0,
+            last_updated: chrono::Utc::now(),
         };
         
         assert!(!executor.should_execute_fork(&metrics), "Should not execute fork when hashpower below threshold");

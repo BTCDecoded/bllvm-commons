@@ -241,12 +241,14 @@ mod tests {
     fn create_test_github_client() -> GitHubClient {
         let temp_dir = tempdir().unwrap();
         let private_key_path = temp_dir.path().join("test_key.pem");
-        std::fs::write(&private_key_path, "-----BEGIN PRIVATE KEY-----\nMOCK_KEY\n-----END PRIVATE KEY-----").unwrap();
+        // Use the actual test RSA key from test_fixtures
+        let valid_key = include_str!("../../test_fixtures/test_rsa_key.pem");
+        std::fs::write(&private_key_path, valid_key).unwrap();
         GitHubClient::new(123456, private_key_path.to_str().unwrap()).unwrap()
     }
 
-    #[test]
-    fn test_build_monitor_new() {
+    #[tokio::test]
+    async fn test_build_monitor_new() {
         let github_client = create_test_github_client();
         let monitor = BuildMonitor::new(
             github_client,
@@ -261,8 +263,8 @@ mod tests {
         assert_eq!(monitor.poll_interval, Duration::from_secs(10));
     }
 
-    #[test]
-    fn test_build_monitor_clone() {
+    #[tokio::test]
+    async fn test_build_monitor_clone() {
         let github_client = create_test_github_client();
         let monitor1 = BuildMonitor::new(
             github_client.clone(),

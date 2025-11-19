@@ -103,7 +103,7 @@ impl MergeBlocker {
 
         if let Some(client) = &self.github_client {
             client
-                .create_status_check(owner, repo, sha, "governance/merge", state, &final_description)
+                .post_status_check(owner, repo, sha, state, &final_description, "governance/merge")
                 .await?;
             info!("Posted merge status: {} for {}/{}@{}", state, owner, repo, sha);
         } else {
@@ -212,7 +212,7 @@ mod tests {
     #[test]
     fn test_get_block_reason_all_met() {
         let reason = MergeBlocker::get_block_reason(
-            true, false, false, 2, false
+            true, true, false, 2, false  // All requirements met: review_period_met=true, signatures_met=true
         );
         assert_eq!(reason, "All governance requirements met");
     }

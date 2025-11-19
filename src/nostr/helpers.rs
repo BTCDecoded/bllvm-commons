@@ -369,16 +369,20 @@ mod tests {
         assert!(result.is_ok());
     }
 
-    #[test]
-    fn test_create_keyholder_announcement_event() {
+    #[tokio::test]
+    async fn test_create_keyholder_announcement_event() {
         let config = setup_test_config().await;
         let keyholder = KeyholderAnnouncement {
-            keyholder: "alice".to_string(),
-            keyholder_type: "maintainer".to_string(),
+            name: "alice".to_string(),
+            about: "Test maintainer".to_string(),
+            role: "maintainer".to_string(),
+            governance_pubkey: "test_pubkey".to_string(),
+            jurisdiction: None,
+            backup_contact: None,
+            joined: chrono::Utc::now().timestamp(),
             layer: Some(2),
+            keyholder_type: "maintainer".to_string(),
             zap_address: Some("alice@example.com".to_string()),
-            bio: Some("Test maintainer".to_string()),
-            github_username: Some("alice".to_string()),
         };
         
         let result = create_keyholder_announcement_event(&config, &keyholder);
@@ -388,16 +392,20 @@ mod tests {
         assert_eq!(event.kind, nostr_sdk::prelude::Kind::Metadata);
     }
 
-    #[test]
-    fn test_create_keyholder_announcement_event_without_layer() {
+    #[tokio::test]
+    async fn test_create_keyholder_announcement_event_without_layer() {
         let config = setup_test_config().await;
         let keyholder = KeyholderAnnouncement {
-            keyholder: "bob".to_string(),
-            keyholder_type: "emergency".to_string(),
+            name: "bob".to_string(),
+            about: "Emergency keyholder".to_string(),
+            role: "emergency".to_string(),
+            governance_pubkey: "test_pubkey2".to_string(),
+            jurisdiction: None,
+            backup_contact: None,
+            joined: chrono::Utc::now().timestamp(),
             layer: None,
+            keyholder_type: "emergency_keyholder".to_string(),
             zap_address: None,
-            bio: None,
-            github_username: None,
         };
         
         let result = create_keyholder_announcement_event(&config, &keyholder);

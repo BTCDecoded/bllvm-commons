@@ -2,7 +2,7 @@ pub mod models;
 pub mod queries;
 pub mod schema;
 
-use sqlx::{SqlitePool, PgPool, sqlite::SqliteConnectOptions, sqlite::SqlitePoolOptions};
+use sqlx::{SqlitePool, PgPool, sqlite::SqliteConnectOptions, sqlite::SqlitePoolOptions, Row};
 use std::str::FromStr;
 use crate::error::GovernanceError;
 
@@ -121,7 +121,23 @@ impl Database {
                     .await;
                 
                 match result {
-                    Ok(_) => Ok(()),
+                    Ok(_) => {
+                        // Verify migrations ran by checking if key tables exist
+                        let tables_check = sqlx::query_scalar::<_, i64>(
+                            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('pull_requests', 'tier_overrides', 'build_runs')"
+                        )
+                        .fetch_one(pool)
+                        .await;
+                        
+                        if let Ok(count) = tables_check {
+                            if count < 3 {
+                                return Err(GovernanceError::DatabaseError(
+                                    format!("Migrations may have failed: expected at least 3 tables, found {}", count)
+                                ));
+                            }
+                        }
+                        Ok(())
+                    },
                     Err(e) => {
                         // Only ignore UNIQUE constraint errors on the _sqlx_migrations table itself
                         // This happens when migrations run in parallel during tests
@@ -130,7 +146,7 @@ impl Database {
                             // Migration table entry already exists, migrations are already applied
                             Ok(())
                         } else {
-                            Err(GovernanceError::DatabaseError(err_str))
+                            Err(GovernanceError::DatabaseError(format!("Migration failed: {}", err_str)))
                         }
                     }
                 }
@@ -462,18 +478,18 @@ impl Database {
 
                 match row {
                     Some(r) => {
-                        let id: i32 = r.get(0);
-                        let repo_name: String = r.get(1);
-                        let pr_number: i32 = r.get(2);
-                        let opened_at: chrono::DateTime<chrono::Utc> = r.get(3);
-                        let layer: i32 = r.get(4);
-                        let head_sha: String = r.get(5);
-                        let signatures_json: String = r.get(6);
-                        let governance_status: String = r.get(7);
-                        let linked_prs_json: String = r.get(8);
-                        let emergency_mode: bool = r.get(9);
-                        let created_at: chrono::DateTime<chrono::Utc> = r.get(10);
-                        let updated_at: chrono::DateTime<chrono::Utc> = r.get(11);
+                        let id: i32 = r.try_get(0).map_err(|e| GovernanceError::DatabaseError(e.to_string()))?;
+                        let repo_name: String = r.try_get(1).map_err(|e| GovernanceError::DatabaseError(e.to_string()))?;
+                        let pr_number: i32 = r.try_get(2).map_err(|e| GovernanceError::DatabaseError(e.to_string()))?;
+                        let opened_at: chrono::DateTime<chrono::Utc> = r.try_get(3).map_err(|e| GovernanceError::DatabaseError(e.to_string()))?;
+                        let layer: i32 = r.try_get(4).map_err(|e| GovernanceError::DatabaseError(e.to_string()))?;
+                        let head_sha: String = r.try_get(5).map_err(|e| GovernanceError::DatabaseError(e.to_string()))?;
+                        let signatures_json: String = r.try_get(6).map_err(|e| GovernanceError::DatabaseError(e.to_string()))?;
+                        let governance_status: String = r.try_get(7).map_err(|e| GovernanceError::DatabaseError(e.to_string()))?;
+                        let linked_prs_json: String = r.try_get(8).map_err(|e| GovernanceError::DatabaseError(e.to_string()))?;
+                        let emergency_mode: bool = r.try_get::<i32, _>(9).map_err(|e| GovernanceError::DatabaseError(e.to_string()))? != 0;
+                        let created_at: chrono::DateTime<chrono::Utc> = r.try_get(10).map_err(|e| GovernanceError::DatabaseError(e.to_string()))?;
+                        let updated_at: chrono::DateTime<chrono::Utc> = r.try_get(11).map_err(|e| GovernanceError::DatabaseError(e.to_string()))?;
 
                         let signatures: Vec<crate::database::models::Signature> = 
                             serde_json::from_str(&signatures_json)
@@ -531,13 +547,13 @@ impl Database {
 
                 let mut events = Vec::new();
                 for row in rows {
-                    let id: i32 = row.get(0);
-                    let event_type: String = row.get(1);
-                    let repo_name: Option<String> = row.get(2);
-                    let pr_number: Option<i32> = row.get(3);
-                    let maintainer: Option<String> = row.get(4);
-                    let details_str: String = row.get(5);
-                    let timestamp: chrono::DateTime<chrono::Utc> = row.get(6);
+                    let id: i32 = row.try_get(0).map_err(|e| GovernanceError::DatabaseError(e.to_string()))?;
+                    let event_type: String = row.try_get(1).map_err(|e| GovernanceError::DatabaseError(e.to_string()))?;
+                    let repo_name: Option<String> = row.try_get(2).map_err(|e| GovernanceError::DatabaseError(e.to_string()))?;
+                    let pr_number: Option<i32> = row.try_get(3).map_err(|e| GovernanceError::DatabaseError(e.to_string()))?;
+                    let maintainer: Option<String> = row.try_get(4).map_err(|e| GovernanceError::DatabaseError(e.to_string()))?;
+                    let details_str: String = row.try_get(5).map_err(|e| GovernanceError::DatabaseError(e.to_string()))?;
+                    let timestamp: chrono::DateTime<chrono::Utc> = row.try_get(6).map_err(|e| GovernanceError::DatabaseError(e.to_string()))?;
                     
                     let details: serde_json::Value = serde_json::from_str(&details_str)
                         .unwrap_or_else(|_| serde_json::json!({}));
@@ -577,13 +593,13 @@ impl Database {
 
                 let mut events = Vec::new();
                 for row in rows {
-                    let id: i32 = row.get(0);
-                    let event_type: String = row.get(1);
-                    let repo_name: Option<String> = row.get(2);
-                    let pr_number: Option<i32> = row.get(3);
-                    let maintainer: Option<String> = row.get(4);
-                    let details: serde_json::Value = row.get(5);
-                    let timestamp: chrono::DateTime<chrono::Utc> = row.get(6);
+                    let id: i32 = row.try_get(0).map_err(|e| GovernanceError::DatabaseError(e.to_string()))?;
+                    let event_type: String = row.try_get(1).map_err(|e| GovernanceError::DatabaseError(e.to_string()))?;
+                    let repo_name: Option<String> = row.try_get(2).map_err(|e| GovernanceError::DatabaseError(e.to_string()))?;
+                    let pr_number: Option<i32> = row.try_get(3).map_err(|e| GovernanceError::DatabaseError(e.to_string()))?;
+                    let maintainer: Option<String> = row.try_get(4).map_err(|e| GovernanceError::DatabaseError(e.to_string()))?;
+                    let details: serde_json::Value = row.try_get(5).map_err(|e| GovernanceError::DatabaseError(e.to_string()))?;
+                    let timestamp: chrono::DateTime<chrono::Utc> = row.try_get(6).map_err(|e| GovernanceError::DatabaseError(e.to_string()))?;
                     
                     events.push(crate::database::models::GovernanceEvent {
                         id,
@@ -620,8 +636,8 @@ impl Database {
                 .map_err(|e| GovernanceError::DatabaseError(e.to_string()))?;
 
                 if let Some(row) = row {
-                    let pr_number: Option<i32> = row.get(0);
-                    let timestamp: Option<chrono::DateTime<chrono::Utc>> = row.get(1);
+                    let pr_number: Option<i32> = row.try_get(0).map_err(|e| GovernanceError::DatabaseError(e.to_string()))?;
+                    let timestamp: Option<chrono::DateTime<chrono::Utc>> = row.try_get(1).map_err(|e| GovernanceError::DatabaseError(e.to_string()))?;
                     Ok(Some((pr_number, timestamp)))
                 } else {
                     Ok(None)
@@ -642,8 +658,8 @@ impl Database {
                 .map_err(|e| GovernanceError::DatabaseError(e.to_string()))?;
 
                 if let Some(row) = row {
-                    let pr_number: Option<i32> = row.get(0);
-                    let timestamp: Option<chrono::DateTime<chrono::Utc>> = row.get(1);
+                    let pr_number: Option<i32> = row.try_get(0).map_err(|e| GovernanceError::DatabaseError(e.to_string()))?;
+                    let timestamp: Option<chrono::DateTime<chrono::Utc>> = row.try_get(1).map_err(|e| GovernanceError::DatabaseError(e.to_string()))?;
                     Ok(Some((pr_number, timestamp)))
                 } else {
                     Ok(None)
@@ -656,36 +672,32 @@ impl Database {
     pub async fn count_merges_today(
         &self,
     ) -> Result<u64, GovernanceError> {
-        let today_start = chrono::Utc::now().date_naive().and_hms_opt(0, 0, 0)
-            .and_then(|dt| chrono::DateTime::from_naive_utc_and_offset(dt, chrono::Utc).into())
-            .ok_or_else(|| GovernanceError::DatabaseError("Failed to calculate today start".to_string()))?;
-        
         match &self.backend {
             DatabaseBackend::Sqlite(pool) => {
+                // Use SQLite date functions for reliable date comparison
                 let count: i64 = sqlx::query_scalar(
                     r#"
                     SELECT COUNT(*)
                     FROM governance_events
                     WHERE event_type IN ('merge', 'merged', 'pr_merged')
-                    AND timestamp >= ?
+                    AND date(timestamp) = date('now')
                     "#
                 )
-                .bind(today_start)
                 .fetch_one(pool)
                 .await
                 .map_err(|e| GovernanceError::DatabaseError(e.to_string()))?;
                 Ok(count as u64)
             }
             DatabaseBackend::Postgres(pool) => {
+                // Use PostgreSQL date functions for reliable date comparison
                 let count: i64 = sqlx::query_scalar(
                     r#"
                     SELECT COUNT(*)
                     FROM governance_events
                     WHERE event_type IN ('merge', 'merged', 'pr_merged')
-                    AND timestamp >= $1
+                    AND date(timestamp) = CURRENT_DATE
                     "#
                 )
-                .bind(today_start)
                 .fetch_one(pool)
                 .await
                 .map_err(|e| GovernanceError::DatabaseError(e.to_string()))?;
@@ -771,13 +783,13 @@ impl Database {
 
                 if let Some(row) = row {
                     Ok(Some(crate::database::models::TierOverride {
-                        id: row.get(0),
-                        repo_name: row.get(1),
-                        pr_number: row.get(2),
-                        override_tier: row.get::<i32, _>(3) as u32,
-                        justification: row.get(4),
-                        overridden_by: row.get(5),
-                        created_at: row.get(6),
+                        id: row.try_get(0).map_err(|e| GovernanceError::DatabaseError(e.to_string()))?,
+                        repo_name: row.try_get(1).map_err(|e| GovernanceError::DatabaseError(e.to_string()))?,
+                        pr_number: row.try_get(2).map_err(|e| GovernanceError::DatabaseError(e.to_string()))?,
+                        override_tier: row.try_get::<i32, _>(3).map_err(|e| GovernanceError::DatabaseError(e.to_string()))? as u32,
+                        justification: row.try_get(4).map_err(|e| GovernanceError::DatabaseError(e.to_string()))?,
+                        overridden_by: row.try_get(5).map_err(|e| GovernanceError::DatabaseError(e.to_string()))?,
+                        created_at: row.try_get(6).map_err(|e| GovernanceError::DatabaseError(e.to_string()))?,
                     }))
                 } else {
                     Ok(None)
@@ -799,13 +811,13 @@ impl Database {
 
                 if let Some(row) = row {
                     Ok(Some(crate::database::models::TierOverride {
-                        id: row.get(0),
-                        repo_name: row.get(1),
-                        pr_number: row.get(2),
+                        id: row.try_get(0).map_err(|e| GovernanceError::DatabaseError(e.to_string()))?,
+                        repo_name: row.try_get(1).map_err(|e| GovernanceError::DatabaseError(e.to_string()))?,
+                        pr_number: row.try_get(2).map_err(|e| GovernanceError::DatabaseError(e.to_string()))?,
                         override_tier: row.get::<i32, _>(3) as u32,
-                        justification: row.get(4),
-                        overridden_by: row.get(5),
-                        created_at: row.get(6),
+                        justification: row.try_get(4).map_err(|e| GovernanceError::DatabaseError(e.to_string()))?,
+                        overridden_by: row.try_get(5).map_err(|e| GovernanceError::DatabaseError(e.to_string()))?,
+                        created_at: row.try_get(6).map_err(|e| GovernanceError::DatabaseError(e.to_string()))?,
                     }))
                 } else {
                     Ok(None)
@@ -872,11 +884,11 @@ impl Database {
 
                 let mut keyholders = Vec::new();
                 for row in rows {
-                    let id: i32 = row.get(0);
-                    let github_username: String = row.get(1);
-                    let public_key: String = row.get(2);
-                    let active: bool = row.get(3);
-                    let last_updated: chrono::DateTime<chrono::Utc> = row.get(4);
+                    let id: i32 = row.try_get(0).map_err(|e| GovernanceError::DatabaseError(e.to_string()))?;
+                    let github_username: String = row.try_get(1).map_err(|e| GovernanceError::DatabaseError(e.to_string()))?;
+                    let public_key: String = row.try_get(2).map_err(|e| GovernanceError::DatabaseError(e.to_string()))?;
+                    let active: bool = row.try_get(3).map_err(|e| GovernanceError::DatabaseError(e.to_string()))?;
+                    let last_updated: chrono::DateTime<chrono::Utc> = row.try_get(4).map_err(|e| GovernanceError::DatabaseError(e.to_string()))?;
 
                     keyholders.push(crate::database::models::EmergencyKeyholder {
                         id,
@@ -1563,7 +1575,7 @@ mod tests {
         db.log_governance_event("merge", None, Some(2), None, &details).await.unwrap();
         
         let count = db.count_merges_today().await.unwrap();
-        assert!(count >= 2);
+        assert_eq!(count, 2, "Should count exactly 2 merges from today");
     }
 
     #[tokio::test]
@@ -1642,7 +1654,7 @@ mod tests {
         let db = Database::new_in_memory().await.unwrap();
         db.upsert_build_run("v1.0.0", "test/repo", Some(123), "running").await.unwrap();
         
-        let result = db.update_build_run_status("v1.0.0", "test/repo", "success", None).await;
+        let result = db.update_build_status("v1.0.0", "test/repo", "success", None).await;
         assert!(result.is_ok());
     }
 

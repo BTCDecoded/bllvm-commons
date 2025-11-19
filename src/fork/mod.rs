@@ -14,7 +14,7 @@ pub mod verification;
 pub use adoption::AdoptionTracker;
 pub use dashboard::AdoptionDashboard;
 pub use detection::{ForkDetector, ForkDetectionEvent, ForkTriggerType, ForkAction};
-pub use executor::{ForkExecutor, ForkStatus};
+pub use executor::ForkExecutor;
 pub use export::GovernanceExporter;
 pub use types::*;
 pub use versioning::RulesetVersioning;

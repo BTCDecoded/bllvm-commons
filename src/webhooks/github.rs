@@ -122,13 +122,15 @@ pub async fn handle_webhook(
                 .unwrap_or("BTCDecoded")
                 .to_string();
             
+            // Clone database before moving it to orchestrator
+            let database_clone = database.clone();
             let orchestrator = BuildOrchestrator::new(
                 github_client,
-                database,
+                database_clone.clone(),
                 organization,
             );
             
-            match release::handle_repository_dispatch(&payload, &orchestrator, &database).await {
+            match release::handle_repository_dispatch(&payload, &orchestrator, &database_clone).await {
                 Ok((status, response)) => (status, Json(response)),
                 Err(e) => {
                     warn!("Failed to handle repository_dispatch: {}", e);

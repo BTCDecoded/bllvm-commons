@@ -17,29 +17,10 @@ pub fn verify_entry(entry: &AuditLogEntry) -> Result<bool, GovernanceError> {
 }
 
 /// Calculate hash for an audit log entry
+/// This must match the hash calculation in AuditLogEntry::calculate_hash()
 pub fn calculate_entry_hash(entry: &AuditLogEntry) -> Result<String, GovernanceError> {
-    use serde_json;
-    
-    // Serialize entry data (excluding the hash itself)
-    let entry_data = serde_json::json!({
-        "job_id": entry.job_id,
-        "entry_type": entry.entry_type,
-        "governance_id": entry.governance_id,
-        "input_hash": entry.input_hash,
-        "output_hash": entry.output_hash,
-        "previous_log_hash": entry.previous_log_hash,
-        "metadata": entry.metadata,
-        "timestamp": entry.timestamp.to_rfc3339(),
-    });
-    
-    let entry_str = serde_json::to_string(&entry_data)
-        .map_err(|e| GovernanceError::CryptoError(format!("Failed to serialize entry: {}", e)))?;
-    
-    let mut hasher = Sha256::new();
-    hasher.update(entry_str.as_bytes());
-    let hash = hasher.finalize();
-    
-    Ok(format!("sha256:{}", hex::encode(hash)))
+    // Use the same canonical string format as AuditLogEntry::calculate_hash()
+    Ok(entry.calculate_hash())
 }
 
 /// Verify the hash chain of audit log entries
@@ -196,4 +177,37 @@ mod tests {
         
         assert_ne!(hash1, hash2, "Different entries should have different hashes");
     }
+}
+
+/// Verify an audit log (alias for verify_hash_chain)
+pub fn verify_audit_log(entries: &[AuditLogEntry]) -> Result<bool, GovernanceError> {
+    verify_hash_chain(entries)
+}
+
+/// Verify an audit log from a file
+pub fn verify_audit_log_file(file_path: &str) -> Result<bool, GovernanceError> {
+    use std::fs;
+    use serde_json;
+    
+    let content = fs::read_to_string(file_path)
+        .map_err(|e| GovernanceError::ConfigError(format!("Failed to read audit log file: {}", e)))?;
+    
+    let entries: Vec<AuditLogEntry> = serde_json::from_str(&content)
+        .map_err(|e| GovernanceError::ConfigError(format!("Failed to parse audit log: {}", e)))?;
+    
+    verify_hash_chain(&entries)
+}
+
+/// Load audit log entries from a file
+pub fn load_audit_log_from_file(file_path: &str) -> Result<Vec<AuditLogEntry>, GovernanceError> {
+    use std::fs;
+    use serde_json;
+    
+    let content = fs::read_to_string(file_path)
+        .map_err(|e| GovernanceError::ConfigError(format!("Failed to read audit log file: {}", e)))?;
+    
+    let entries: Vec<AuditLogEntry> = serde_json::from_str(&content)
+        .map_err(|e| GovernanceError::ConfigError(format!("Failed to parse audit log: {}", e)))?;
+    
+    Ok(entries)
 }

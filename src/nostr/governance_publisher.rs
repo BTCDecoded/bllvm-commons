@@ -156,41 +156,35 @@ mod tests {
     use super::*;
     use crate::nostr::events::{EconomicVetoStatus, GovernanceActionEvent, LayerRequirement, TierRequirement, CombinedRequirement, KeyholderSignature};
 
-    fn create_test_publisher() -> GovernanceActionPublisher {
+    async fn create_test_publisher() -> GovernanceActionPublisher {
         // Create a mock client for testing
         // Note: This won't actually connect to relays
         let keys = nostr_sdk::prelude::Keys::generate();
-        let client = nostr_sdk::prelude::Client::new(&keys);
+        let nsec = keys.secret_key().unwrap().display_secret().to_string();
+        let client = crate::nostr::client::NostrClient::new(nsec, vec![]).await.unwrap();
         
         GovernanceActionPublisher::new(
-            crate::nostr::client::NostrClient {
-                client,
-                keys,
-                relay_status: std::sync::Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new())),
-            },
+            client,
             "test-config".to_string(),
             None,
         )
     }
 
-    #[test]
-    fn test_governance_action_publisher_new() {
-        let publisher = create_test_publisher();
+    #[tokio::test]
+    async fn test_governance_action_publisher_new() {
+        let publisher = create_test_publisher().await;
         assert_eq!(publisher.governance_config, "test-config");
         assert!(publisher.zap_address.is_none());
     }
 
-    #[test]
-    fn test_governance_action_publisher_with_zap() {
+    #[tokio::test]
+    async fn test_governance_action_publisher_with_zap() {
         let keys = nostr_sdk::prelude::Keys::generate();
-        let client = nostr_sdk::prelude::Client::new(&keys);
+        let nsec = keys.secret_key().unwrap().display_secret().to_string();
+        let client = crate::nostr::client::NostrClient::new(nsec, vec![]).await.unwrap();
         
         let publisher = GovernanceActionPublisher::new(
-            crate::nostr::client::NostrClient {
-                client,
-                keys,
-                relay_status: std::sync::Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new())),
-            },
+            client,
             "test-config".to_string(),
             Some("zap@example.com".to_string()),
         );
@@ -199,10 +193,10 @@ mod tests {
         assert_eq!(publisher.zap_address, Some("zap@example.com".to_string()));
     }
 
-    #[test]
-    fn test_governance_action_publisher_governance_config() {
-        let publisher = create_test_publisher();
-        assert_eq!(publisher.governance_config(), "test-config");
+    #[tokio::test]
+    async fn test_governance_action_publisher_governance_config() {
+        let publisher = create_test_publisher().await;
+        assert_eq!(publisher.governance_config, "test-config");
     }
 }
 

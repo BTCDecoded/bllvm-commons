@@ -326,7 +326,7 @@ mod tests {
         assert_eq!(signals.len(), 0, "Should return empty list when no signals");
     }
 
-    #[tokio::test]
+    #[test]
     fn test_veto_threshold_calculation() {
         // Test threshold calculation logic
         let mining_veto_percent = 25.0;

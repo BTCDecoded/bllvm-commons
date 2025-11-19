@@ -277,7 +277,7 @@ impl CrossLayerStatusChecker {
         owner: &str,
         repo: &str,
         pr_number: u64,
-        changed_files: &[String],
+        _changed_files: &[String],
     ) -> Result<EquivalenceProofStatus, GovernanceError> {
         info!("Checking equivalence proofs for {}/{} PR #{}", owner, repo, pr_number);
 
@@ -340,12 +340,13 @@ impl CrossLayerStatusChecker {
                 }
                 ValidationResult::Invalid { message, blocking: _ } => {
                     let mut failed = tests_failed;
+                    let message_clone = message.clone();
                     if !message.is_empty() {
                         failed.push(message);
                     }
                     Ok(EquivalenceProofStatus {
                         status: StatusState::Failure,
-                        message: format!("❌ Equivalence Proof: {}", message),
+                        message: format!("❌ Equivalence Proof: {}", message_clone),
                         tests_run,
                         tests_passed,
                         tests_failed: failed,
@@ -498,16 +499,16 @@ impl CrossLayerStatusChecker {
         Self::extract_test_count_from_name_impl(name)
     }
     
-    #[cfg(test)]
-    pub(crate) fn extract_test_count_from_name_impl(name: &str) -> Option<usize> {
+    fn extract_test_count_from_name_impl(name: &str) -> Option<usize> {
         use regex::Regex;
         
-        // Pattern: "123 tests" or "Tests: 456" or "cargo test: 789"
+        // Pattern: "123 tests" or "Tests: 456" or "cargo test: 789" (case-insensitive, handles plural)
         let patterns = vec![
-            r"(\d+)\s+test",
-            r"test[:\s]+(\d+)",
-            r"(\d+)\s+passed",
-            r"passed[:\s]+(\d+)",
+            r"(?i)(\d+)\s+test[s]?",
+            r"(?i)test[s]?[:\s]+(\d+)",
+            r"(?i)(\d+)\s+passed",
+            r"(?i)passed[:\s]+(\d+)",
+            r"(?i)\((\d+)\s+test[s]?\)", // Matches "(123 tests)" format
         ];
         
         for pattern in patterns {
@@ -780,8 +781,8 @@ mod tests {
     }
 
     // Unit tests for determine_overall_status
-    #[test]
-    fn test_determine_overall_status_all_success() {
+    #[tokio::test]
+    async fn test_determine_overall_status_all_success() {
         let checker = match create_test_checker() {
             Some(c) => c,
             None => return, // Skip if can't create client
@@ -818,8 +819,8 @@ mod tests {
         assert_eq!(result, StatusState::Success);
     }
 
-    #[test]
-    fn test_determine_overall_status_any_failure() {
+    #[tokio::test]
+    async fn test_determine_overall_status_any_failure() {
         let checker = match create_test_checker() {
             Some(c) => c,
             None => return,
@@ -857,8 +858,8 @@ mod tests {
         assert_eq!(result, StatusState::Failure);
     }
 
-    #[test]
-    fn test_determine_overall_status_pending() {
+    #[tokio::test]
+    async fn test_determine_overall_status_pending() {
         let checker = match create_test_checker() {
             Some(c) => c,
             None => return,
@@ -896,8 +897,8 @@ mod tests {
         assert_eq!(result, StatusState::Pending);
     }
 
-    #[test]
-    fn test_determine_overall_status_mixed_pending_success() {
+    #[tokio::test]
+    async fn test_determine_overall_status_mixed_pending_success() {
         let checker = match create_test_checker() {
             Some(c) => c,
             None => return,
@@ -936,8 +937,8 @@ mod tests {
     }
 
     // Unit tests for generate_recommendations
-    #[test]
-    fn test_generate_recommendations_all_success() {
+    #[tokio::test]
+    async fn test_generate_recommendations_all_success() {
         let checker = match create_test_checker() {
             Some(c) => c,
             None => return,
@@ -975,8 +976,8 @@ mod tests {
         assert!(recommendations[0].contains("All cross-layer checks passed"));
     }
 
-    #[test]
-    fn test_generate_recommendations_content_hash_missing() {
+    #[tokio::test]
+    async fn test_generate_recommendations_content_hash_missing() {
         let checker = match create_test_checker() {
             Some(c) => c,
             None => return,
@@ -1015,8 +1016,8 @@ mod tests {
         assert!(recommendations[0].contains("block-validation.md"));
     }
 
-    #[test]
-    fn test_generate_recommendations_version_pinning_invalid() {
+    #[tokio::test]
+    async fn test_generate_recommendations_version_pinning_invalid() {
         let checker = match create_test_checker() {
             Some(c) => c,
             None => return,
@@ -1068,8 +1069,8 @@ mod tests {
         assert!(recommendations[0].contains("Orange Paper"));
     }
 
-    #[test]
-    fn test_generate_recommendations_equivalence_proof_failed() {
+    #[tokio::test]
+    async fn test_generate_recommendations_equivalence_proof_failed() {
         let checker = match create_test_checker() {
             Some(c) => c,
             None => return,
@@ -1108,8 +1109,8 @@ mod tests {
         assert!(recommendations[0].contains("implementation matches specification"));
     }
 
-    #[test]
-    fn test_generate_recommendations_multiple_failures() {
+    #[tokio::test]
+    async fn test_generate_recommendations_multiple_failures() {
         let checker = match create_test_checker() {
             Some(c) => c,
             None => return,
@@ -1162,8 +1163,8 @@ mod tests {
         assert!(recommendations.iter().any(|r| r.contains("Fix failing equivalence tests")));
     }
 
-    #[test]
-    fn test_generate_recommendations_content_hash_multiple_files() {
+    #[tokio::test]
+    async fn test_generate_recommendations_content_hash_multiple_files() {
         let checker = match create_test_checker() {
             Some(c) => c,
             None => return,
@@ -1208,8 +1209,8 @@ mod tests {
     }
 
     // Unit tests for generate_status_description
-    #[test]
-    fn test_generate_status_description_all_success() {
+    #[tokio::test]
+    async fn test_generate_status_description_all_success() {
         let checker = match create_test_checker() {
             Some(c) => c,
             None => return,
@@ -1249,8 +1250,8 @@ mod tests {
         assert!(description.contains(" | ")); // Should have separators
     }
 
-    #[test]
-    fn test_generate_status_description_all_failure() {
+    #[tokio::test]
+    async fn test_generate_status_description_all_failure() {
         let checker = match create_test_checker() {
             Some(c) => c,
             None => return,
@@ -1289,8 +1290,8 @@ mod tests {
         assert!(description.contains("Equivalence Proof: ❌"));
     }
 
-    #[test]
-    fn test_generate_status_description_mixed() {
+    #[tokio::test]
+    async fn test_generate_status_description_mixed() {
         let checker = match create_test_checker() {
             Some(c) => c,
             None => return,
@@ -1330,8 +1331,8 @@ mod tests {
     }
 
     // Unit tests for map_status_to_sync_status
-    #[test]
-    fn test_map_status_to_sync_status_success() {
+    #[tokio::test]
+    async fn test_map_status_to_sync_status_success() {
         let checker = match create_test_checker() {
             Some(c) => c,
             None => return,
@@ -1341,8 +1342,8 @@ mod tests {
         assert_eq!(sync_status, SyncStatus::Synchronized);
     }
 
-    #[test]
-    fn test_map_status_to_sync_status_failure() {
+    #[tokio::test]
+    async fn test_map_status_to_sync_status_failure() {
         let checker = match create_test_checker() {
             Some(c) => c,
             None => return,
@@ -1352,8 +1353,8 @@ mod tests {
         assert_eq!(sync_status, SyncStatus::MissingUpdates);
     }
 
-    #[test]
-    fn test_map_status_to_sync_status_pending() {
+    #[tokio::test]
+    async fn test_map_status_to_sync_status_pending() {
         let checker = match create_test_checker() {
             Some(c) => c,
             None => return,
@@ -1363,8 +1364,8 @@ mod tests {
         assert_eq!(sync_status, SyncStatus::SyncFailure);
     }
 
-    #[test]
-    fn test_map_status_to_sync_status_error() {
+    #[tokio::test]
+    async fn test_map_status_to_sync_status_error() {
         let checker = match create_test_checker() {
             Some(c) => c,
             None => return,

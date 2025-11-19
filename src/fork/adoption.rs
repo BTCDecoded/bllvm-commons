@@ -250,7 +250,7 @@ impl AdoptionTracker {
     }
 
     /// Log a fork event
-    async fn log_fork_event(
+    pub(crate) async fn log_fork_event(
         &self,
         event_type: ForkEventType,
         ruleset_id: &str,
