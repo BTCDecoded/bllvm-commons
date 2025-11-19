@@ -1,6 +1,5 @@
 # BIP119 CTV (OP_CHECKTEMPLATEVERIFY) - Complete Implementation Plan
 
-**Date**: 2025-01-XX  
 **Status**: Planning Phase  
 **Priority**: High (Already tracked in codebase, growing community support)
 

@@ -1,6 +1,5 @@
 # Bitcoin Commons Documentation Index
 
-**Last Updated**: 2025-01-XX  
 **Purpose**: Central navigation for all Bitcoin Commons documentation
 
 ---

@@ -1,6 +1,5 @@
 # Book Compliance Gap Analysis
 
-**Date**: 2025-01-XX  
 **Scope**: Comparing `/home/user/src/btcdecoded-book/book/manuscript.md` descriptions against current implementation
 
 **Exclusions** (handled separately):
