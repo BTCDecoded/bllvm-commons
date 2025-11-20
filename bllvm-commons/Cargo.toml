@@ -22,6 +22,7 @@ jsonwebtoken = "9.2"
 
 # Database
 sqlx = { version = "0.8.1", features = ["postgres", "sqlite", "runtime-tokio-rustls", "chrono", "json", "migrate"] }
+# Note: MySQL feature removed - not used, eliminates rsa 0.9.8 vulnerability
 
 # Cryptography (Bitcoin-compatible)
 secp256k1 = { version = "0.28", features = ["rand"] }
