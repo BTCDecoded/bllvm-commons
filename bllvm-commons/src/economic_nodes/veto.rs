@@ -124,10 +124,8 @@ impl VetoManager {
 
         let mut mining_veto_weight = 0.0;
         let mut economic_veto_weight = 0.0;
-        let mut total_mining_weight = 0.0;
-        let mut total_economic_weight = 0.0;
 
-        // Calculate weights by node type
+        // Calculate veto weights from signals
         for signal in signals {
             let node_type =
                 NodeType::from_str(&signal.get::<String, _>("node_type")).ok_or_else(|| {
@@ -149,13 +147,11 @@ impl VetoManager {
 
             match node_type {
                 NodeType::MiningPool => {
-                    total_mining_weight += weight;
                     if signal_type == SignalType::Veto {
                         mining_veto_weight += weight;
                     }
                 }
                 _ => {
-                    total_economic_weight += weight;
                     if signal_type == SignalType::Veto {
                         economic_veto_weight += weight;
                     }
@@ -163,15 +159,47 @@ impl VetoManager {
             }
         }
 
-        // Calculate percentages
-        let mining_veto_percent = if total_mining_weight > 0.0 {
-            (mining_veto_weight / total_mining_weight) * 100.0
+        // Get total network hashpower (sum of all active mining pool weights)
+        // This is the correct denominator - total network, not just signal submitters
+        let total_network_mining_weight: Option<f64> = sqlx::query_scalar(
+            r#"
+            SELECT COALESCE(SUM(weight), 0.0)
+            FROM economic_nodes
+            WHERE node_type = 'mining_pool' AND status = 'active'
+            "#,
+        )
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| {
+            GovernanceError::DatabaseError(format!("Failed to fetch total network mining weight: {}", e))
+        })?;
+
+        // Get total network economic activity (sum of all active non-mining pool weights)
+        let total_network_economic_weight: Option<f64> = sqlx::query_scalar(
+            r#"
+            SELECT COALESCE(SUM(weight), 0.0)
+            FROM economic_nodes
+            WHERE node_type != 'mining_pool' AND status = 'active'
+            "#,
+        )
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| {
+            GovernanceError::DatabaseError(format!("Failed to fetch total network economic weight: {}", e))
+        })?;
+
+        let total_network_mining_weight = total_network_mining_weight.unwrap_or(0.0);
+        let total_network_economic_weight = total_network_economic_weight.unwrap_or(0.0);
+
+        // Calculate percentages against total network (not just signal submitters)
+        let mining_veto_percent = if total_network_mining_weight > 0.0 {
+            (mining_veto_weight / total_network_mining_weight) * 100.0
         } else {
             0.0
         };
 
-        let economic_veto_percent = if total_economic_weight > 0.0 {
-            (economic_veto_weight / total_economic_weight) * 100.0
+        let economic_veto_percent = if total_network_economic_weight > 0.0 {
+            (economic_veto_weight / total_network_economic_weight) * 100.0
         } else {
             0.0
         };
