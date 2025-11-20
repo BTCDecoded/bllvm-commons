@@ -127,10 +127,14 @@ impl WeightCalculator {
         .await?;
         
         // Calculate total system weight first (needed for caps)
-        let total_system_weight = self.calculate_total_system_weight().await?;
+        // On first pass, this will be 0, so we'll do a second pass to apply caps correctly
+        let mut total_system_weight = self.calculate_total_system_weight().await?;
         
         // Save contributor count before moving
         let contributor_count = contributors.len();
+        
+        // First pass: calculate base weights without cap (if total_system_weight is 0)
+        let mut base_weights: Vec<(String, f64)> = Vec::new();
         
         // Update weights for each contributor
         for contributor in contributors {
@@ -172,16 +176,22 @@ impl WeightCalculator {
             .await?;
             let fee_forwarding_btc = fee_forwarding_btc.unwrap_or(0.0);
             
-            // Zaps (cumulative - all time)
+            // Zaps (cumulative - all time, but exclude contributions in cooling-off period)
             let cumulative_zaps_btc: Option<f64> = sqlx::query_scalar(
                 r#"
                 SELECT COALESCE(SUM(amount_btc), 0.0) as total
                 FROM unified_contributions
                 WHERE contributor_id = ?
                   AND contribution_type LIKE 'zap:%'
+                  AND (
+                    amount_btc < ? OR
+                    contribution_age_days >= ?
+                  )
                 "#,
             )
             .bind(&contributor_id)
+            .bind(self.cooling_off_threshold_btc)
+            .bind(self.cooling_off_period_days)
             .fetch_one(&self.pool)
             .await?;
             let cumulative_zaps_btc = cumulative_zaps_btc.unwrap_or(0.0);
@@ -193,6 +203,11 @@ impl WeightCalculator {
                 fee_forwarding_btc,
                 cumulative_zaps_btc,
             );
+            
+            // Store base weight for second pass if needed
+            if total_system_weight == 0.0 {
+                base_weights.push((contributor_id.clone(), base_weight));
+            }
             
             // Apply weight cap (only if we have a valid total system weight)
             // On first iteration, total_system_weight is 0, so we skip the cap
@@ -236,6 +251,42 @@ impl WeightCalculator {
                 "Updated participation weight for {}: base={:.2}, capped={:.2} (contributions: {:.8} BTC)",
                 contributor_id, base_weight, capped_weight, total_contribution_btc
             );
+        }
+        
+        // If we did a first pass without caps, do a second pass to apply caps correctly
+        if total_system_weight == 0.0 && !base_weights.is_empty() {
+            // Recalculate total system weight from base weights
+            total_system_weight = base_weights.iter().map(|(_, w)| *w).sum();
+            
+            // Second pass: apply caps
+            for (contributor_id, base_weight) in base_weights {
+                let capped_weight = self.apply_weight_cap(base_weight, total_system_weight);
+                
+                // Update the capped weight
+                sqlx::query(
+                    r#"
+                    UPDATE participation_weights
+                    SET capped_weight = ?, total_system_weight = ?
+                    WHERE contributor_id = ?
+                    "#,
+                )
+                .bind(capped_weight)
+                .bind(total_system_weight)
+                .bind(&contributor_id)
+                .execute(&self.pool)
+                .await?;
+            }
+            
+            // Update total_system_weight for all rows
+            sqlx::query(
+                r#"
+                UPDATE participation_weights
+                SET total_system_weight = ?
+                "#,
+            )
+            .bind(total_system_weight)
+            .execute(&self.pool)
+            .await?;
         }
         
         info!("Updated participation weights for {} contributors", contributor_count);

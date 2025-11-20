@@ -7,9 +7,12 @@ use bllvm_commons::governance::{
     ContributionTracker, ContributionAggregator, WeightCalculator, VoteAggregator,
 };
 use bllvm_commons::nostr::ZapVotingProcessor;
-use bllvm_commons::economic_nodes::veto::VetoManager;
+use bllvm_commons::economic_nodes::{veto::VetoManager, registry::EconomicNodeRegistry};
+use bllvm_commons::crypto::signatures::SignatureManager;
+use bllvm_sdk::governance::GovernanceKeypair;
 use chrono::{DateTime, Utc};
 use sqlx::SqlitePool;
+use hex;
 
 /// Setup complete test database with all governance tables
 async fn setup_complete_governance_db() -> SqlitePool {
@@ -229,7 +232,7 @@ async fn test_complete_governance_flow_tier3_veto_blocked() {
     let timestamp = Utc::now();
     
     // Step 1: Create economic node
-    sqlx::query(
+    let result = sqlx::query(
         r#"
         INSERT INTO economic_nodes (entity_name, node_type, public_key, qualification_data, weight, status)
         VALUES (?, ?, ?, '{}', ?, ?)
@@ -244,26 +247,44 @@ async fn test_complete_governance_flow_tier3_veto_blocked() {
     .await
     .unwrap();
     
-    let node_id: i64 = sqlx::query_scalar("SELECT last_insert_rowid()")
-        .fetch_one(&pool)
+    let node_id = result.last_insert_rowid() as i32;
+    
+    // Step 2: Create valid signature for veto signal
+    let signature_manager = SignatureManager::new();
+    let keypair = GovernanceKeypair::generate().expect("Failed to generate keypair");
+    let pubkey_hex = hex::encode(keypair.public_key().to_bytes());
+    
+    // Update node's public key to match generated keypair
+    sqlx::query("UPDATE economic_nodes SET public_key = ? WHERE id = ?")
+        .bind(&pubkey_hex)
+        .bind(node_id)
+        .execute(&pool)
         .await
         .unwrap();
     
-    // Step 2: Economic node vetoes (35% > 30% threshold)
+    // Get node to get entity name for signature message
+    let registry = EconomicNodeRegistry::new(pool.clone());
+    let node = registry.get_node_by_id(node_id).await.unwrap();
+    
+    // Create valid signature
+    let message = format!("PR #{} veto signal from {}", pr_id, node.entity_name);
+    let signature = signature_manager.create_governance_signature(&message, &keypair).expect("Failed to create signature");
+    
+    // Step 3: Economic node vetoes (35% > 30% threshold)
     veto_manager.collect_veto_signal(
         pr_id,
-        node_id as i32,
+        node_id,
         bllvm_commons::economic_nodes::types::SignalType::Veto,
-        "signature1",
+        &signature,
         "Economic concerns",
     )
     .await
     .unwrap();
     
-    // Step 3: Aggregate votes (should detect veto)
+    // Step 4: Aggregate votes (should detect veto)
     let result = vote_aggregator.aggregate_proposal_votes(pr_id, tier).await.unwrap();
     
-    // Step 4: Verify veto blocks
+    // Step 5: Verify veto blocks
     assert!(result.veto_blocks, "Proposal should be blocked by economic node veto");
     
     // Step 5: Check economic veto blocking
@@ -427,7 +448,7 @@ async fn test_complete_governance_flow_combined_veto_systems() {
     let timestamp = Utc::now();
     
     // Step 1: Economic node veto (25% hashpower - below 30% threshold)
-    sqlx::query(
+    let result = sqlx::query(
         r#"
         INSERT INTO economic_nodes (entity_name, node_type, public_key, qualification_data, weight, status)
         VALUES (?, ?, ?, '{}', ?, ?)
@@ -442,16 +463,34 @@ async fn test_complete_governance_flow_combined_veto_systems() {
     .await
     .unwrap();
     
-    let node_id: i64 = sqlx::query_scalar("SELECT last_insert_rowid()")
-        .fetch_one(&pool)
+    let node_id = result.last_insert_rowid() as i32;
+    
+    // Create valid signature for veto signal
+    let signature_manager = SignatureManager::new();
+    let keypair = GovernanceKeypair::generate().expect("Failed to generate keypair");
+    let pubkey_hex = hex::encode(keypair.public_key().to_bytes());
+    
+    // Update node's public key to match generated keypair
+    sqlx::query("UPDATE economic_nodes SET public_key = ? WHERE id = ?")
+        .bind(&pubkey_hex)
+        .bind(node_id)
+        .execute(&pool)
         .await
         .unwrap();
     
+    // Get node to get entity name for signature message
+    let registry = EconomicNodeRegistry::new(pool.clone());
+    let node = registry.get_node_by_id(node_id).await.unwrap();
+    
+    // Create valid signature
+    let message = format!("PR #{} veto signal from {}", pr_id, node.entity_name);
+    let signature = signature_manager.create_governance_signature(&message, &keypair).expect("Failed to create signature");
+    
     veto_manager.collect_veto_signal(
         pr_id,
-        node_id as i32,
+        node_id,
         bllvm_commons::economic_nodes::types::SignalType::Veto,
-        "signature1",
+        &signature,
         "Concerns",
     )
     .await
