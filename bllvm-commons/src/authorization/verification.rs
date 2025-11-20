@@ -58,20 +58,22 @@ pub fn verify_server_authorization_detailed(
 
     match server {
         Some(s) => {
+            // Check status first (regardless of NPUB match)
+            let is_active = s.status == "active";
+            let is_compromised = s.status == "compromised";
+            
             // Check NPUB match
             if s.keys.nostr_npub != nostr_npub {
                 return ServerVerificationResult {
                     is_authorized: false,
-                    is_active: false,
-                    is_compromised: false,
+                    is_active,
+                    is_compromised,
                     error_message: Some("NPUB does not match".to_string()),
                     server_info: Some(s.clone().into()),
                 };
             }
 
-            // Check status
-            let is_active = s.status == "active";
-            let is_compromised = s.status == "compromised";
+            // NPUB matches, check authorization
             let is_authorized = is_active && !is_compromised;
 
             let error_message = if is_compromised {

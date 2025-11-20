@@ -202,10 +202,15 @@ async fn test_adoption_tracking() -> Result<(), Box<dyn std::error::Error>> {
     .await
     .unwrap_or(false);
     
+    // Enable foreign key constraints
+    sqlx::query("PRAGMA foreign_keys = ON")
+        .execute(&pool)
+        .await?;
+    
     if !table_exists {
         sqlx::query(
             r#"
-            CREATE TABLE IF NOT EXISTS governance_rulesets (
+            CREATE TABLE governance_rulesets (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
                 version_major INTEGER NOT NULL,
@@ -224,9 +229,19 @@ async fn test_adoption_tracking() -> Result<(), Box<dyn std::error::Error>> {
         .execute(&pool)
         .await?;
         
+        // Create a ruleset for the fork decisions to reference (must exist before foreign key tables)
         sqlx::query(
             r#"
-            CREATE TABLE IF NOT EXISTS fork_decisions (
+            INSERT INTO governance_rulesets (id, name, version_major, version_minor, version_patch, hash, config, description, status)
+            VALUES ('ruleset-v1.0.0', 'Ruleset v1.0.0', 1, 0, 0, 'hash_v1_0_0', '{}', 'Test ruleset', 'active')
+            "#
+        )
+        .execute(&pool)
+        .await?;
+        
+        sqlx::query(
+            r#"
+            CREATE TABLE fork_decisions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 ruleset_id TEXT NOT NULL,
                 node_id TEXT NOT NULL,
@@ -234,7 +249,8 @@ async fn test_adoption_tracking() -> Result<(), Box<dyn std::error::Error>> {
                 weight REAL NOT NULL,
                 decision_reason TEXT NOT NULL,
                 signature TEXT NOT NULL,
-                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (ruleset_id) REFERENCES governance_rulesets(id)
             )
             "#
         )
@@ -250,7 +266,8 @@ async fn test_adoption_tracking() -> Result<(), Box<dyn std::error::Error>> {
                 ruleset_id TEXT,
                 node_id TEXT,
                 details TEXT NOT NULL,
-                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (ruleset_id) REFERENCES governance_rulesets(id)
             )
             "#
         )
@@ -266,18 +283,9 @@ async fn test_adoption_tracking() -> Result<(), Box<dyn std::error::Error>> {
                 hashpower_percentage REAL NOT NULL,
                 economic_activity_percentage REAL NOT NULL,
                 total_weight REAL NOT NULL,
-                calculated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                calculated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (ruleset_id) REFERENCES governance_rulesets(id)
             )
-            "#
-        )
-        .execute(&pool)
-        .await?;
-        
-        // Create a ruleset for the fork decisions to reference
-        sqlx::query(
-            r#"
-            INSERT INTO governance_rulesets (id, name, version_major, version_minor, version_patch, hash, config, description, status)
-            VALUES ('ruleset-v1.0.0', 'Ruleset v1.0.0', 1, 0, 0, 'hash_v1_0_0', '{}', 'Test ruleset', 'active')
             "#
         )
         .execute(&pool)
@@ -450,10 +458,15 @@ async fn test_adoption_history() -> Result<(), Box<dyn std::error::Error>> {
     .await
     .unwrap_or(false);
     
+    // Enable foreign key constraints
+    sqlx::query("PRAGMA foreign_keys = ON")
+        .execute(&pool)
+        .await?;
+    
     if !table_exists {
         sqlx::query(
             r#"
-            CREATE TABLE IF NOT EXISTS governance_rulesets (
+            CREATE TABLE governance_rulesets (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
                 version_major INTEGER NOT NULL,
@@ -472,9 +485,19 @@ async fn test_adoption_history() -> Result<(), Box<dyn std::error::Error>> {
         .execute(&pool)
         .await?;
         
+        // Create a ruleset for the fork decisions to reference (must exist before foreign key tables)
         sqlx::query(
             r#"
-            CREATE TABLE IF NOT EXISTS fork_decisions (
+            INSERT INTO governance_rulesets (id, name, version_major, version_minor, version_patch, hash, config, description, status)
+            VALUES ('ruleset-v1.0.0', 'Ruleset v1.0.0', 1, 0, 0, 'hash_v1_0_0', '{}', 'Test ruleset', 'active')
+            "#
+        )
+        .execute(&pool)
+        .await?;
+        
+        sqlx::query(
+            r#"
+            CREATE TABLE fork_decisions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 ruleset_id TEXT NOT NULL,
                 node_id TEXT NOT NULL,
@@ -482,7 +505,8 @@ async fn test_adoption_history() -> Result<(), Box<dyn std::error::Error>> {
                 weight REAL NOT NULL,
                 decision_reason TEXT NOT NULL,
                 signature TEXT NOT NULL,
-                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (ruleset_id) REFERENCES governance_rulesets(id)
             )
             "#
         )
@@ -498,7 +522,8 @@ async fn test_adoption_history() -> Result<(), Box<dyn std::error::Error>> {
                 ruleset_id TEXT,
                 node_id TEXT,
                 details TEXT NOT NULL,
-                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (ruleset_id) REFERENCES governance_rulesets(id)
             )
             "#
         )
@@ -514,23 +539,9 @@ async fn test_adoption_history() -> Result<(), Box<dyn std::error::Error>> {
                 hashpower_percentage REAL NOT NULL,
                 economic_activity_percentage REAL NOT NULL,
                 total_weight REAL NOT NULL,
-                calculated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                calculated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (ruleset_id) REFERENCES governance_rulesets(id)
             )
-            "#
-        )
-        .execute(&pool)
-        .await?;
-        
-        // Enable foreign key constraints
-        sqlx::query("PRAGMA foreign_keys = ON")
-            .execute(&pool)
-            .await?;
-        
-        // Create a ruleset for the fork decisions to reference
-        sqlx::query(
-            r#"
-            INSERT OR IGNORE INTO governance_rulesets (id, name, version_major, version_minor, version_patch, hash, config, description, status)
-            VALUES ('ruleset-v1.0.0', 'Ruleset v1.0.0', 1, 0, 0, 'hash_v1_0_0', '{}', 'Test ruleset', 'active')
             "#
         )
         .execute(&pool)
