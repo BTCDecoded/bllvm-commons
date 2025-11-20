@@ -130,8 +130,11 @@ impl ForkExecutor {
                     let content = fs::read_to_string(&path)?;
                     let maintainer_config: serde_json::Value = serde_yaml::from_str(&content)
                         .map_err(|e| GovernanceError::ConfigError(format!("Failed to parse {}: {}", path.display(), e)))?;
+                    let file_stem = path.file_stem()
+                        .and_then(|s| s.to_str())
+                        .ok_or_else(|| GovernanceError::ConfigError(format!("Invalid file name in maintainers directory: {}", path.display())))?;
                     maintainers.insert(
-                        path.file_stem().unwrap().to_string_lossy().to_string(),
+                        file_stem.to_string(),
                         maintainer_config
                     );
                 }
@@ -150,8 +153,11 @@ impl ForkExecutor {
                     let content = fs::read_to_string(&path)?;
                     let repo_config: serde_json::Value = serde_yaml::from_str(&content)
                         .map_err(|e| GovernanceError::ConfigError(format!("Failed to parse {}: {}", path.display(), e)))?;
+                    let file_stem = path.file_stem()
+                        .and_then(|s| s.to_str())
+                        .ok_or_else(|| GovernanceError::ConfigError(format!("Invalid file name in repos directory: {}", path.display())))?;
                     repositories.insert(
-                        path.file_stem().unwrap().to_string_lossy().to_string(),
+                        file_stem.to_string(),
                         repo_config
                     );
                 }

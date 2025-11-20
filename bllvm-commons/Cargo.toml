@@ -84,6 +84,8 @@ optional = true
 default = []
 # Enable formal verification tools
 verify = ["kani-verifier"]
+# Enable PostgreSQL support
+postgres = []
 
 [[bin]]
 name = "bllvm-commons"

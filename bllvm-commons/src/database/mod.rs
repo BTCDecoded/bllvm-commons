@@ -193,6 +193,13 @@ impl Database {
         matches!(self.backend, DatabaseBackend::Postgres(_))
     }
 
+    /// Reconnect to database using stored database URL
+    /// Useful when connection pool is closed or unhealthy
+    /// Returns a new Database instance with fresh connection pool
+    pub async fn reconnect(&self) -> Result<Self, GovernanceError> {
+        Self::new(&self.database_url).await
+    }
+
     /// Check database connection health
     /// Returns true if connection is healthy, false otherwise
     pub async fn check_health(&self) -> Result<bool, GovernanceError> {
@@ -331,7 +338,7 @@ impl Database {
                 // Parse existing signatures or create empty array
                 let mut signatures: Vec<Value> = if let Some(json_str) = signatures_json {
                     serde_json::from_str(&json_str)
-                        .unwrap_or_else(|_| vec![])
+                        .map_err(|e| GovernanceError::DatabaseError(format!("Failed to parse signatures JSON: {}", e)))?
                 } else {
                     vec![]
                 };
@@ -366,9 +373,12 @@ impl Database {
                 .map_err(|e| GovernanceError::DatabaseError(e.to_string()))?;
 
                 // Parse existing signatures or create empty array
-                let mut signatures: Vec<Value> = signatures_json
-                    .and_then(|v| serde_json::from_value(v).ok())
-                    .unwrap_or_default();
+                let mut signatures: Vec<Value> = if let Some(json_val) = signatures_json {
+                    serde_json::from_value(json_val)
+                        .map_err(|e| GovernanceError::DatabaseError(format!("Failed to parse signatures JSON: {}", e).into()))?
+                } else {
+                    vec![]
+                };
 
                 // Add new signature
                 signatures.push(serde_json::to_value(&new_signature)
@@ -412,7 +422,8 @@ impl Database {
                 .bind(repo_name)
                 .bind(pr_number)
                 .bind(maintainer)
-                .bind(serde_json::to_string(details).unwrap_or_default())
+                .bind(serde_json::to_string(details)
+                    .map_err(|e| GovernanceError::DatabaseError(format!("Failed to serialize event details: {}", e)))?)
                 .execute(pool)
                 .await
                 .map_err(|e| GovernanceError::DatabaseError(e.to_string()))?;
@@ -493,10 +504,10 @@ impl Database {
 
                         let signatures: Vec<crate::database::models::Signature> = 
                             serde_json::from_str(&signatures_json)
-                                .unwrap_or_else(|_| vec![]);
+                                .map_err(|e| GovernanceError::DatabaseError(format!("Failed to parse signatures JSON: {}", e)))?;
                         let linked_prs: Vec<i32> = 
                             serde_json::from_str(&linked_prs_json)
-                                .unwrap_or_else(|_| vec![]);
+                                .map_err(|e| GovernanceError::DatabaseError(format!("Failed to parse linked_prs JSON: {}", e)))?;
 
                         Ok(Some(crate::database::models::PullRequest {
                             id,
@@ -556,7 +567,7 @@ impl Database {
                     let timestamp: chrono::DateTime<chrono::Utc> = row.try_get(6).map_err(|e| GovernanceError::DatabaseError(e.to_string()))?;
                     
                     let details: serde_json::Value = serde_json::from_str(&details_str)
-                        .unwrap_or_else(|_| serde_json::json!({}));
+                        .map_err(|e| GovernanceError::DatabaseError(format!("Failed to parse event details JSON: {}", e)))?;
                     
                     events.push(crate::database::models::GovernanceEvent {
                         id,

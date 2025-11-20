@@ -333,3 +333,4 @@ While hardware-layer protection is primary, software-layer protection provides d
 
 **Production Readiness**: Bitcoin Commons software includes comprehensive software-layer protection, but **production deployments must include hardware-layer DDoS protection** for maximum security and performance.
 
+

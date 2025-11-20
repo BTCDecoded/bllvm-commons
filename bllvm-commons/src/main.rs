@@ -35,7 +35,7 @@ mod economic_nodes;
 use config::AppConfig;
 use database::Database;
 use nostr::{NostrClient, StatusPublisher, ZapTracker};
-use governance::{ContributionAggregator, WeightCalculator, FeeForwardingTracker};
+use governance::{ContributionAggregator, FeeForwardingTracker};
 use ots::{OtsClient, RegistryAnchorer};
 use audit::AuditLogger;
 
@@ -77,18 +77,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     backup_manager.clone().start_backup_task();
     info!("Automated backup task started");
 
-    // Start database health monitoring task
+    // Start database health monitoring task with reconnection capability
     let database_for_health = database.clone();
     let database_url_for_reconnect = config.database_url.clone();
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(60)); // Check every 60 seconds
         let mut consecutive_failures = 0u32;
+        let mut current_db = database_for_health;
         
         loop {
             interval.tick().await;
             
             // Check database health
-            match database_for_health.check_health().await {
+            match current_db.check_health().await {
                 Ok(true) => {
                     if consecutive_failures > 0 {
                         info!("Database health check passed after {} failures", consecutive_failures);
@@ -97,7 +98,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     
                     // Log pool stats periodically (every 10 checks = 10 minutes)
                     if consecutive_failures == 0 {
-                        if let Ok(stats) = database_for_health.get_pool_stats().await {
+                        if let Ok(stats) = current_db.get_pool_stats().await {
                             debug!("Database pool stats: size={}, idle={}, closed={}", 
                                    stats.size, stats.idle, stats.is_closed);
                         }
@@ -111,12 +112,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     if consecutive_failures >= 3 {
                         error!("Database connection unhealthy after {} consecutive failures - attempting reconnection", consecutive_failures);
                         
-                        // Note: sqlx pools handle reconnection automatically, but we can log the issue
-                        // For production, you might want to recreate the pool here
-                        // For now, we'll just log and let sqlx handle it
-                        if let Ok(stats) = database_for_health.get_pool_stats().await {
-                            if stats.is_closed {
-                                error!("Database pool is closed - manual intervention may be required");
+                        // Check if pool is closed before attempting reconnection
+                        let should_reconnect = current_db.get_pool_stats().await
+                            .map(|stats| stats.is_closed)
+                            .unwrap_or(true);
+                        
+                        if should_reconnect {
+                            // Attempt to reconnect using stored database URL
+                            match Database::new(&database_url_for_reconnect).await {
+                                Ok(new_db) => {
+                                    info!("Database reconnection successful");
+                                    current_db = new_db;
+                                    consecutive_failures = 0;
+                                }
+                                Err(e) => {
+                                    error!("Database reconnection failed: {} - will retry on next health check", e);
+                                }
                             }
                         }
                     }
@@ -151,7 +162,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             client.clone(),
             database.clone(),
             config.server_id.clone(),
-            std::env::current_exe().unwrap().to_string_lossy().to_string(),
+            std::env::current_exe()
+                .map(|p| p.to_string_lossy().to_string())
+                .unwrap_or_else(|_| "bllvm-commons".to_string()),
             "config.toml".to_string(),
         ))
     } else {
@@ -253,7 +266,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             
             if !bot_pubkeys.is_empty() {
-                let zap_tracker = ZapTracker::new(pool.clone(), Arc::new((*nostr_client).clone()), bot_pubkeys);
+                let zap_tracker = ZapTracker::new(pool.clone(), nostr_client.clone(), bot_pubkeys);
                 if let Err(e) = zap_tracker.start_tracking().await {
                     error!("Failed to start zap tracking: {}", e);
                 } else {

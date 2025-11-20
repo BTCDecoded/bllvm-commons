@@ -1,109 +1,178 @@
-# Next High Priority Items
+# Next High-Priority Items for Mainnet Acceleration
 
-## Recently Completed ✅
-1. ✅ Peer stream management (channel-based approach)
-2. ✅ Transport abstraction (TCP/Quinn/Iroh integration)
-3. ✅ Graceful degradation on connection failures
-4. ✅ Security review
-5. ✅ Ban list cleanup (periodic task)
-6. ✅ Message rate limiting (token bucket)
-7. ✅ Per-IP connection limits (Sybil protection)
-8. ✅ Message Buffer Management (Size validation added)
-9. ✅ Security Testing (Basic tests added)
-10. ✅ **Iroh Peer Tracking** (Phase 1 - TransportAddr refactoring)
-11. ✅ **UTXO Commitments Async Routing** (Phase 2 - Request-response system)
-12. ✅ **Async Routing Enhancements** (Request ID, timestamps, metrics, cancellation)
-13. ✅ **Ban List Sharing Protocol** (GetBanList/BanList messages, merging, signing)
+**Last Updated**: 2025-11-18  
+**Status**: After completing Tier 1-3 items, these are the next highest-impact items
 
-## High Priority - Production Readiness
+---
 
-### 1. RPC Authentication
-**Priority**: HIGH (for production)  
-**Effort**: High  
-**Impact**: Security
+## 🚀 Tier 1: Build Orchestration Completion (Highest Impact)
 
-- Token-based authentication
-- Certificate-based authentication
-- Rate limiting per user
+### 1. **Artifact Collection** ⭐ **HIGHEST PRIORITY**
+- **Location**: `bllvm-commons/src/build/artifacts.rs`
+- **Status**: ✅ **MOSTLY COMPLETE** - Collects and downloads artifacts
+- **Remaining**: SHA256 verification and expiration handling
+- **Effort**: 4-6 hours
+- **Impact**: **HIGH** - Completes release automation
+- **Why It Accelerates Mainnet**:
+  - Enables automated release artifact collection
+  - Required for release creation
+  - Reduces manual release coordination
+  - **Blocks**: Automated release pipeline
+- **Action**: 
+  - ✅ Download artifacts from workflow runs (DONE)
+  - ⏳ Verify artifact integrity (SHA256) - TODO
+  - ✅ Store artifact metadata (DONE)
+  - ⏳ Handle artifact expiration - TODO
 
-### 2. Enhanced DoS Protection
-**Priority**: MEDIUM  
-**Status**: ✅ COMPLETED  
-**Effort**: High  
-**Impact**: Resilience
+### 2. **Release Creation with SHA256SUMS** ⭐ **HIGH PRIORITY**
+- **Location**: `bllvm-commons/src/build/orchestrator.rs:create_github_release()`
+- **Status**: ✅ **MOSTLY COMPLETE** - Creates release and uploads artifacts
+- **Remaining**: SHA256SUMS generation and upload
+- **Effort**: 4-6 hours
+- **Impact**: **HIGH** - Completes release automation
+- **Why It Accelerates Mainnet**:
+  - Enables fully automated releases
+  - Generates SHA256SUMS for verification
+  - Creates release notes automatically
+  - **Blocks**: Production-ready release process
+- **Action**:
+  - ✅ Upload each artifact to release (DONE)
+  - ⏳ Generate SHA256SUMS file - TODO
+  - ⏳ Upload SHA256SUMS - TODO
+  - ✅ Update release body with artifact list (DONE)
 
-- ✅ Connection rate limiting (beyond per-IP limits) - 10 connections per IP per 60-second window
-- ✅ Message queue size limits - 10,000 message limit with monitoring
-- ✅ Resource usage monitoring - Tracks connections, queue size, bytes sent/received
-- ✅ Automatic mitigation - Auto-ban after 3 connection rate violations (1 hour ban)
+**Combined Impact**: Completes the build orchestration system, enabling fully automated releases. This is critical for operational infrastructure (Phase 5).
 
-### 3. UTXO Commitment Handler Implementation
-**Priority**: MEDIUM  
-**Status**: ✅ COMPLETED  
-**Effort**: High  
-**Impact**: Feature completeness
+---
 
-- ✅ Complete `handle_get_utxo_set` implementation - Loads UTXO set from storage, builds Merkle tree, generates commitment
-- ✅ Complete `handle_get_filtered_block` implementation - Loads block, applies spam filter, generates commitment
-- ✅ Integration with UTXO commitment module - Uses UtxoMerkleTree for commitment generation
-- ✅ Integration with block store and spam filter - Full storage integration and spam filtering support
+## 🔧 Tier 2: Network Layer Completeness (Medium-High Impact)
 
-## Medium Priority - Feature Completion
+### 3. **Protocol Message Processing Integration** 
+- **Location**: `bllvm-node/src/network/message_bridge.rs:90`
+- **Status**: Only handles message conversion, not processing
+- **Effort**: 2-3 days
+- **Impact**: **MEDIUM-HIGH** - Completes network message handling
+- **Why It Accelerates Mainnet**:
+  - Completes network layer functionality
+  - Enables proper protocol message processing
+  - Required for full P2P functionality
+  - **Blocks**: Network layer completeness
+- **Action**:
+  - Integrate with protocol layer processing
+  - Add BitcoinProtocolEngine instance
+  - Implement PeerState management
+  - Add ChainStateAccess integration
 
-### 4. Erlay Implementation (BIP330)
-**Priority**: REMOVED  
-**Status**: ❌ Removed from codebase (stub only, not needed)
-**Rationale**: With multi-transport (TCP/Quinn/Iroh), async routing, and advanced networking, Erlay's bandwidth savings are redundant
+---
 
-### 5. StratumV2 Template Generation
-**Priority**: LOW  
-**Status**: ✅ COMPLETED  
-**Effort**: Medium  
-**Impact**: Mining protocol completeness
+## 📊 Tier 3: Feature Enhancements (Lower Priority)
 
-- ✅ Complete template generation integration - `update_template()` now calls `MiningCoordinator.generate_block_template()`
-- ✅ MiningCoordinator integration - Full integration with StratumV2 server via `Arc<RwLock<MiningCoordinator>>`
-- ✅ Real template generation - Uses actual chain tip (prev_block_hash, bits), calculates merkle root, selects transactions from mempool
-- ✅ Template distribution - Templates are properly set in pool and distributed to all miners
+### 4. **UTXO Commitments Message Parsing**
+- **Location**: `bllvm-node/src/network/utxo_commitments_client.rs`
+- **Status**: Block header fields not extracted from messages
+- **Effort**: 1-2 days
+- **Impact**: **MEDIUM** - Feature enhancement
+- **Why It Accelerates Mainnet**:
+  - Improves UTXO commitments functionality
+  - Better message parsing
+  - **Note**: Not blocking for mainnet
 
-## Testing Priorities
+### 5. **Storage Index Implementation**
+- **Location**: `bllvm-node/src/storage/txindex.rs`
+- **Status**: Address and value indexes not implemented
+- **Effort**: 2-3 days
+- **Impact**: **MEDIUM** - Performance optimization
+- **Why It Accelerates Mainnet**:
+  - Improves query performance
+  - Enables faster address lookups
+  - **Note**: Not blocking for mainnet (performance optimization)
 
-### 6. Integration Testing
-**Priority**: MEDIUM  
-**Status**: ✅ COMPLETED  
-**Effort**: Medium  
-**Impact**: Reliability
+---
 
-- ✅ Multi-transport integration tests - TCP, Quinn, Iroh, and mixed transport tests
-- ✅ Graceful degradation tests - Transport fallback and preference ordering tests
-- ✅ Connection failure recovery tests - Failure recovery, cleanup, and reconnection tests
-- ✅ Async routing integration tests - Concurrent requests, timeouts, cancellation, UTXO commitments
-- ✅ RPC Authentication integration tests - Token auth, rate limiting, optional auth
-- ✅ DoS Protection integration tests - Rate limiting, connection limits, auto-ban, resource monitoring
-- ✅ UTXO Commitments integration tests - Storage integration, spam filtering, handler tests
+## 📈 Prioritized Implementation Plan
 
-### 7. Enhanced Security Testing
-**Priority**: MEDIUM  
-**Status**: ✅ COMPLETED  
-**Effort**: Medium  
-**Impact**: Vulnerability detection
+### Week 1: Build Orchestration Completion (Highest Impact)
+1. **Artifact Collection Enhancements** (4-6 hours)
+   - ✅ Download artifacts (DONE)
+   - ⏳ SHA256 verification (TODO)
+   - ✅ Store metadata (DONE)
+   - ⏳ Expiration handling (TODO)
+   
+2. **Release Creation with SHA256SUMS** (4-6 hours)
+   - ✅ Upload artifacts (DONE)
+   - ⏳ Generate SHA256SUMS (TODO)
+   - ⏳ Upload SHA256SUMS (TODO)
+   - ✅ Release notes (DONE)
 
-- ✅ Expanded fuzzing for protocol parsing - Enhanced protocol_message_parsing fuzz target with UTXO commitments, edge cases, and malformed data tests
-- ✅ DoS scenario tests - Connection flooding, message flooding, distributed attacks, resource exhaustion, rate limit bypass attempts
-- ✅ Stress testing - Maximum connections, high message throughput, long-running operations, concurrent operations, memory pressure
-- ✅ Memory leak detection - Connection handling, message processing, async requests, rate limiter cleanup, ban list cleanup
-- ✅ Ban list sharing security tests - Signature verification, tamper detection, replay attack prevention, malicious ban list detection, merging security
+**Total**: 1 day (8-12 hours)  
+**Impact**: Completes build orchestration, enables automated releases
 
-## Recommended Order
+### Week 2: Network Layer (Optional)
+3. **Protocol Message Processing** (2-3 days)
+   - Complete network message handling
+   - Integrate with protocol engine
 
-1. ✅ **RPC Authentication** (COMPLETED - Token/certificate auth, rate limiting)
-2. ✅ **Enhanced DoS Protection** (COMPLETED - Connection rate limiting, queue limits, auto-ban)
-3. ✅ **UTXO Commitment Handler Implementation** (COMPLETED - Full storage and spam filter integration)
-4. ✅ **Integration Testing** (COMPLETED - Multi-transport, graceful degradation, recovery, async routing)
-5. ✅ **Enhanced Security Testing** (COMPLETED - Expanded fuzzing, DoS scenarios, stress tests, memory leak detection, ban list security)
-6. ✅ **StratumV2 Template Generation** (COMPLETED - Full MiningCoordinator integration, real template generation with chain state)
+**Total**: 2-3 days  
+**Impact**: Completes network layer functionality
 
-## Removed/Deferred Items
+---
 
-- **Erlay (BIP330)** - ❌ Removed (stub only, not needed with advanced networking)
-- **Peer Scoring System** - Deferred to future module (not core priority, can be implemented as module later)
+## 🎯 Recommended Focus
+
+**For Maximum Mainnet Acceleration:**
+
+1. **Artifact Collection** - **DO THIS FIRST**
+   - Highest impact on release automation
+   - Required for release creation
+   - Enables automated deployment
+
+2. **Release Creation with Artifacts** - **DO THIS SECOND**
+   - Completes release automation
+   - Enables production-ready releases
+   - Reduces operational overhead
+
+**Total Effort**: 1 day (8-12 hours)  
+**Impact**: Completes build orchestration system, enables automated releases
+
+---
+
+## 📊 Expected Timeline Impact
+
+### Current Timeline
+- **Phase 5**: 2-3 months (Operational Infrastructure)
+
+### With These Items Completed
+- **Phase 5**: **1.5-2 months** (Reduced from 2-3 months) ⚡
+  - Automated releases reduce operational overhead
+  - Faster deployment cycles
+  - Reduced manual coordination
+
+**Total Savings**: 0.5-1 month on Phase 5
+
+---
+
+## ✅ Success Criteria
+
+### Artifact Collection
+- [ ] Artifacts downloaded from workflow runs
+- [ ] SHA256 verification working
+- [ ] Metadata stored correctly
+- [ ] Expiration handling implemented
+- [ ] Tests passing
+
+### Release Creation
+- [ ] Artifacts uploaded to release
+- [ ] SHA256SUMS generated
+- [ ] SHA256SUMS uploaded
+- [ ] Release notes created
+- [ ] Tests passing
+
+---
+
+## 🔄 Next Steps
+
+1. **Start with Artifact Collection** (highest impact)
+2. **Follow with Release Creation** (completes automation)
+3. **Optionally complete Protocol Message Processing** (network completeness)
+
+**Recommendation**: Focus on Artifact Collection and Release Creation as they complete the build orchestration system and enable fully automated releases.

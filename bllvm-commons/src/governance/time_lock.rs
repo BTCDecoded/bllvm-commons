@@ -5,7 +5,6 @@
 
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
-use serde_json;
 use std::collections::HashMap;
 use tracing::{debug, info, warn};
 
@@ -82,7 +81,8 @@ impl<'r> sqlx::FromRow<'r, sqlx::sqlite::SqliteRow> for TimeLockedChange {
         
         let override_signals_json: Option<String> = row.try_get("override_signals")?;
         let override_signals: HashMap<String, DateTime<Utc>> = if let Some(json_str) = override_signals_json {
-            serde_json::from_str(&json_str).unwrap_or_default()
+            serde_json::from_str(&json_str)
+                .map_err(|e| sqlx::Error::Decode(format!("Failed to parse override_signals JSON: {}", e).into()))?
         } else {
             HashMap::new()
         };
@@ -103,14 +103,15 @@ impl<'r> sqlx::FromRow<'r, sqlx::sqlite::SqliteRow> for TimeLockedChange {
     }
 }
 
-#[cfg(feature = "postgres")]
+#[cfg(any(feature = "postgres", test))]
 impl<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow> for TimeLockedChange {
     fn from_row(row: &'r sqlx::postgres::PgRow) -> Result<Self, sqlx::Error> {
         use sqlx::Row;
         
         let override_signals_json: Option<serde_json::Value> = row.try_get("override_signals")?;
         let override_signals: HashMap<String, DateTime<Utc>> = if let Some(json_val) = override_signals_json {
-            serde_json::from_value(json_val).unwrap_or_default()
+            serde_json::from_value(json_val)
+                .map_err(|e| sqlx::Error::Decode(format!("Failed to parse override_signals JSON: {}", e).into()))?
         } else {
             HashMap::new()
         };
@@ -165,7 +166,8 @@ impl TimeLockManager {
         };
 
         let lock_start = Utc::now();
-        let lock_end = lock_start + Duration::hours(min_duration_hours);
+        let lock_end = lock_start + Duration::try_hours(min_duration_hours)
+            .ok_or_else(|| sqlx::Error::Decode("Invalid duration hours".into()))?;
 
         // Insert into database
         let change = sqlx::query_as::<_, TimeLockedChange>(
@@ -188,7 +190,10 @@ impl TimeLockManager {
         .bind("pending")
         .bind(lock_start)
         .bind(lock_start)
-        .fetch_one(self.db.pool().unwrap())
+        .fetch_one(
+            self.db.get_sqlite_pool()
+                .ok_or_else(|| sqlx::Error::PoolClosed)?
+        )
         .await?;
 
         info!(
@@ -202,11 +207,13 @@ impl TimeLockManager {
 
     /// Check if a time lock has elapsed
     pub async fn check_time_lock(&self, change_id: &str) -> Result<TimeLockStatus, sqlx::Error> {
+        let pool = self.db.get_sqlite_pool()
+            .ok_or_else(|| sqlx::Error::PoolClosed)?;
         let change = sqlx::query_as::<_, TimeLockedChange>(
             "SELECT * FROM time_locked_changes WHERE change_id = $1",
         )
         .bind(change_id)
-        .fetch_optional(self.db.pool().unwrap())
+        .fetch_optional(pool)
         .await?;
 
         let change = match change {
@@ -222,7 +229,7 @@ impl TimeLockManager {
             "activated" => return Ok(TimeLockStatus::Activated),
             "cancelled" => return Ok(TimeLockStatus::Cancelled),
             _ => {}
-        };
+        }
 
         // Check if time lock has elapsed
         let now = Utc::now();
@@ -238,11 +245,13 @@ impl TimeLockManager {
         &self,
         change_id: &str,
     ) -> Result<Option<Duration>, sqlx::Error> {
+        let pool = self.db.get_sqlite_pool()
+            .ok_or_else(|| sqlx::Error::PoolClosed)?;
         let change = sqlx::query_as::<_, TimeLockedChange>(
             "SELECT * FROM time_locked_changes WHERE change_id = $1",
         )
         .bind(change_id)
-        .fetch_optional(self.db.pool().unwrap())
+        .fetch_optional(pool)
         .await?;
 
         let change = match change {
@@ -271,7 +280,10 @@ impl TimeLockManager {
             "SELECT * FROM time_locked_changes WHERE change_id = ?"
         )
         .bind(change_id)
-        .fetch_optional(self.db.pool().unwrap())
+        .fetch_optional(
+            self.db.get_sqlite_pool()
+                .ok_or_else(|| sqlx::Error::PoolClosed)?
+        )
         .await?;
 
         let mut signals = if let Some(c) = change {
@@ -331,11 +343,13 @@ impl TimeLockManager {
         change_id: &str,
         active_node_count: usize,
     ) -> Result<bool, sqlx::Error> {
+        let pool = self.db.get_sqlite_pool()
+            .ok_or_else(|| sqlx::Error::PoolClosed)?;
         let change = sqlx::query_as::<_, TimeLockedChange>(
             "SELECT * FROM time_locked_changes WHERE change_id = $1",
         )
         .bind(change_id)
-        .fetch_optional(self.db.pool().unwrap())
+        .fetch_optional(pool)
         .await?;
 
         let change = match change {
@@ -358,7 +372,10 @@ impl TimeLockManager {
         )
         .bind(Utc::now())
         .bind(change_id)
-        .execute(self.db.pool().unwrap())
+        .execute(
+            self.db.get_sqlite_pool()
+                .ok_or_else(|| sqlx::Error::PoolClosed)?
+        )
         .await?;
 
         Ok(())
@@ -373,7 +390,10 @@ impl TimeLockManager {
         )
         .bind(Utc::now())
         .bind(change_id)
-        .execute(self.db.pool().unwrap())
+        .execute(
+            self.db.get_sqlite_pool()
+                .ok_or_else(|| sqlx::Error::PoolClosed)?
+        )
         .await?;
 
         Ok(())
@@ -381,10 +401,12 @@ impl TimeLockManager {
 
     /// List all pending time locks
     pub async fn list_pending(&self) -> Result<Vec<TimeLockedChange>, sqlx::Error> {
+        let pool = self.db.get_sqlite_pool()
+            .ok_or_else(|| sqlx::Error::PoolClosed)?;
         sqlx::query_as::<_, TimeLockedChange>(
             "SELECT * FROM time_locked_changes WHERE status = 'pending' ORDER BY lock_end ASC",
         )
-        .fetch_all(self.db.pool().unwrap())
+        .fetch_all(pool)
         .await
     }
 
@@ -418,20 +440,29 @@ pub async fn migrate_time_lock_tables(db: &Database) -> Result<(), sqlx::Error> 
         )
         "#,
     )
-    .execute(db.pool().unwrap())
+    .execute(
+        db.get_sqlite_pool()
+            .ok_or_else(|| sqlx::Error::PoolClosed)?
+    )
     .await?;
 
     // Create index on status and lock_end for efficient queries
     sqlx::query(
         "CREATE INDEX IF NOT EXISTS idx_time_locked_changes_status ON time_locked_changes(status)",
     )
-    .execute(db.pool().unwrap())
+    .execute(
+        db.get_sqlite_pool()
+            .ok_or_else(|| sqlx::Error::PoolClosed)?
+    )
     .await?;
 
     sqlx::query(
         "CREATE INDEX IF NOT EXISTS idx_time_locked_changes_lock_end ON time_locked_changes(lock_end)",
     )
-    .execute(db.pool().unwrap())
+    .execute(
+        db.get_sqlite_pool()
+            .ok_or_else(|| sqlx::Error::PoolClosed)?
+    )
     .await?;
 
     Ok(())
@@ -596,7 +627,7 @@ mod tests {
             .unwrap();
         
         // Verify signal was recorded by checking the change
-        let change = manager.get_change("test-override").await.unwrap().unwrap();
+        let _change = manager.get_change("test-override").await.unwrap().unwrap();
         // Note: override_signals is stored as JSONB, so we check it was updated
         // The actual deserialization depends on the database implementation
     }
@@ -619,8 +650,8 @@ mod tests {
             .unwrap();
         
         // Both signals should be recorded
-        let change = manager.get_change("test-multi-override").await.unwrap().unwrap();
-        assert!(change.override_signals.len() >= 0); // At least recorded
+        let _change = manager.get_change("test-multi-override").await.unwrap().unwrap();
+        // Note: override_signals length verification depends on JSONB deserialization
     }
 
     #[tokio::test]
