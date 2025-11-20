@@ -9,7 +9,7 @@ use std::io::{BufRead, BufReader, Write};
 use std::path::Path;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info};
 
 use crate::audit::entry::AuditLogEntry;
 
@@ -66,7 +66,7 @@ impl AuditLogger {
             .map_err(|e| anyhow!("Failed to serialize entry: {}", e))?;
 
         // Write to file
-        if let Some(mut file) = self.file.lock().await.as_mut() {
+        if let Some(file) = self.file.lock().await.as_mut() {
             writeln!(file, "{}", json)
                 .map_err(|e| anyhow!("Failed to write to audit log: {}", e))?;
             file.flush()
@@ -214,7 +214,7 @@ impl AuditLogger {
 
     /// Close the audit logger
     pub async fn close(&self) -> Result<()> {
-        if let Some(mut file) = self.file.lock().await.as_mut() {
+        if let Some(file) = self.file.lock().await.as_mut() {
             file.flush()
                 .map_err(|e| anyhow!("Failed to flush audit log on close: {}", e))?;
         }

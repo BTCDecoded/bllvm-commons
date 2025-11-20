@@ -5,11 +5,7 @@ use bllvm_commons::enforcement::decision_log::DecisionLogger;
 use bllvm_sdk::governance::GovernanceKeypair;
 use secp256k1::{SecretKey, Secp256k1, PublicKey};
 use rand::rngs::OsRng;
-use std::collections::HashMap;
 use chrono::{DateTime, Utc, Duration};
-use std::process::Command;
-use tempfile::tempdir;
-use std::path::PathBuf;
 
 /// Setup an in-memory SQLite database for testing
 pub async fn setup_test_db() -> Database {

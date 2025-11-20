@@ -278,7 +278,7 @@ impl BuildOrchestrator {
             for artifact in repo_artifacts {
                 release_body.push_str(&format!("- {} ({} bytes)\n", artifact.name, artifact.size));
             }
-            release_body.push_str("\n");
+            release_body.push('\n');
         }
         
         // Create release in bllvm repository

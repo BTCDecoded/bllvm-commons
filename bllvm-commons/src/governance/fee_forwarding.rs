@@ -7,8 +7,8 @@ use crate::governance::ContributionTracker;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use sqlx::SqlitePool;
-use tracing::{debug, info, warn};
-use sha2::{Digest, Sha256};
+use tracing::info;
+use sha2::Digest;
 
 /// Fee forwarding tracker
 pub struct FeeForwardingTracker {
@@ -135,7 +135,7 @@ impl FeeForwardingTracker {
     /// Decode Bitcoin address from script_pubkey
     /// Supports P2PKH, P2SH, P2WPKH, P2WSH, and P2TR addresses
     fn decode_address_from_script(&self, script_pubkey: &[u8]) -> Result<Option<String>> {
-        use bitcoin::{Address, Network, ScriptBuf};
+        use bitcoin::{Address, ScriptBuf};
         
         // Create ScriptBuf from bytes
         let script = ScriptBuf::from_bytes(script_pubkey.to_vec());
@@ -208,7 +208,7 @@ impl FeeForwardingTracker {
         
         // Double SHA256 (Bitcoin standard for transaction IDs)
         let first_hash = Sha256::digest(&data);
-        let second_hash = Sha256::digest(&first_hash);
+        let second_hash = Sha256::digest(first_hash);
         
         // Convert to hex string (reversed for display, as Bitcoin displays txids in reverse)
         hex::encode(second_hash)

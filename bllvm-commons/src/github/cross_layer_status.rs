@@ -4,16 +4,15 @@
 //! including content hash verification, version pinning, and equivalence proof status.
 
 use crate::error::GovernanceError;
-use crate::validation::content_hash::{ContentHashValidator, SyncReport, SyncStatus};
+use crate::validation::content_hash::{ContentHashValidator, SyncStatus};
 use crate::validation::version_pinning::{VersionPinningValidator, VersionReference};
-use crate::validation::equivalence_proof::{EquivalenceProofValidator, VerificationResult, VerificationStatus};
+use crate::validation::equivalence_proof::EquivalenceProofValidator;
 use crate::validation::verification_check::check_verification_status;
 use crate::validation::ValidationResult;
 use crate::database::models::PullRequest as DatabasePullRequest;
 use crate::github::client::GitHubClient;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use tracing::{info, warn, error};
+use tracing::{info, warn};
 
 /// Status check result for cross-layer validation
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -173,7 +172,7 @@ impl CrossLayerStatusChecker {
         let mut files_checked = 0;
         let mut files_synced = 0;
         let mut files_missing = Vec::new();
-        let mut files_outdated = Vec::new();
+        let files_outdated = Vec::new();
 
         for file in changed_files {
             files_checked += 1;

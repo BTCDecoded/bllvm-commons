@@ -5,9 +5,9 @@
 
 use crate::governance::{ContributionTracker, WeightCalculator};
 use anyhow::Result;
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use sqlx::SqlitePool;
-use tracing::{info, warn};
+use tracing::info;
 
 /// Contribution aggregator for monthly aggregation
 pub struct ContributionAggregator {

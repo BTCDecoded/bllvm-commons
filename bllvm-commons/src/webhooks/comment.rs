@@ -185,7 +185,7 @@ async fn handle_tier_override(
     let remainder = body.strip_prefix("/governance-tier-override").unwrap_or("").trim();
     
     // Extract tier number and justification
-    let parts: Vec<&str> = remainder.splitn(2, |c: char| c == '"').collect();
+    let parts: Vec<&str> = remainder.splitn(2, '"').collect();
     if parts.len() < 2 {
         warn!("Invalid tier override format. Expected: /governance-tier-override <tier> \"justification\"");
         return Ok(axum::response::Json(
@@ -204,7 +204,7 @@ async fn handle_tier_override(
     }
     
     let override_tier: u32 = match tier_str.parse() {
-        Ok(t) if t >= 1 && t <= 5 => t,
+        Ok(t) if (1..=5).contains(&t) => t,
         _ => {
             warn!("Invalid tier number: {}", tier_str);
             return Ok(axum::response::Json(

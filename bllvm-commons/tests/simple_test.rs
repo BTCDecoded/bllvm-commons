@@ -235,7 +235,7 @@ async fn test_threshold_validation() -> Result<(), Box<dyn std::error::Error>> {
 async fn test_governance_fork_export() -> Result<(), Box<dyn std::error::Error>> {
     println!("🧪 Testing governance fork export...");
 
-    use bllvm_commons::fork::{export::GovernanceExporter, types::*};
+    use bllvm_commons::fork::export::GovernanceExporter;
 
     // Create a temporary config directory for testing
     let temp_dir = tempfile::tempdir()?;

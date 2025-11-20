@@ -73,6 +73,12 @@ pub struct ContentHashValidator {
     pub correspondence_mappings: HashMap<String, FileCorrespondence>,
 }
 
+impl Default for ContentHashValidator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ContentHashValidator {
     /// Create a new content hash validator with correspondence mappings
     pub fn new() -> Self {

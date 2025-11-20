@@ -5,7 +5,6 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// Governance status event published to Nostr
 #[derive(Debug, Clone, Serialize, Deserialize)]

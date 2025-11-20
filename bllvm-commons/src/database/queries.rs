@@ -1,5 +1,4 @@
 use crate::database::models::*;
-use crate::error::GovernanceError;
 use chrono::Utc;
 use sqlx::{SqlitePool, Row, FromRow};
 

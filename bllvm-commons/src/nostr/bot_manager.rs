@@ -131,7 +131,7 @@ impl NostrBotManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::{BotProfile, NostrConfig};
+    
 
     #[tokio::test]
     async fn test_bot_manager_creation() {

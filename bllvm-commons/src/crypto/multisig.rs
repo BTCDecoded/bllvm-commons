@@ -156,7 +156,7 @@ mod tests {
         ];
         
         // 2-of-3 threshold
-        let result = manager.verify_multisig(&message, &signatures, &public_keys, (2, 3));
+        let result = manager.verify_multisig(message, &signatures, &public_keys, (2, 3));
         assert!(result.is_ok() && result.unwrap(), "Should meet 2-of-3 threshold");
     }
 
@@ -182,7 +182,7 @@ mod tests {
         ];
         
         // 2-of-3 threshold, only 1 signature
-        let result = manager.verify_multisig(&message, &signatures, &public_keys, (2, 3));
+        let result = manager.verify_multisig(message, &signatures, &public_keys, (2, 3));
         assert!(result.is_err(), "Should fail 2-of-3 threshold with only 1 signature");
     }
 
@@ -208,7 +208,7 @@ mod tests {
         ];
         
         // 2-of-2 threshold, but one signature is invalid
-        let result = manager.verify_multisig(&message, &signatures, &public_keys, (2, 2));
+        let result = manager.verify_multisig(message, &signatures, &public_keys, (2, 2));
         assert!(result.is_err(), "Should fail with invalid signature");
     }
 
@@ -232,7 +232,7 @@ mod tests {
         ];
         
         // bob's signature will be ignored (no public key)
-        let result = manager.verify_multisig(&message, &signatures, &public_keys, (1, 2));
+        let result = manager.verify_multisig(message, &signatures, &public_keys, (1, 2));
         assert!(result.is_ok() && result.unwrap(), "Should pass with alice's signature");
     }
 
@@ -261,7 +261,7 @@ mod tests {
             ("charlie".to_string(), wrong_sig.to_string()),
         ];
         
-        let verified = manager.get_verified_signers(&message, &signatures, &public_keys).unwrap();
+        let verified = manager.get_verified_signers(message, &signatures, &public_keys).unwrap();
         assert_eq!(verified.len(), 2, "Should have 2 verified signers");
         assert!(verified.contains(&"alice".to_string()));
         assert!(verified.contains(&"bob".to_string()));
@@ -290,7 +290,7 @@ mod tests {
         ];
         
         // Exactly 2-of-2
-        let result = manager.verify_multisig(&message, &signatures, &public_keys, (2, 2));
+        let result = manager.verify_multisig(message, &signatures, &public_keys, (2, 2));
         assert!(result.is_ok() && result.unwrap(), "Should meet exact 2-of-2 threshold");
     }
 
@@ -320,7 +320,7 @@ mod tests {
         ];
         
         // 2-of-3 threshold, but have 3 signatures
-        let result = manager.verify_multisig(&message, &signatures, &public_keys, (2, 3));
+        let result = manager.verify_multisig(message, &signatures, &public_keys, (2, 3));
         assert!(result.is_ok() && result.unwrap(), "Should pass with more than threshold");
     }
 

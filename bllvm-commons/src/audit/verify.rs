@@ -4,8 +4,6 @@
 
 use crate::error::GovernanceError;
 use crate::audit::entry::AuditLogEntry;
-use sha2::{Digest, Sha256};
-use hex;
 
 /// Verify the integrity of an audit log entry
 pub fn verify_entry(entry: &AuditLogEntry) -> Result<bool, GovernanceError> {
@@ -63,12 +61,45 @@ pub fn verify_entry_in_chain(entry: &AuditLogEntry, previous_entry: Option<&Audi
     Ok(true)
 }
 
+/// Verify an audit log (alias for verify_hash_chain)
+pub fn verify_audit_log(entries: &[AuditLogEntry]) -> Result<bool, GovernanceError> {
+    verify_hash_chain(entries)
+}
+
+/// Verify an audit log from a file
+pub fn verify_audit_log_file(file_path: &str) -> Result<bool, GovernanceError> {
+    use std::fs;
+    use serde_json;
+    
+    let content = fs::read_to_string(file_path)
+        .map_err(|e| GovernanceError::ConfigError(format!("Failed to read audit log file: {}", e)))?;
+    
+    let entries: Vec<AuditLogEntry> = serde_json::from_str(&content)
+        .map_err(|e| GovernanceError::ConfigError(format!("Failed to parse audit log: {}", e)))?;
+    
+    verify_hash_chain(&entries)
+}
+
+/// Load audit log entries from a file
+pub fn load_audit_log_from_file(file_path: &str) -> Result<Vec<AuditLogEntry>, GovernanceError> {
+    use std::fs;
+    use serde_json;
+    
+    let content = fs::read_to_string(file_path)
+        .map_err(|e| GovernanceError::ConfigError(format!("Failed to read audit log file: {}", e)))?;
+    
+    let entries: Vec<AuditLogEntry> = serde_json::from_str(&content)
+        .map_err(|e| GovernanceError::ConfigError(format!("Failed to parse audit log: {}", e)))?;
+    
+    Ok(entries)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::audit::entry::AuditLogEntry;
     use std::collections::HashMap;
-    use chrono::Utc;
+    
 
     fn create_test_entry(previous_hash: &str) -> AuditLogEntry {
         let mut metadata = HashMap::new();
@@ -177,37 +208,4 @@ mod tests {
         
         assert_ne!(hash1, hash2, "Different entries should have different hashes");
     }
-}
-
-/// Verify an audit log (alias for verify_hash_chain)
-pub fn verify_audit_log(entries: &[AuditLogEntry]) -> Result<bool, GovernanceError> {
-    verify_hash_chain(entries)
-}
-
-/// Verify an audit log from a file
-pub fn verify_audit_log_file(file_path: &str) -> Result<bool, GovernanceError> {
-    use std::fs;
-    use serde_json;
-    
-    let content = fs::read_to_string(file_path)
-        .map_err(|e| GovernanceError::ConfigError(format!("Failed to read audit log file: {}", e)))?;
-    
-    let entries: Vec<AuditLogEntry> = serde_json::from_str(&content)
-        .map_err(|e| GovernanceError::ConfigError(format!("Failed to parse audit log: {}", e)))?;
-    
-    verify_hash_chain(&entries)
-}
-
-/// Load audit log entries from a file
-pub fn load_audit_log_from_file(file_path: &str) -> Result<Vec<AuditLogEntry>, GovernanceError> {
-    use std::fs;
-    use serde_json;
-    
-    let content = fs::read_to_string(file_path)
-        .map_err(|e| GovernanceError::ConfigError(format!("Failed to read audit log file: {}", e)))?;
-    
-    let entries: Vec<AuditLogEntry> = serde_json::from_str(&content)
-        .map_err(|e| GovernanceError::ConfigError(format!("Failed to parse audit log: {}", e)))?;
-    
-    Ok(entries)
 }

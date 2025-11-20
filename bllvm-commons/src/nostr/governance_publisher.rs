@@ -6,7 +6,7 @@
 use anyhow::{anyhow, Result};
 use chrono::Utc;
 use nostr_sdk::prelude::*;
-use tracing::{error, info};
+use tracing::info;
 
 use crate::nostr::client::NostrClient;
 use crate::nostr::events::{
@@ -228,7 +228,7 @@ impl GovernanceActionPublisher {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::nostr::events::{EconomicVetoStatus, GovernanceActionEvent, LayerRequirement, TierRequirement, CombinedRequirement, KeyholderSignature};
+    
 
     async fn create_test_publisher() -> GovernanceActionPublisher {
         // Create a mock client for testing

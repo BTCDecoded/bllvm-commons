@@ -2,10 +2,8 @@
 //! 
 //! This tool allows anyone to verify economic node registrations and veto signals.
 
-use std::env;
 use std::fs;
 use clap::{Parser, Subcommand};
-use serde_json::json;
 
 #[derive(Parser)]
 #[command(name = "economic-node-verify")]
@@ -90,7 +88,7 @@ fn verify_registration(
     let default_path = format!("economic-registrations/{}.json", name);
     let file_path = file.unwrap_or(&default_path);
     
-    if !fs::metadata(file_path).is_ok() {
+    if fs::metadata(file_path).is_err() {
         println!("❌ Registration file not found: {}", file_path);
         return Ok(());
     }
@@ -177,7 +175,7 @@ fn verify_veto(
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!("🔍 Verifying veto signal: {}", file);
     
-    if !fs::metadata(file).is_ok() {
+    if fs::metadata(file).is_err() {
         println!("❌ Veto file not found: {}", file);
         return Ok(());
     }
@@ -252,7 +250,7 @@ fn verify_all_registrations(
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!("🔍 Verifying all registrations in: {}", dir);
     
-    if !fs::metadata(dir).is_ok() {
+    if fs::metadata(dir).is_err() {
         println!("❌ Directory not found: {}", dir);
         return Ok(());
     }
@@ -286,7 +284,7 @@ fn verify_all_registrations(
         }
     }
     
-    println!("");
+    println!();
     println!("📊 Verification summary:");
     println!("  Total files: {}", total);
     println!("  Valid: {}", valid);
@@ -300,7 +298,7 @@ fn verify_all_vetoes(
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!("🔍 Verifying all veto signals in: {}", dir);
     
-    if !fs::metadata(dir).is_ok() {
+    if fs::metadata(dir).is_err() {
         println!("❌ Directory not found: {}", dir);
         return Ok(());
     }
@@ -341,7 +339,7 @@ fn verify_all_vetoes(
         }
     }
     
-    println!("");
+    println!();
     println!("📊 Verification summary:");
     println!("  Total files: {}", total);
     println!("  Valid: {}", valid);

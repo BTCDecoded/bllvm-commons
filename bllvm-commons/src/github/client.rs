@@ -105,7 +105,7 @@ impl GitHubClient {
                 // Post status check via GitHub API
                 // Note: octocrab 0.38 API - target_url is optional and can be set via builder
                 let repos_handler = self.client.repos(owner, repo);
-                let mut status_builder = repos_handler
+                let status_builder = repos_handler
                     .create_status(sha.to_string(), github_state)
                     .description(description.to_string())
                     .context(context.to_string());

@@ -7,9 +7,7 @@
 use crate::error::GovernanceError;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::HashMap;
-use std::str::FromStr;
-use tracing::{info, warn, error, debug};
+use tracing::{info, warn, debug};
 
 /// Version reference found in code
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

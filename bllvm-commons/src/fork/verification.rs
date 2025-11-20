@@ -7,7 +7,6 @@ use super::types::ForkDecision;
 use bllvm_sdk::governance::{verify_signature, PublicKey, Signature};
 use hex;
 use serde_json;
-use chrono::Utc;
 
 /// Serialize fork decision for signing (excludes signature field)
 fn serialize_decision_for_signing(decision: &ForkDecision) -> Vec<u8> {

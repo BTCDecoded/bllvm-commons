@@ -41,8 +41,8 @@ impl VoteType {
     
     pub fn from_str(s: &str) -> Self {
         match s.to_lowercase().as_str() {
-            "veto" => VoteType::Veto,
-            "abstain" => VoteType::Abstain,
+            "veto" | "oppose" | "against" => VoteType::Veto,
+            "abstain" | "neutral" => VoteType::Abstain,
             _ => VoteType::Support,  // Default to support
         }
     }
@@ -72,7 +72,7 @@ impl ZapVotingProcessor {
         }
         
         // Verify this zap is for the correct governance event
-        if zap.governance_event_id.as_ref().map(|s| s.as_str()) != Some(governance_event_id) {
+        if zap.governance_event_id.as_deref() != Some(governance_event_id) {
             return Ok(None);
         }
         

@@ -5,7 +5,6 @@
 
 use crate::error::GovernanceError;
 use octocrab::Octocrab;
-use octocrab::models::repos::{ContentItems, Content};
 use std::collections::HashMap;
 use tracing::{info, warn, error, debug};
 use base64::{Engine as _, engine::general_purpose};
@@ -157,7 +156,7 @@ impl GitHubFileOperations {
         // For a directory, items contains multiple Content items
         let items = response.items;
         let mut files = Vec::new();
-        let mut subdirectories = Vec::new();
+        let subdirectories = Vec::new();
         let mut total_size = 0u64;
         
         // Process each item in the directory

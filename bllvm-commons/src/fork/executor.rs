@@ -6,10 +6,9 @@
 use std::collections::HashMap;
 use std::path::Path;
 use std::fs;
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use chrono::Utc;
 use serde_json;
-use tracing::{info, warn};
+use tracing::info;
 use secp256k1::SecretKey;
 use hex;
 
@@ -18,7 +17,6 @@ use super::types::*;
 use super::export::GovernanceExporter;
 use super::adoption::AdoptionTracker;
 use super::versioning::RulesetVersioning;
-use crate::crypto::signatures::SignatureManager;
 
 /// Executes governance forks and manages ruleset transitions
 pub struct ForkExecutor {
@@ -310,19 +308,19 @@ impl ForkExecutor {
     /// Validate a ruleset before fork execution
     pub fn validate_ruleset(&self, ruleset: &Ruleset) -> Result<(), GovernanceError> {
         // Check if ruleset has required components
-        if !ruleset.config.get("action_tiers").is_some() {
+        if ruleset.config.get("action_tiers").is_none() {
             return Err(GovernanceError::ConfigError(
                 "Ruleset missing action_tiers".to_string()
             ));
         }
         
-        if !ruleset.config.get("maintainers").is_some() {
+        if ruleset.config.get("maintainers").is_none() {
             return Err(GovernanceError::ConfigError(
                 "Ruleset missing maintainers".to_string()
             ));
         }
         
-        if !ruleset.config.get("repositories").is_some() {
+        if ruleset.config.get("repositories").is_none() {
             return Err(GovernanceError::ConfigError(
                 "Ruleset missing repositories".to_string()
             ));
@@ -361,7 +359,7 @@ impl ForkExecutor {
 mod tests {
     use super::*;
     use tempfile::tempdir;
-    use crate::database::Database;
+    
 
     async fn setup_test_executor() -> ForkExecutor {
         let temp_dir = tempdir().unwrap();
@@ -388,7 +386,7 @@ mod tests {
         
         // Create in-memory database for testing
         let pool = sqlx::SqlitePool::connect("sqlite::memory:").await.unwrap();
-        let mut executor = ForkExecutor::new(export_path.to_str().unwrap(), pool, None).unwrap();
+        let executor = ForkExecutor::new(export_path.to_str().unwrap(), pool, None).unwrap();
         
         // Create a valid ruleset
         let config = serde_json::json!({

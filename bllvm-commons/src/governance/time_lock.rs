@@ -6,7 +6,6 @@
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json;
-use sqlx::FromRow;
 use std::collections::HashMap;
 use tracing::{debug, info, warn};
 
@@ -219,7 +218,7 @@ impl TimeLockManager {
         };
 
         // Check status
-        let status = match change.status.as_str() {
+        match change.status.as_str() {
             "activated" => return Ok(TimeLockStatus::Activated),
             "cancelled" => return Ok(TimeLockStatus::Cancelled),
             _ => {}

@@ -119,8 +119,8 @@ pub fn generate_merkle_proof(entries: &[AuditLogEntry], entry_index: usize) -> R
     let mut proof_hashes = Vec::new();
     
     // Rebuild tree structure to find path
-    let mut current_index = entry_index;
-    let mut current_level = entries.len();
+    let current_index = entry_index;
+    let current_level = entries.len();
     
     // Build levels bottom-up to track path
     let mut levels: Vec<Vec<String>> = vec![entries.iter().map(|e| e.this_log_hash.clone()).collect()];
@@ -155,7 +155,7 @@ pub fn generate_merkle_proof(entries: &[AuditLogEntry], entry_index: usize) -> R
     let mut proof_order = Vec::new();
     for level in 0..levels.len() - 1 {
         let level_size = levels[level].len();
-        let is_left = idx % 2 == 0;
+        let is_left = idx.is_multiple_of(2);
         
         if is_left && idx + 1 < level_size {
             // We're on the left, add right sibling (current_hash + proof_hash)
@@ -171,7 +171,7 @@ pub fn generate_merkle_proof(entries: &[AuditLogEntry], entry_index: usize) -> R
             proof_order.push(true); // current is on left
         }
         
-        idx = idx / 2;
+        idx /= 2;
     }
 
     Ok(MerkleProof {

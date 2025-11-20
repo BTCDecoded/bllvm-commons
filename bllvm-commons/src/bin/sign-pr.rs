@@ -3,12 +3,10 @@
 //! This tool allows maintainers to sign PRs offline using their private keys.
 //! It generates the proper signature that can be posted as a comment on GitHub.
 
-use std::env;
 use std::fs;
 use std::path::Path;
 use std::str::FromStr;
 use clap::{Parser, Subcommand};
-use serde_json::json;
 
 use bllvm_commons::crypto::signatures::SignatureManager;
 
@@ -109,10 +107,10 @@ fn sign_pr(
     let signature = signature_manager.create_signature(&message, &secret_key)?;
     
     println!("✅ Signature generated successfully!");
-    println!("");
+    println!();
     println!("📋 Copy this command to post on GitHub:");
     println!("/governance-sign {}", signature);
-    println!("");
+    println!();
     println!("🔍 Signature details:");
     println!("  Repository: {}", repo);
     println!("  PR Number: {}", pr);
@@ -137,7 +135,7 @@ fn generate_keypair(
     
     // Generate private key
     let output = std::process::Command::new("openssl")
-        .args(&["genpkey", "-algorithm", "Ed25519", "-out", private_key_path.to_str().unwrap()])
+        .args(["genpkey", "-algorithm", "Ed25519", "-out", private_key_path.to_str().unwrap()])
         .output()?;
     
     if !output.status.success() {
@@ -146,7 +144,7 @@ fn generate_keypair(
     
     // Extract public key
     let output = std::process::Command::new("openssl")
-        .args(&["pkey", "-in", private_key_path.to_str().unwrap(), "-pubout", "-out", public_key_path.to_str().unwrap()])
+        .args(["pkey", "-in", private_key_path.to_str().unwrap(), "-pubout", "-out", public_key_path.to_str().unwrap()])
         .output()?;
     
     if !output.status.success() {
@@ -155,7 +153,7 @@ fn generate_keypair(
     
     // Get public key in hex format
     let output = std::process::Command::new("openssl")
-        .args(&["pkey", "-in", private_key_path.to_str().unwrap(), "-pubout", "-outform", "DER"])
+        .args(["pkey", "-in", private_key_path.to_str().unwrap(), "-pubout", "-outform", "DER"])
         .output()?;
     
     if !output.status.success() {
@@ -168,7 +166,7 @@ fn generate_keypair(
     println!("📁 Private key: {}", private_key_path.display());
     println!("📁 Public key: {}", public_key_path.display());
     println!("🔑 Public key (hex): {}", public_key_hex);
-    println!("");
+    println!();
     println!("💾 To add this maintainer to the database:");
     println!("INSERT INTO maintainers (github_username, public_key, layer, active, last_updated) VALUES");
     println!("('{}', '{}', 1, true, CURRENT_TIMESTAMP);", username, public_key_hex);

@@ -118,16 +118,22 @@ async fn setup_complete_governance_db() -> SqlitePool {
     .await
     .unwrap();
     
-    // Economic node tables (simplified for testing)
+    // Economic node tables (matching migration 004_economic_nodes.sql)
     sqlx::query(
         r#"
         CREATE TABLE economic_nodes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            entity_name TEXT NOT NULL,
             node_type TEXT NOT NULL,
+            entity_name TEXT NOT NULL,
             public_key TEXT NOT NULL,
-            weight REAL NOT NULL,
-            status TEXT NOT NULL
+            qualification_data TEXT DEFAULT '{}',
+            weight REAL DEFAULT 0.0,
+            status TEXT DEFAULT 'pending',
+            registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            verified_at TIMESTAMP,
+            last_verified_at TIMESTAMP,
+            created_by TEXT,
+            notes TEXT DEFAULT ''
         );
         "#
     )
@@ -225,8 +231,8 @@ async fn test_complete_governance_flow_tier3_veto_blocked() {
     // Step 1: Create economic node
     sqlx::query(
         r#"
-        INSERT INTO economic_nodes (entity_name, node_type, public_key, weight, status)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO economic_nodes (entity_name, node_type, public_key, qualification_data, weight, status)
+        VALUES (?, ?, ?, '{}', ?, ?)
         "#
     )
     .bind("mining_pool_1")
@@ -423,8 +429,8 @@ async fn test_complete_governance_flow_combined_veto_systems() {
     // Step 1: Economic node veto (25% hashpower - below 30% threshold)
     sqlx::query(
         r#"
-        INSERT INTO economic_nodes (entity_name, node_type, public_key, weight, status)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO economic_nodes (entity_name, node_type, public_key, qualification_data, weight, status)
+        VALUES (?, ?, ?, '{}', ?, ?)
         "#
     )
     .bind("mining_pool_1")

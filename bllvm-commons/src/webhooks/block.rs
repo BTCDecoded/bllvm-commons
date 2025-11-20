@@ -5,11 +5,10 @@
 use axum::{
     extract::State,
     response::Json,
-    routing::post,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tracing::{info, warn, error};
+use tracing::{info, error};
 
 use crate::config::AppConfig;
 use crate::database::Database;
@@ -95,7 +94,7 @@ pub async fn handle_block_notification(
             
             Json(BlockNotificationResponse {
                 success: true,
-                message: format!("Block processed successfully"),
+                message: "Block processed successfully".to_string(),
                 contributions_found: contributions.len(),
             })
         }

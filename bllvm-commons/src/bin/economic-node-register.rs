@@ -3,7 +3,6 @@
 //! This tool allows economic nodes (mining pools, exchanges, custodians) to register
 //! with the governance system and submit proof-of-stake verification.
 
-use std::env;
 use std::fs;
 use clap::{Parser, Subcommand};
 use serde_json::json;
@@ -172,7 +171,7 @@ fn register_node(
     
     println!("✅ Economic node registration created!");
     println!("📁 Registration saved to: {}", registration_file);
-    println!("");
+    println!();
     println!("📋 Registration details:");
     println!("  Name: {}", name);
     println!("  Type: {}", node_type);
@@ -185,7 +184,7 @@ fn register_node(
     }
     println!("  Timestamp: {}", payload["registration_timestamp"]);
     
-    println!("");
+    println!();
     println!("📤 To complete registration, send this file to the governance administrator:");
     println!("  scp {} governance-server:/path/to/economic-registrations/", registration_file);
     
@@ -207,7 +206,7 @@ fn generate_keypair(
     
     // Generate private key
     let output = std::process::Command::new("openssl")
-        .args(&["genpkey", "-algorithm", "Ed25519", "-out", &private_key_path])
+        .args(["genpkey", "-algorithm", "Ed25519", "-out", &private_key_path])
         .output()?;
     
     if !output.status.success() {
@@ -216,7 +215,7 @@ fn generate_keypair(
     
     // Extract public key
     let output = std::process::Command::new("openssl")
-        .args(&["pkey", "-in", &private_key_path, "-pubout", "-out", &public_key_path])
+        .args(["pkey", "-in", &private_key_path, "-pubout", "-out", &public_key_path])
         .output()?;
     
     if !output.status.success() {
@@ -225,7 +224,7 @@ fn generate_keypair(
     
     // Get public key in hex format
     let output = std::process::Command::new("openssl")
-        .args(&["pkey", "-in", &private_key_path, "-pubout", "-outform", "DER"])
+        .args(["pkey", "-in", &private_key_path, "-pubout", "-outform", "DER"])
         .output()?;
     
     if !output.status.success() {
@@ -274,7 +273,7 @@ fn submit_proof(
     
     println!("✅ Proof submission created!");
     println!("📁 Proof saved to: {}", proof_file);
-    println!("");
+    println!();
     println!("📋 Proof details:");
     println!("  Node: {}", name);
     println!("  Type: {}", proof_type);

@@ -8,13 +8,12 @@ use chrono::{DateTime, Utc, Datelike, Timelike};
 use ::hex;
 use nostr_sdk::prelude::*;
 use sha2::{Digest, Sha256};
-use std::collections::HashMap;
 use std::fs;
-use tracing::{debug, error, info, warn};
+use tracing::{info, warn};
 
 use crate::database::Database;
 use crate::nostr::client::NostrClient;
-use crate::nostr::events::{GovernanceStatus, Hashes, ServerHealth};
+use crate::nostr::events::{GovernanceStatus, ServerHealth};
 
 /// Status publisher for governance infrastructure
 pub struct StatusPublisher {
@@ -187,7 +186,7 @@ mod tests {
     use super::*;
     use tempfile::tempdir;
     use nostr_sdk::prelude::Keys;
-    use std::collections::HashMap;
+    
 
     #[tokio::test]
     async fn test_file_hash_calculation() {

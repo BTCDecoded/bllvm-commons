@@ -261,7 +261,7 @@ pub async fn classify_pr_tier_detailed(
                 name.split('_').nth(1).and_then(|s| s.parse::<u32>().ok()).unwrap_or(1)
             } else {
                 // Fallback: try to parse from last segment
-                name.split('_').last().and_then(|s| s.parse::<u32>().ok()).unwrap_or(1)
+                name.split('_').next_back().and_then(|s| s.parse::<u32>().ok()).unwrap_or(1)
             };
             (tier_num, name.clone(), rule)
         })
@@ -353,7 +353,7 @@ pub async fn classify_pr_tier_detailed(
         }
         
         // Boost confidence if multiple strong indicators present
-        if tier_patterns.len() > 0 && tier_keywords.len() > 0 {
+        if !tier_patterns.is_empty() && !tier_keywords.is_empty() {
             confidence += 0.1; // Bonus for both file and keyword matches
         }
 
@@ -367,11 +367,7 @@ pub async fn classify_pr_tier_detailed(
         // so we only override with lower tiers if they have significantly higher confidence
         // For governance (tier 5), we want to prioritize it even with lower confidence
         let should_update = if confidence >= rule.confidence_threshold {
-            if best_confidence == 0.0 || confidence > best_confidence + 0.1 || (tier_num == 5 && confidence > 0.0) {
-                true
-            } else {
-                false
-            }
+            best_confidence == 0.0 || confidence > best_confidence + 0.1 || (tier_num == 5 && confidence > 0.0)
         } else {
             false
         };
@@ -683,7 +679,7 @@ fn extract_body(payload: &Value) -> String {
 
 /// Manual tier override (for maintainer use)
 pub async fn override_tier(tier: u32, rationale: &str) -> Result<(), String> {
-    if tier < 1 || tier > 5 {
+    if !(1..=5).contains(&tier) {
         return Err("Invalid tier: must be 1-5".to_string());
     }
 

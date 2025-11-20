@@ -3,7 +3,7 @@ use tracing::{info, warn};
 
 use crate::config::AppConfig;
 use crate::database::Database;
-use crate::nostr::{publish_merge_action, publish_review_period_notification};
+use crate::nostr::publish_merge_action;
 use crate::validation::tier_classification;
 use crate::validation::threshold::ThresholdValidator;
 
@@ -159,7 +159,7 @@ pub async fn handle_pr_merged(
         // Publish merge action to Nostr
         publish_merge_action(
             config,
-            &database,
+            database,
             repo_name,
             pr_number,
             commit_hash,

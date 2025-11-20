@@ -296,13 +296,11 @@ impl SecurityControlValidator {
             return file.contains(inner);
         }
         
-        if pattern.ends_with('*') {
-            let prefix = &pattern[..pattern.len()-1];
+        if let Some(prefix) = pattern.strip_suffix('*') {
             return file.starts_with(prefix);
         }
         
-        if pattern.starts_with('*') {
-            let suffix = &pattern[1..];
+        if let Some(suffix) = pattern.strip_prefix('*') {
             return file.ends_with(suffix);
         }
         
@@ -526,7 +524,7 @@ pub struct PlaceholderViolation {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::tempdir;
+    
 
     #[test]
     fn test_file_pattern_matching() {

@@ -397,14 +397,14 @@ impl KeyManager {
 
         // If this is a maintainer key, update the maintainers table
         if current_metadata.key_type == KeyType::Maintainer {
-            self.update_maintainer_public_key(&owner, &new_metadata.public_key)
+            self.update_maintainer_public_key(owner, &new_metadata.public_key)
                 .await?;
             info!("Updated maintainer registry for: {}", owner);
         }
 
         // If this is an emergency key, update the emergency_keyholders table
         if current_metadata.key_type == KeyType::Emergency {
-            self.update_emergency_keyholder_public_key(&owner, &new_metadata.public_key)
+            self.update_emergency_keyholder_public_key(owner, &new_metadata.public_key)
                 .await?;
             info!("Updated emergency keyholder registry for: {}", owner);
         }

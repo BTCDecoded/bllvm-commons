@@ -313,8 +313,8 @@ mod tests {
         );
 
         assert_eq!(decision.pr_number, 123);
-        assert_eq!(decision.dry_run, true);
-        assert_eq!(decision.would_allow_merge, false);
+        assert!(decision.dry_run);
+        assert!(!decision.would_allow_merge);
     }
 
     #[test]
@@ -328,7 +328,7 @@ mod tests {
         );
 
         assert_eq!(action.action_type, "status_check");
-        assert_eq!(action.dry_run, true);
+        assert!(action.dry_run);
     }
 
     #[test]

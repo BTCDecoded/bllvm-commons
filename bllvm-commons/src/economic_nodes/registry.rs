@@ -2,7 +2,6 @@
 //!
 //! Handles registration, qualification verification, and weight calculation
 
-use chrono::{DateTime, Utc};
 use sqlx::{Row, SqlitePool};
 use tracing::{info, warn};
 
@@ -54,7 +53,7 @@ impl EconomicNodeRegistry {
 
         // Calculate initial weight
         let weight = self
-            .calculate_weight(node_type.clone(), &qualification_data)
+            .calculate_weight(node_type.clone(), qualification_data)
             .await?;
 
         // Insert into database
@@ -395,7 +394,7 @@ impl EconomicNodeRegistry {
 mod tests {
     use super::*;
     use crate::database::Database;
-    use crate::economic_nodes::types::{QualificationProof, HashpowerProof, HoldingsProof, VolumeProof, ContactInfo};
+    use crate::economic_nodes::types::{QualificationProof, HoldingsProof, VolumeProof, ContactInfo};
 
     async fn setup_test_registry() -> EconomicNodeRegistry {
         let db = Database::new_in_memory().await.unwrap();

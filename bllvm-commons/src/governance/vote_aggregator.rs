@@ -5,10 +5,10 @@
 
 use crate::economic_nodes::VetoManager;
 use crate::governance::WeightCalculator;
-use crate::nostr::zap_voting::{ZapVotingProcessor, VoteTotals as ZapVoteTotals};
+use crate::nostr::zap_voting::ZapVotingProcessor;
 use anyhow::Result;
 use sqlx::SqlitePool;
-use tracing::{debug, info};
+use tracing::info;
 
 /// Vote aggregator for governance proposals
 pub struct VoteAggregator {

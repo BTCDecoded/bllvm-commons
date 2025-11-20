@@ -368,7 +368,7 @@ impl Database {
                 // Parse existing signatures or create empty array
                 let mut signatures: Vec<Value> = signatures_json
                     .and_then(|v| serde_json::from_value(v).ok())
-                    .unwrap_or_else(|| vec![]);
+                    .unwrap_or_default();
 
                 // Add new signature
                 signatures.push(serde_json::to_value(&new_signature)
@@ -913,7 +913,7 @@ impl Database {
         match &self.backend {
             DatabaseBackend::Sqlite(pool) => {
                 // Check database connectivity
-                let connection_count = pool.size() as u32;
+                let connection_count = pool.size();
                 let idle_connections = pool.num_idle() as u32;
                 let active_connections = connection_count - idle_connections;
 
@@ -952,7 +952,7 @@ impl Database {
             }
             DatabaseBackend::Postgres(pool) => {
                 // Check database connectivity
-                let connection_count = pool.size() as u32;
+                let connection_count = pool.size();
                 let idle_connections = pool.num_idle() as u32;
                 let active_connections = connection_count - idle_connections;
 

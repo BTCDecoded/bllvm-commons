@@ -1,4 +1,3 @@
-use crate::validation::emergency::{ActiveEmergency, EmergencyTier};
 use crate::validation::review_period::ReviewPeriodValidator;
 use crate::validation::threshold::ThresholdValidator;
 use chrono::{DateTime, Utc};

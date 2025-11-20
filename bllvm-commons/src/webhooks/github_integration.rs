@@ -51,7 +51,7 @@ impl GitHubIntegration {
         let tier_name = self.get_tier_name(tier);
 
         // Post initial status check
-        self.post_initial_status_check(&owner, &repo, &head_sha, tier, &tier_name)
+        self.post_initial_status_check(&owner, &repo, &head_sha, tier, tier_name)
             .await?;
 
         // Set up required status checks for the branch
@@ -187,7 +187,7 @@ impl GitHubIntegration {
                 sha,
                 layer,
                 tier,
-                &tier_name,
+                tier_name,
                 review_period_met,
                 signatures_met,
                 economic_veto_active,

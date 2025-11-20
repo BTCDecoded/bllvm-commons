@@ -194,7 +194,7 @@ fn parse_zap_event(event: &nostr_sdk::prelude::Event) -> Result<ZapEvent> {
         .iter()
         .find(|tag| {
             let vec = tag.as_vec();
-            vec.get(0).map(|s| s.as_str()) == Some("p")
+            vec.first().map(|s| s.as_str()) == Some("p")
         })
         .and_then(|tag| {
             let vec = tag.as_vec();
@@ -208,7 +208,7 @@ fn parse_zap_event(event: &nostr_sdk::prelude::Event) -> Result<ZapEvent> {
         .iter()
         .find(|tag| {
             let vec = tag.as_vec();
-            vec.get(0).map(|s| s.as_str()) == Some("amount")
+            vec.first().map(|s| s.as_str()) == Some("amount")
         })
         .and_then(|tag| {
             let vec = tag.as_vec();
@@ -222,7 +222,7 @@ fn parse_zap_event(event: &nostr_sdk::prelude::Event) -> Result<ZapEvent> {
         .iter()
         .find(|tag| {
             let vec = tag.as_vec();
-            vec.get(0).map(|s| s.as_str()) == Some("bolt11")
+            vec.first().map(|s| s.as_str()) == Some("bolt11")
         })
         .and_then(|tag| {
             let vec = tag.as_vec();
@@ -235,7 +235,7 @@ fn parse_zap_event(event: &nostr_sdk::prelude::Event) -> Result<ZapEvent> {
         .iter()
         .find(|tag| {
             let vec = tag.as_vec();
-            vec.get(0).map(|s| s.as_str()) == Some("description")
+            vec.first().map(|s| s.as_str()) == Some("description")
         })
         .and_then(|tag| {
             let vec = tag.as_vec();
@@ -260,7 +260,7 @@ fn parse_zap_event(event: &nostr_sdk::prelude::Event) -> Result<ZapEvent> {
         .iter()
         .find(|tag| {
             let vec = tag.as_vec();
-            vec.get(0).map(|s| s.as_str()) == Some("e")
+            vec.first().map(|s| s.as_str()) == Some("e")
         })
         .and_then(|tag| {
             let vec = tag.as_vec();
@@ -281,7 +281,7 @@ fn parse_zap_event(event: &nostr_sdk::prelude::Event) -> Result<ZapEvent> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use nostr_sdk::prelude::*;
+    
 
     #[tokio::test]
     async fn test_client_creation() {

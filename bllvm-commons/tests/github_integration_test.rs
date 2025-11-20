@@ -4,9 +4,7 @@
 //! merge blocking/unblocking, and webhook event handling
 
 use bllvm_commons::database::Database;
-use bllvm_commons::error::GovernanceError;
 use bllvm_commons::github::{client::GitHubClient, webhooks::WebhookProcessor};
-use bllvm_commons::webhooks::github_integration::GitHubIntegration;
 use serde_json::json;
 
 mod common;

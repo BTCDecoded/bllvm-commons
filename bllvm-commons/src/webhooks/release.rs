@@ -6,9 +6,7 @@ use axum::http::StatusCode;
 
 use crate::error::GovernanceError;
 use crate::build::orchestrator::BuildOrchestrator;
-use crate::github::client::GitHubClient;
 use crate::database::Database;
-use crate::config::AppConfig;
 
 /// Handle release webhook events
 pub async fn handle_release_event(

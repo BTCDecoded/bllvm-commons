@@ -8,7 +8,7 @@ use crate::error::GovernanceError;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
-use tracing::{info, warn, error};
+use tracing::{info, warn};
 use sha2::{Digest, Sha256};
 use hex;
 
@@ -85,6 +85,12 @@ impl Default for VerificationRules {
                 "preserves_security_guarantees".to_string(),
             ],
         }
+    }
+}
+
+impl Default for EquivalenceProofValidator {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -218,7 +224,7 @@ impl EquivalenceProofValidator {
         let mut vectors = Vec::new();
 
         // Block validation test vector
-        let mut block_vector = EquivalenceTestVector {
+        let block_vector = EquivalenceTestVector {
             test_id: "block_validation_001".to_string(),
             description: "Block header validation equivalence".to_string(),
             orange_paper_spec: "Block header must have valid timestamp, nonce, and merkle root".to_string(),
@@ -242,7 +248,7 @@ impl EquivalenceProofValidator {
         vectors.push(block_vector);
 
         // Transaction validation test vector
-        let mut tx_vector = EquivalenceTestVector {
+        let tx_vector = EquivalenceTestVector {
             test_id: "tx_validation_001".to_string(),
             description: "Transaction signature validation equivalence".to_string(),
             orange_paper_spec: "Transaction must have valid ECDSA signature".to_string(),
@@ -266,7 +272,7 @@ impl EquivalenceProofValidator {
         vectors.push(tx_vector);
 
         // Script execution test vector
-        let mut script_vector = EquivalenceTestVector {
+        let script_vector = EquivalenceTestVector {
             test_id: "script_execution_001".to_string(),
             description: "Script execution equivalence".to_string(),
             orange_paper_spec: "Script must execute according to consensus rules".to_string(),

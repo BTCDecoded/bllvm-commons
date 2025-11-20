@@ -74,7 +74,7 @@ impl DependencyGraph {
                     continue;
                 }
                 in_degree.entry(repo.clone()).and_modify(|d| *d += 1);
-                graph.entry(dep.clone()).or_insert_with(Vec::new).push(repo.clone());
+                graph.entry(dep.clone()).or_default().push(repo.clone());
             }
         }
         

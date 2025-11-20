@@ -4,7 +4,7 @@
 //! applies weight caps, and checks cooling-off periods.
 
 use anyhow::Result;
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use sqlx::SqlitePool;
 use tracing::{debug, info};
 

@@ -5,12 +5,11 @@
 
 use anyhow::{anyhow, Result};
 use clap::{Parser, Subcommand};
-use serde_json;
 use std::fs;
 use std::path::Path;
-use tracing::{error, info, warn};
+use tracing::info;
 
-use bllvm_commons::validation::security_controls::{SecurityControlValidator, SecurityImpact};
+use bllvm_commons::validation::security_controls::SecurityControlValidator;
 
 #[derive(Parser)]
 #[command(name = "security-gate")]
@@ -467,7 +466,7 @@ async fn generate_report(output: Option<String>) -> Result<()> {
                     for action in actions {
                         report.push_str(&format!("- {}\n", action.as_str().unwrap_or("Unknown")));
                     }
-                    report.push_str("\n");
+                    report.push('\n');
                 }
             }
         }

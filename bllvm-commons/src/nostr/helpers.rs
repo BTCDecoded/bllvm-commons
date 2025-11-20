@@ -3,7 +3,6 @@
 //! Helper functions for publishing governance events to Nostr
 
 use anyhow::Result;
-use chrono::Utc;
 
 use crate::config::AppConfig;
 use crate::database::Database;
@@ -271,7 +270,7 @@ pub fn create_keyholder_announcement_event(
     keyholder: &crate::nostr::KeyholderAnnouncement,
 ) -> Result<nostr_sdk::prelude::Event> {
     // Add logo/picture if configured
-    let mut announcement = keyholder.clone();
+    let announcement = keyholder.clone();
     // Note: picture field removed from KeyholderAnnouncement, logo_url is handled elsewhere
 
     let content = announcement.to_json()

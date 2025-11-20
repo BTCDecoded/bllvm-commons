@@ -1,9 +1,8 @@
 use crate::error::GovernanceError;
 use crate::validation::content_hash::{ContentHashValidator, SyncReport, SyncStatus};
 use crate::validation::version_pinning::{VersionPinningValidator, VersionPinningConfig, VersionManifest};
-use crate::validation::equivalence_proof::{EquivalenceProofValidator, EquivalenceTestVector};
 use crate::github::file_operations::GitHubFileOperations;
-use crate::github::cross_layer_status::{CrossLayerStatusChecker, CrossLayerStatusCheck, StatusState};
+use crate::github::cross_layer_status::{CrossLayerStatusChecker, CrossLayerStatusCheck};
 use serde_json::Value;
 use std::collections::HashMap;
 use tracing::{info, warn};
