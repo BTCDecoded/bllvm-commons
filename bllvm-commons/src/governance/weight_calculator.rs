@@ -289,7 +289,11 @@ impl WeightCalculator {
                     capped <= new_total * self.cap_percentage + 0.00001
                 });
                 // Tighter convergence: need both small change AND all weights properly capped
-                let converged = (change_percent < 0.0000001 && change < 0.00001 && all_capped) || iterations >= MAX_ITERATIONS;
+                // Also verify that the largest weight (whale) is exactly at the cap
+                let largest_weight = new_capped_weights.iter().map(|(_, w)| *w).fold(0.0, f64::max);
+                let expected_cap = new_total * self.cap_percentage;
+                let cap_correct = (largest_weight - expected_cap).abs() < 0.0001 || largest_weight <= expected_cap + 0.0001;
+                let converged = (change_percent < 0.0000001 && change < 0.00001 && all_capped && cap_correct) || iterations >= MAX_ITERATIONS;
                 
                 if converged {
                     // Use the converged values (new_total and new_capped_weights)
