@@ -228,11 +228,20 @@ async fn test_adoption_tracking() -> Result<(), Box<dyn std::error::Error>> {
         .execute(&pool)
         .await?;
         
-        // Create a ruleset for the fork decisions to reference (must exist before foreign key tables)
+        // Create rulesets for the fork decisions to reference (must exist before foreign key tables)
         sqlx::query(
             r#"
             INSERT INTO governance_rulesets (id, name, version_major, version_minor, version_patch, hash, config, description, status)
             VALUES ('ruleset-v1.0.0', 'Ruleset v1.0.0', 1, 0, 0, 'hash_v1_0_0', '{}', 'Test ruleset', 'active')
+            "#
+        )
+        .execute(&pool)
+        .await?;
+        
+        sqlx::query(
+            r#"
+            INSERT INTO governance_rulesets (id, name, version_major, version_minor, version_patch, hash, config, description, status)
+            VALUES ('ruleset-v1.1.0', 'Ruleset v1.1.0', 1, 1, 0, 'hash_v1_1_0', '{}', 'Test ruleset v1.1.0', 'active')
             "#
         )
         .execute(&pool)
