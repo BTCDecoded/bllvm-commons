@@ -1,5 +1,6 @@
 pub mod content_hash;
 pub mod cross_layer;
+pub mod diff_parser;
 pub mod emergency;
 pub mod equivalence_proof;
 pub mod review_period;

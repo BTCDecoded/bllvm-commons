@@ -11,6 +11,7 @@ use sha2::{Digest, Sha256};
 use std::fs;
 use tracing::{info, warn};
 
+use crate::audit::logger::AuditLogger;
 use crate::database::Database;
 use crate::nostr::client::NostrClient;
 use crate::nostr::events::{GovernanceStatus, ServerHealth};
@@ -22,6 +23,7 @@ pub struct StatusPublisher {
     server_id: String,
     binary_path: String,
     config_path: String,
+    audit_log_path: Option<String>,
     start_time: DateTime<Utc>,
 }
 
@@ -33,6 +35,7 @@ impl StatusPublisher {
         server_id: String,
         binary_path: String,
         config_path: String,
+        audit_log_path: Option<String>,
     ) -> Self {
         Self {
             client,
@@ -40,6 +43,7 @@ impl StatusPublisher {
             server_id,
             binary_path,
             config_path,
+            audit_log_path,
             start_time: Utc::now(),
         }
     }
@@ -139,10 +143,93 @@ impl StatusPublisher {
     }
 
     /// Get audit log information
+    /// Returns (merkle_root, entry_count) for the audit log
     async fn get_audit_log_info(&self) -> Result<(Option<String>, Option<u64>)> {
-        // This would be implemented when audit logging is added
-        // For now, return None values
-        Ok((None, None))
+        // If audit logging is not enabled or path not configured, return None
+        let log_path = match &self.audit_log_path {
+            Some(path) => path,
+            None => return Ok((None, None)),
+        };
+
+        // Create audit logger to read entries
+        let logger = match AuditLogger::new(log_path.clone()) {
+            Ok(l) => l,
+            Err(e) => {
+                warn!("Failed to create audit logger: {}. Audit log info unavailable.", e);
+                return Ok((None, None));
+            }
+        };
+
+        // Get all entries
+        let entries = match logger.get_all_entries().await {
+            Ok(entries) => entries,
+            Err(e) => {
+                warn!("Failed to read audit log entries: {}. Audit log info unavailable.", e);
+                return Ok((None, None));
+            }
+        };
+
+        // If no entries, return empty state
+        if entries.is_empty() {
+            return Ok((
+                Some("sha256:0000000000000000000000000000000000000000000000000000000000000000".to_string()),
+                Some(0),
+            ));
+        }
+
+        // Calculate Merkle root from all entries
+        let merkle_root = Self::calculate_merkle_root(&entries)?;
+        let entry_count = entries.len() as u64;
+
+        Ok((Some(merkle_root), Some(entry_count)))
+    }
+
+    /// Calculate Merkle root from audit log entries
+    fn calculate_merkle_root(entries: &[crate::audit::entry::AuditLogEntry]) -> Result<String> {
+        use sha2::{Digest, Sha256};
+
+        if entries.is_empty() {
+            return Ok("sha256:0000000000000000000000000000000000000000000000000000000000000000".to_string());
+        }
+
+        // Hash each entry using its this_log_hash (which is already a hash of the entry)
+        // Extract the hex part (after "sha256:") for Merkle tree calculation
+        let mut hashes: Vec<[u8; 32]> = entries
+            .iter()
+            .map(|e| {
+                // Extract hex from "sha256:hexstring"
+                let hex_str = e.this_log_hash.strip_prefix("sha256:").unwrap_or(&e.this_log_hash);
+                let hash_bytes = hex::decode(hex_str)
+                    .unwrap_or_else(|_| {
+                        // Fallback: hash the entry's canonical string
+                        let canonical = e.canonical_string();
+                        Sha256::digest(canonical.as_bytes()).into()
+                    });
+                // Ensure we have exactly 32 bytes
+                let mut hash = [0u8; 32];
+                hash.copy_from_slice(&hash_bytes[..32.min(hash_bytes.len())]);
+                hash
+            })
+            .collect();
+
+        // Build Merkle tree
+        while hashes.len() > 1 {
+            let mut next_level = Vec::new();
+            for chunk in hashes.chunks(2) {
+                if chunk.len() == 2 {
+                    // Combine two hashes
+                    let combined = [chunk[0].as_slice(), chunk[1].as_slice()].concat();
+                    next_level.push(Sha256::digest(&combined).into());
+                } else {
+                    // Odd number, duplicate last hash
+                    let combined = [chunk[0].as_slice(), chunk[0].as_slice()].concat();
+                    next_level.push(Sha256::digest(&combined).into());
+                }
+            }
+            hashes = next_level;
+        }
+
+        Ok(format!("sha256:{}", hex::encode(hashes[0])))
     }
 
     /// Calculate next OTS anchor date (first day of next month)
@@ -229,6 +316,7 @@ mod tests {
             server_id: "test".to_string(),
             binary_path: test_file.to_string_lossy().to_string(),
             config_path: "".to_string(),
+            audit_log_path: None,
             start_time: Utc::now(),
         };
 
@@ -251,6 +339,7 @@ mod tests {
             server_id: "test".to_string(),
             binary_path: "".to_string(),
             config_path: "".to_string(),
+            audit_log_path: None,
             start_time: Utc::now(),
         };
 

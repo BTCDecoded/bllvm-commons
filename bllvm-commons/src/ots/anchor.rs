@@ -5,6 +5,7 @@
 
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
+use hex;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
@@ -179,30 +180,183 @@ impl RegistryAnchorer {
 
     /// Get previous registry hash
     async fn get_previous_registry_hash(&self) -> Result<String> {
-        // This would query the database for the last registry hash
-        // For now, return a placeholder
-        Ok("sha256:0000000000000000000000000000000000000000000000000000000000000000".to_string())
+        use sqlx::Row;
+        
+        let pool = self.database.get_sqlite_pool()
+            .ok_or_else(|| anyhow!("Database pool not available or not SQLite"))?;
+        
+        let row = sqlx::query(
+            "SELECT registry_hash FROM governance_registries ORDER BY timestamp DESC LIMIT 1"
+        )
+        .fetch_optional(pool)
+        .await?;
+        
+        match row {
+            Some(r) => Ok(r.get::<String, _>(0)),
+            None => Ok("sha256:0000000000000000000000000000000000000000000000000000000000000000".to_string()),
+        }
     }
 
     /// Get maintainers from database
     async fn get_maintainers(&self) -> Result<Vec<Maintainer>> {
-        // This would query the database for maintainers
-        // For now, return empty vector
-        Ok(vec![])
+        use crate::database::queries::Queries;
+        
+        let pool = self.database.get_sqlite_pool()
+            .ok_or_else(|| anyhow!("Database pool not available or not SQLite"))?;
+        
+        // Get all maintainers from all layers
+        let mut all_maintainers = Vec::new();
+        
+        // Query maintainers for each layer (layers 1-6)
+        for layer in 1..=6 {
+            match Queries::get_maintainers_for_layer(pool, layer).await {
+                Ok(maintainers) => {
+                    for db_maintainer in maintainers {
+                        // Map database Maintainer to registry Maintainer
+                        // Note: Database maintainer has github_username and public_key
+                        // Registry maintainer needs name, npub, added_at, status
+                        // We'll use github_username as name, and derive npub from public_key if possible
+                        all_maintainers.push(Maintainer {
+                            id: db_maintainer.id,
+                            name: db_maintainer.github_username.clone(),
+                            npub: db_maintainer.public_key.clone(), // Use public_key as npub for now
+                            added_at: db_maintainer.last_updated,
+                            status: if db_maintainer.active { "active".to_string() } else { "inactive".to_string() },
+                        });
+                    }
+                }
+                Err(e) => {
+                    warn!("Failed to get maintainers for layer {}: {}", layer, e);
+                }
+            }
+        }
+        
+        Ok(all_maintainers)
     }
 
     /// Get authorized servers from database
     async fn get_authorized_servers(&self) -> Result<Vec<AuthorizedServer>> {
-        // This would query the database for authorized servers
+        // Note: There is no authorized_servers table in the current schema
+        // This would need to be added in a future migration if server registration is needed
         // For now, return empty vector
+        warn!("Authorized servers table not implemented - returning empty list");
         Ok(vec![])
     }
 
     /// Get audit log summaries
     async fn get_audit_log_summaries(&self) -> Result<HashMap<String, AuditLogSummary>> {
-        // This would calculate merkle roots for each server's audit log
-        // For now, return empty map
-        Ok(HashMap::new())
+        use crate::audit::logger::AuditLogger;
+        
+        // Note: Audit logs are file-based, not database-based
+        // We need to read from the audit log file path
+        // For now, we'll try to read from a default path or return empty
+        // In production, this would be configured via AppConfig
+        
+        // Try to find audit log files in common locations
+        let default_audit_path = "/var/lib/governance/audit-log.jsonl";
+        
+        // Check if default path exists
+        if !Path::new(default_audit_path).exists() {
+            warn!("Audit log file not found at {} - returning empty summaries", default_audit_path);
+            return Ok(HashMap::new());
+        }
+        
+        // Create audit logger to read entries
+        let logger = match AuditLogger::new(default_audit_path.to_string()) {
+            Ok(l) => l,
+            Err(e) => {
+                warn!("Failed to create audit logger: {}. Returning empty summaries.", e);
+                return Ok(HashMap::new());
+            }
+        };
+        
+        // Get all entries
+        let entries = match logger.get_all_entries().await {
+            Ok(entries) => entries,
+            Err(e) => {
+                warn!("Failed to read audit log entries: {}. Returning empty summaries.", e);
+                return Ok(HashMap::new());
+            }
+        };
+        
+        if entries.is_empty() {
+            return Ok(HashMap::new());
+        }
+        
+        // Group entries by server_id
+        let mut summaries: HashMap<String, Vec<crate::audit::entry::AuditLogEntry>> = HashMap::new();
+        for entry in entries {
+            summaries.entry(entry.server_id.clone())
+                .or_insert_with(Vec::new)
+                .push(entry);
+        }
+        
+        // Calculate summaries for each server
+        let mut result = HashMap::new();
+        for (server_id, server_entries) in summaries {
+            let entries_count = server_entries.len() as u64;
+            let first_entry_hash = server_entries.first()
+                .map(|e| e.this_log_hash.clone())
+                .unwrap_or_else(|| "sha256:0000000000000000000000000000000000000000000000000000000000000000".to_string());
+            let last_entry_hash = server_entries.last()
+                .map(|e| e.this_log_hash.clone())
+                .unwrap_or_else(|| "sha256:0000000000000000000000000000000000000000000000000000000000000000".to_string());
+            
+            // Calculate Merkle root from entries
+            let merkle_root = Self::calculate_merkle_root_for_entries(&server_entries)?;
+            
+            result.insert(server_id, AuditLogSummary {
+                entries_count,
+                first_entry_hash,
+                last_entry_hash,
+                merkle_root,
+            });
+        }
+        
+        Ok(result)
+    }
+    
+    /// Calculate Merkle root from audit log entries
+    fn calculate_merkle_root_for_entries(entries: &[crate::audit::entry::AuditLogEntry]) -> Result<String> {
+        if entries.is_empty() {
+            return Ok("sha256:0000000000000000000000000000000000000000000000000000000000000000".to_string());
+        }
+        
+        // Hash each entry using its this_log_hash (extract hex part)
+        let mut hashes: Vec<[u8; 32]> = entries
+            .iter()
+            .map(|e| {
+                let hex_str = e.this_log_hash.strip_prefix("sha256:").unwrap_or(&e.this_log_hash);
+                let hash_bytes = hex::decode(hex_str)
+                    .unwrap_or_else(|_| {
+                        // Fallback: hash the entry's canonical string
+                        let canonical = e.canonical_string();
+                        Sha256::digest(canonical.as_bytes()).into()
+                    });
+                // Ensure we have exactly 32 bytes
+                let mut hash = [0u8; 32];
+                hash.copy_from_slice(&hash_bytes[..32.min(hash_bytes.len())]);
+                hash
+            })
+            .collect();
+        
+        // Build Merkle tree
+        while hashes.len() > 1 {
+            let mut next_level = Vec::new();
+            for chunk in hashes.chunks(2) {
+                if chunk.len() == 2 {
+                    let combined = [chunk[0].as_slice(), chunk[1].as_slice()].concat();
+                    next_level.push(Sha256::digest(&combined).into());
+                } else {
+                    // Odd number, duplicate last hash
+                    let combined = [chunk[0].as_slice(), chunk[0].as_slice()].concat();
+                    next_level.push(Sha256::digest(&combined).into());
+                }
+            }
+            hashes = next_level;
+        }
+        
+        Ok(format!("sha256:{}", hex::encode(hashes[0])))
     }
 
     /// Get multisig configuration
@@ -249,13 +403,44 @@ impl RegistryAnchorer {
         registry_file: &Path,
         proof_file: &Path,
     ) -> Result<()> {
-        // This would store the registry info in the database
-        // For now, just log
+        use sqlx::Row;
+        
+        // Calculate registry hash
+        let registry_data = fs::read(registry_file)
+            .map_err(|e| anyhow!("Failed to read registry file: {}", e))?;
+        let mut hasher = Sha256::new();
+        hasher.update(&registry_data);
+        let hash = hasher.finalize();
+        let registry_hash = format!("sha256:{}", hex::encode(hash));
+        
+        let pool = self.database.get_sqlite_pool()
+            .ok_or_else(|| anyhow!("Database pool not available or not SQLite"))?;
+        
+        let now = Utc::now();
+        let proof_path_str = proof_file.to_string_lossy().to_string();
+        let registry_path_str = registry_file.to_string_lossy().to_string();
+        
+        sqlx::query(
+            r#"
+            INSERT INTO governance_registries 
+            (registry_hash, registry_path, timestamp, month_year, ots_proof_path)
+            VALUES (?, ?, ?, ?, ?)
+            "#,
+        )
+        .bind(&registry_hash)
+        .bind(&registry_path_str)
+        .bind(now)
+        .bind(month_key)
+        .bind(&proof_path_str)
+        .execute(pool)
+        .await?;
+        
         info!(
-            "Stored registry info for {}: {} -> {}",
+            "Stored registry info for {}: {} -> {} (hash: {})",
             month_key,
             registry_file.display(),
-            proof_file.display()
+            proof_file.display(),
+            registry_hash
         );
         Ok(())
     }

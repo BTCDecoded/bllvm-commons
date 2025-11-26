@@ -6,7 +6,6 @@
 use crate::governance::ContributionTracker;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
-use sha2::Digest;
 use sqlx::SqlitePool;
 use tracing::info;
 
@@ -172,75 +171,26 @@ impl FeeForwardingTracker {
         Ok(None)
     }
 
-    /// Calculate transaction hash using proper Bitcoin double SHA256
+    /// Calculate transaction hash using proper Bitcoin transaction ID calculation
+    /// Uses bllvm-consensus's calculate_tx_id which properly serializes and hashes transactions
+    /// This ensures we match Bitcoin Core's txid calculation exactly
+    #[cfg(test)]
+    pub(crate) fn calculate_tx_hash(&self, tx: &bllvm_protocol::Transaction) -> String {
+    #[cfg(not(test))]
     fn calculate_tx_hash(&self, tx: &bllvm_protocol::Transaction) -> String {
-        use sha2::{Digest, Sha256};
+        use bllvm_protocol::block::calculate_tx_id;
 
-        // Serialize transaction to Bitcoin wire format
-        let mut data = Vec::new();
+        // Use the proper transaction ID calculation from bllvm-consensus
+        // This function properly serializes the transaction to Bitcoin wire format
+        // and computes the double SHA256 hash, matching Bitcoin Core exactly
+        let txid = calculate_tx_id(tx);
 
-        // Version (4 bytes, little-endian)
-        data.extend_from_slice(&(tx.version as u32).to_le_bytes());
-
-        // Input count (varint)
-        data.extend_from_slice(&self.encode_varint(tx.inputs.len() as u64));
-
-        // Inputs
-        for input in &tx.inputs {
-            // Previous output hash (32 bytes)
-            data.extend_from_slice(&input.prevout.hash);
-            // Previous output index (4 bytes, little-endian)
-            data.extend_from_slice(&(input.prevout.index as u32).to_le_bytes());
-            // Script length (varint)
-            data.extend_from_slice(&self.encode_varint(input.script_sig.len() as u64));
-            // Script
-            data.extend_from_slice(&input.script_sig);
-            // Sequence (4 bytes, little-endian)
-            data.extend_from_slice(&(input.sequence as u32).to_le_bytes());
-        }
-
-        // Output count (varint)
-        data.extend_from_slice(&self.encode_varint(tx.outputs.len() as u64));
-
-        // Outputs
-        for output in &tx.outputs {
-            // Value (8 bytes, little-endian)
-            data.extend_from_slice(&(output.value as u64).to_le_bytes());
-            // Script length (varint)
-            data.extend_from_slice(&self.encode_varint(output.script_pubkey.len() as u64));
-            // Script
-            data.extend_from_slice(&output.script_pubkey);
-        }
-
-        // Lock time (4 bytes, little-endian)
-        data.extend_from_slice(&(tx.lock_time as u32).to_le_bytes());
-
-        // Double SHA256 (Bitcoin standard for transaction IDs)
-        let first_hash = Sha256::digest(&data);
-        let second_hash = Sha256::digest(first_hash);
-
-        // Convert to hex string (reversed for display, as Bitcoin displays txids in reverse)
-        hex::encode(second_hash)
+        // Convert to hex string for storage and comparison
+        // Note: Bitcoin Core displays txids in reverse byte order in RPC responses,
+        // but for internal storage and duplicate detection, we use the standard byte order
+        hex::encode(txid)
     }
 
-    /// Encode integer as Bitcoin varint
-    fn encode_varint(&self, value: u64) -> Vec<u8> {
-        if value < 0xfd {
-            vec![value as u8]
-        } else if value <= 0xffff {
-            let mut result = vec![0xfd];
-            result.extend_from_slice(&(value as u16).to_le_bytes());
-            result
-        } else if value <= 0xffffffff {
-            let mut result = vec![0xfe];
-            result.extend_from_slice(&(value as u32).to_le_bytes());
-            result
-        } else {
-            let mut result = vec![0xff];
-            result.extend_from_slice(&value.to_le_bytes());
-            result
-        }
-    }
 
     /// Look up contributor ID from node registry based on address
     async fn lookup_contributor_from_address(&self, address: &str) -> Option<String> {

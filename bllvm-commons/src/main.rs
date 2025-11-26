@@ -180,6 +180,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .map(|p| p.to_string_lossy().to_string())
                 .unwrap_or_else(|_| "bllvm-commons".to_string()),
             "config.toml".to_string(),
+            if config.audit.enabled {
+                Some(config.audit.log_path.clone())
+            } else {
+                None
+            },
         ))
     } else {
         None

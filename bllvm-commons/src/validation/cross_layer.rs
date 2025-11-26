@@ -2,6 +2,7 @@ use crate::error::GovernanceError;
 use crate::github::cross_layer_status::{CrossLayerStatusCheck, CrossLayerStatusChecker};
 use crate::github::file_operations::GitHubFileOperations;
 use crate::validation::content_hash::{ContentHashValidator, SyncReport, SyncStatus};
+use crate::validation::diff_parser::{DiffParser, FileDiff};
 use crate::validation::version_pinning::{
     VersionManifest, VersionPinningConfig, VersionPinningValidator,
 };
@@ -318,7 +319,51 @@ impl CrossLayerValidator {
                 let changed_files: Vec<String> =
                     files.items.iter().map(|f| f.filename.clone()).collect();
 
-                return Self::check_consensus_patterns(&consensus_patterns, &changed_files);
+                // If allowed_imports_only, perform full diff analysis
+                if allowed_imports_only {
+                    // Get the full diff from GitHub API
+                    match Self::get_pr_diff(&client, &owner, &repo, pr_number as u64).await {
+                        Ok(Some(diff)) => {
+                            // Parse the diff
+                            match DiffParser::parse_unified_diff(&diff) {
+                                Ok(file_diffs) => {
+                                    // Check each consensus file for import-only changes
+                                    for file_diff in &file_diffs {
+                                        // Check if this file matches consensus patterns
+                                        if Self::matches_consensus_pattern(
+                                            &file_diff.filename,
+                                            &consensus_patterns,
+                                        ) {
+                                            // Verify changes are import-only
+                                            if !DiffParser::is_import_only_changes(file_diff) {
+                                                return Err(GovernanceError::ValidationError(format!(
+                                                    "Consensus file {} contains non-import changes. Only import statements are allowed when allowed_imports_only is true.",
+                                                    file_diff.filename
+                                                )));
+                                            }
+                                        }
+                                    }
+                                    info!("Import-only validation passed for all consensus files");
+                                }
+                                Err(e) => {
+                                    warn!("Failed to parse diff: {}. Falling back to file pattern check.", e);
+                                    return Self::check_consensus_patterns(&consensus_patterns, &changed_files);
+                                }
+                            }
+                        }
+                        Ok(None) => {
+                            warn!("No diff available for PR. Falling back to file pattern check.");
+                            return Self::check_consensus_patterns(&consensus_patterns, &changed_files);
+                        }
+                        Err(e) => {
+                            warn!("Failed to get PR diff: {}. Falling back to file pattern check.", e);
+                            return Self::check_consensus_patterns(&consensus_patterns, &changed_files);
+                        }
+                    }
+                } else {
+                    // Standard file pattern check
+                    return Self::check_consensus_patterns(&consensus_patterns, &changed_files);
+                }
             }
         }
 
@@ -332,13 +377,61 @@ impl CrossLayerValidator {
             return Self::check_consensus_patterns(&consensus_patterns, &files);
         }
 
-        // If allowed_imports_only, warn that full analysis needed
+        // If allowed_imports_only but no PR info, we can't do diff analysis
         if allowed_imports_only {
-            warn!("Import-only validation requires full diff analysis - deferred to Phase 2. File path check passed.");
+            warn!("Import-only validation requires PR diff, but no PR number provided. File path check passed.");
         }
 
         // Default: pass (backward compatibility)
         Ok(())
+    }
+
+    /// Get PR diff from GitHub API
+    async fn get_pr_diff(
+        client: &octocrab::Octocrab,
+        owner: &str,
+        repo: &str,
+        pr_number: u64,
+    ) -> Result<Option<String>, GovernanceError> {
+        // Get PR diff using GitHub API
+        // Construct diff URL manually (octocrab 0.38)
+        let diff_url = format!(
+            "https://api.github.com/repos/{}/{}/pulls/{}.diff",
+            owner, repo, pr_number
+        );
+
+        // Fetch diff content using reqwest (already in dependencies)
+        let response = reqwest::Client::new()
+            .get(&diff_url)
+            .header("Accept", "application/vnd.github.v3.diff")
+            .send()
+            .await
+            .map_err(|e| GovernanceError::GitHubError(format!("Failed to fetch diff: {}", e)))?;
+
+        if response.status().is_success() {
+            let diff = response
+                .text()
+                .await
+                .map_err(|e| GovernanceError::GitHubError(format!("Failed to read diff: {}", e)))?;
+            Ok(Some(diff))
+        } else {
+            warn!("Failed to fetch diff: HTTP {}", response.status());
+            Ok(None)
+        }
+    }
+
+    /// Check if filename matches any consensus pattern
+    fn matches_consensus_pattern(filename: &str, patterns: &[&str]) -> bool {
+        for pattern in patterns {
+            if filename.contains(pattern) || filename == *pattern {
+                return true;
+            }
+            // Handle directory patterns (e.g., "src/validation/")
+            if pattern.ends_with("/") && filename.starts_with(pattern) {
+                return true;
+            }
+        }
+        false
     }
 
     /// Check if any files match consensus patterns

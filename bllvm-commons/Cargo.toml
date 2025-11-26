@@ -71,6 +71,9 @@ nostr-sdk = "0.27"
 # OpenTimestamps
 opentimestamps = "0.1"
 
+# Lightning invoice parsing (bolt11)
+lightning-invoice = "0.2"
+
 # Additional dependencies for cross-layer validation
 base64 = "0.21"
 uuid = { version = "1.6", features = ["v4", "serde"] }
