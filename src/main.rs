@@ -6,6 +6,7 @@ use axum::{
 };
 use chrono::Datelike;
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::time::Duration;
 use tower::ServiceBuilder;
@@ -347,24 +348,46 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
 
-    // Initialize EconomicNodeRegistry with ConfigReader-enabled phase calculator
-    let phase_calculator = Arc::new(GovernancePhaseCalculator::with_config(
-        pool.clone(),
-        config_reader.clone(),
-    ));
-    let registry = Arc::new(EconomicNodeRegistry::with_phase_calculator(
-        pool.clone(),
-        Some((*phase_calculator).clone()),
-    ));
-    
     // Initialize P2P message deduplicator
     let dedup = Arc::new(MessageDeduplicator::new(pool.clone()));
     
     // Initialize governance-controlled configuration registry
     let mut config_registry = ConfigRegistry::new(pool.clone());
     
+    // Try to find governance config path from environment or use default
+    let governance_config_path = std::env::var("GOVERNANCE_CONFIG_PATH")
+        .ok()
+        .map(PathBuf::from)
+        .or_else(|| {
+            // Try relative paths
+            let candidates = vec![
+                PathBuf::from("../governance/config"),
+                PathBuf::from("governance/config"),
+                PathBuf::from("./governance/config"),
+            ];
+            candidates.into_iter().find(|p| p.exists())
+        });
+    
+    // Set config path for YAML sync
+    if let Some(ref config_path) = governance_config_path {
+        config_registry.set_config_path(config_path.clone());
+    }
+    
+    // Sync from YAML files first (source of truth)
+    if let Some(ref config_path) = governance_config_path {
+        if let Err(e) = config_registry.sync_from_yaml(config_path.clone()).await {
+            warn!("Failed to sync from YAML files: {}. Continuing with defaults.", e);
+        } else {
+            info!("Synced configuration from YAML files");
+        }
+    }
+    
     // Initialize all governance configuration defaults (forkable variables)
-    if let Err(e) = governance::initialize_governance_defaults(&Arc::new(config_registry.clone())).await {
+    // This will register any missing configs (fallback to hardcoded if YAML not available)
+    if let Err(e) = governance::initialize_governance_defaults(
+        &Arc::new(config_registry.clone()),
+        governance_config_path.clone(),
+    ).await {
         warn!("Failed to initialize governance defaults: {}", e);
         // Continue anyway - defaults may already be registered
     } else {
@@ -372,13 +395,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Create ConfigReader for unified config access
-    let config_reader = Arc::new(governance::ConfigReader::new(Arc::new(config_registry.clone())));
+    // Add YAML loader for fallback access to YAML files
+    let yaml_loader = governance_config_path.as_ref()
+        .map(|path| governance::yaml_loader::YamlConfigLoader::new(path.clone()));
+    let config_reader = Arc::new(governance::ConfigReader::with_yaml_loader(
+        Arc::new(config_registry.clone()),
+        yaml_loader,
+    ));
     
     // Link ConfigReader to ConfigRegistry for automatic cache invalidation
     config_registry.set_config_reader(config_reader.clone());
     let config_registry = Arc::new(config_registry);
     
     info!("Configuration reader initialized with automatic cache invalidation");
+
+    // Initialize EconomicNodeRegistry with ConfigReader-enabled phase calculator
+    let phase_calculator = Arc::new(GovernancePhaseCalculator::with_config(
+        pool.clone(),
+        config_reader.clone(),
+    ));
+    let registry = Arc::new(EconomicNodeRegistry::with_config_reader(
+        pool.clone(),
+        Some(config_reader.clone()),
+        Some((*phase_calculator).clone()),
+    ));
 
     // Start message deduplication cleanup task
     let dedup_for_cleanup = dedup.clone();

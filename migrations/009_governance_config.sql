@@ -60,3 +60,5 @@ CREATE TABLE IF NOT EXISTS governance_config_history (
 CREATE INDEX IF NOT EXISTS idx_governance_config_history_key ON governance_config_history(config_key);
 CREATE INDEX IF NOT EXISTS idx_governance_config_history_change ON governance_config_history(change_id);
 
+
+

@@ -2,20 +2,215 @@
 //!
 //! Registers all forkable governance variables with sensible defaults for the
 //! default Commons distribution, aligned with the growth plan (Phase 1 → Phase 2 → Phase 3).
+//!
+//! This module now reads from YAML files as the source of truth, with hardcoded
+//! defaults as a fallback if YAML files are not available.
 
 use crate::governance::config_registry::{ConfigCategory, ConfigRegistry};
+use crate::governance::yaml_loader::YamlConfigLoader;
 use crate::error::GovernanceError;
-use sqlx::SqlitePool;
-use tracing::info;
+use std::path::PathBuf;
+use tracing::{info, warn};
 
-/// Initialize all governance-controlled configuration parameters with sensible defaults
+/// Initialize all governance-controlled configuration parameters
 ///
-/// This should be called during system initialization to ensure all forkable
-/// governance variables are registered in the configuration registry.
+/// This function:
+/// 1. Attempts to load values from YAML files (source of truth)
+/// 2. Falls back to hardcoded defaults if YAML files are not available
+/// 3. Registers all values in the configuration registry
+///
+/// # Arguments
+/// * `registry` - The configuration registry to register values in
+/// * `config_path` - Optional path to governance config directory. If None, tries to find it.
 pub async fn initialize_governance_defaults(
     registry: &ConfigRegistry,
+    config_path: Option<PathBuf>,
 ) -> Result<(), GovernanceError> {
     info!("Initializing governance-controlled configuration defaults");
+
+    // Try to determine config path
+    let config_path = match config_path {
+        Some(path) => path,
+        None => {
+            // Try common locations
+            let mut candidates = vec![
+                PathBuf::from("../governance/config"),
+                PathBuf::from("governance/config"),
+                PathBuf::from("./governance/config"),
+            ];
+            
+            // Also try from environment variable if set
+            if let Ok(env_path) = std::env::var("GOVERNANCE_CONFIG_PATH") {
+                candidates.insert(0, PathBuf::from(env_path));
+            }
+            
+            // Find first existing path
+            candidates.into_iter()
+                .find(|p| p.exists())
+                .unwrap_or_else(|| PathBuf::from("../governance/config")) // Default fallback
+        }
+    };
+
+    // Try to load from YAML first
+    let yaml_loader = YamlConfigLoader::new(config_path.clone());
+    let yaml_values = yaml_loader.extract_all_config_values();
+    
+    match yaml_values {
+        Ok(values) => {
+            info!("Loaded {} config values from YAML files", values.len());
+            register_yaml_values(registry, &values).await?;
+        }
+        Err(e) => {
+            warn!("Failed to load YAML config values: {}. Falling back to hardcoded defaults.", e);
+            register_hardcoded_defaults(registry).await?;
+        }
+    }
+
+    info!("Governance configuration defaults initialized successfully");
+    Ok(())
+}
+
+/// Register values loaded from YAML files
+async fn register_yaml_values(
+    registry: &ConfigRegistry,
+    values: &std::collections::HashMap<String, serde_json::Value>,
+) -> Result<(), GovernanceError> {
+    // Helper to register a config value with appropriate category
+    let mut register_value = |key: &str, value: serde_json::Value, category: ConfigCategory, description: &str| async move {
+        // Check if already registered
+        if registry.get_config(key).await?.is_some() {
+            return Ok(());
+        }
+        
+        registry.register_config(
+            key,
+            category,
+            value.clone(),
+            Some(description),
+            5, // Tier 5 requirement
+            Some("yaml_loader"),
+        ).await
+    };
+
+    // Register tier thresholds
+    for tier in 1..=5 {
+        if let Some(sig_req) = values.get(&format!("tier_{}_signatures_required", tier)) {
+            register_value(
+                &format!("tier_{}_signatures_required", tier),
+                sig_req.clone(),
+                ConfigCategory::Thresholds,
+                &format!("Tier {}: Required maintainer signatures (out of total)", tier),
+            ).await?;
+        }
+        if let Some(sig_total) = values.get(&format!("tier_{}_signatures_total", tier)) {
+            register_value(
+                &format!("tier_{}_signatures_total", tier),
+                sig_total.clone(),
+                ConfigCategory::Thresholds,
+                &format!("Tier {}: Total maintainer signatures available", tier),
+            ).await?;
+        }
+        if let Some(review) = values.get(&format!("tier_{}_review_period_days", tier)) {
+            register_value(
+                &format!("tier_{}_review_period_days", tier),
+                review.clone(),
+                ConfigCategory::TimeWindows,
+                &format!("Tier {}: Minimum review period in days", tier),
+            ).await?;
+        }
+    }
+
+    // Register layer thresholds
+    for layer in ["1_2", "3", "4", "5"] {
+        if let Some(sig_req) = values.get(&format!("layer_{}_signatures_required", layer)) {
+            register_value(
+                &format!("layer_{}_signatures_required", layer),
+                sig_req.clone(),
+                ConfigCategory::Thresholds,
+                &format!("Layer {}: Required maintainer signatures", layer),
+            ).await?;
+        }
+        if let Some(sig_total) = values.get(&format!("layer_{}_signatures_total", layer)) {
+            register_value(
+                &format!("layer_{}_signatures_total", layer),
+                sig_total.clone(),
+                ConfigCategory::Thresholds,
+                &format!("Layer {}: Total maintainer signatures available", layer),
+            ).await?;
+        }
+        if let Some(review) = values.get(&format!("layer_{}_review_period_days", layer)) {
+            register_value(
+                &format!("layer_{}_review_period_days", layer),
+                review.clone(),
+                ConfigCategory::TimeWindows,
+                &format!("Layer {}: Minimum review period in days", layer),
+            ).await?;
+        }
+    }
+
+    // Register emergency tier values
+    for tier in 1..=3 {
+        if let Some(review) = values.get(&format!("emergency_tier_{}_review_period_days", tier)) {
+            register_value(
+                &format!("emergency_tier_{}_review_period_days", tier),
+                review.clone(),
+                ConfigCategory::TimeWindows,
+                &format!("Emergency Tier {}: Review period in days", tier),
+            ).await?;
+        }
+        if let Some(duration) = values.get(&format!("emergency_tier_{}_max_duration_days", tier)) {
+            register_value(
+                &format!("emergency_tier_{}_max_duration_days", tier),
+                duration.clone(),
+                ConfigCategory::TimeWindows,
+                &format!("Emergency Tier {}: Maximum duration in days", tier),
+            ).await?;
+        }
+        if let Some(sig_n) = values.get(&format!("emergency_tier_{}_signature_threshold_n", tier)) {
+            register_value(
+                &format!("emergency_tier_{}_signature_threshold_n", tier),
+                sig_n.clone(),
+                ConfigCategory::Thresholds,
+                &format!("Emergency Tier {}: Signature threshold N (of M)", tier),
+            ).await?;
+        }
+        if let Some(sig_m) = values.get(&format!("emergency_tier_{}_signature_threshold_m", tier)) {
+            register_value(
+                &format!("emergency_tier_{}_signature_threshold_m", tier),
+                sig_m.clone(),
+                ConfigCategory::Thresholds,
+                &format!("Emergency Tier {}: Signature threshold M (total)", tier),
+            ).await?;
+        }
+    }
+
+    // Register veto thresholds
+    for tier in 3..=5 {
+        if let Some(mining) = values.get(&format!("veto_tier_{}_mining_percent", tier)) {
+            register_value(
+                &format!("veto_tier_{}_mining_percent", tier),
+                mining.clone(),
+                ConfigCategory::Thresholds,
+                &format!("Tier {}: Mining hashpower veto threshold (%)", tier),
+            ).await?;
+        }
+        if let Some(economic) = values.get(&format!("veto_tier_{}_economic_percent", tier)) {
+            register_value(
+                &format!("veto_tier_{}_economic_percent", tier),
+                economic.clone(),
+                ConfigCategory::Thresholds,
+                &format!("Tier {}: Economic activity veto threshold (%)", tier),
+            ).await?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Register hardcoded defaults (fallback when YAML is not available)
+async fn register_hardcoded_defaults(
+    registry: &ConfigRegistry,
+) -> Result<(), GovernanceError> {
 
     // ============================================================================
     // ACTION TIER THRESHOLDS

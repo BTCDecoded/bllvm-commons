@@ -4,9 +4,10 @@
 //! configuration values with caching and fallback support.
 //!
 //! Fallback chain:
-//! 1. Config Registry (governance-controlled, can be changed via Tier 5)
-//! 2. YAML Config (file-based, for initial defaults)
-//! 3. Hardcoded defaults (safety fallback)
+//! 1. Cache (in-memory, 5-minute TTL)
+//! 2. Config Registry (database, governance-controlled, can be changed via Tier 5)
+//! 3. YAML Config (file-based, source of truth for initial defaults)
+//! 4. Hardcoded defaults (safety fallback)
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -15,13 +16,17 @@ use tracing::{debug, warn};
 
 use crate::error::GovernanceError;
 use crate::governance::config_registry::ConfigRegistry;
+use crate::governance::yaml_loader::YamlConfigLoader;
 use crate::config::loader::CommonsContributorThresholdsConfig;
+use std::path::PathBuf;
 
 /// Configuration reader with caching
 pub struct ConfigReader {
     registry: Arc<ConfigRegistry>,
     /// Optional YAML config for Commons contributor thresholds
     yaml_config: Option<CommonsContributorThresholdsConfig>,
+    /// Optional YAML loader for direct YAML file access (fallback)
+    yaml_loader: Option<YamlConfigLoader>,
     /// Cache for frequently accessed config values
     cache: Arc<RwLock<HashMap<String, serde_json::Value>>>,
     /// Cache TTL (seconds) - refresh cache periodically
@@ -34,6 +39,7 @@ impl ConfigReader {
         Self {
             registry,
             yaml_config: None,
+            yaml_loader: None,
             cache: Arc::new(RwLock::new(HashMap::new())),
             cache_ttl: 300, // 5 minutes default
         }
@@ -47,12 +53,27 @@ impl ConfigReader {
         Self {
             registry,
             yaml_config,
+            yaml_loader: None,
             cache: Arc::new(RwLock::new(HashMap::new())),
             cache_ttl: 300,
         }
     }
 
-    /// Get a configuration value (with caching)
+    /// Create with YAML loader for direct YAML file access (fallback)
+    pub fn with_yaml_loader(
+        registry: Arc<ConfigRegistry>,
+        yaml_loader: Option<YamlConfigLoader>,
+    ) -> Self {
+        Self {
+            registry,
+            yaml_config: None,
+            yaml_loader,
+            cache: Arc::new(RwLock::new(HashMap::new())),
+            cache_ttl: 300,
+        }
+    }
+
+    /// Get a configuration value (with caching and fallback chain)
     pub async fn get_value(&self, key: &str) -> Result<Option<serde_json::Value>, GovernanceError> {
         // Check cache first
         {
@@ -63,16 +84,31 @@ impl ConfigReader {
             }
         }
 
-        // Read from registry
+        // Try registry (database) - this should have YAML values synced
         let value = self.registry.get_current_value(key).await?;
 
-        // Cache the value
+        // If found in registry, cache and return
         if let Some(ref val) = value {
             let mut cache = self.cache.write().await;
             cache.insert(key.to_string(), val.clone());
+            return Ok(Some(val.clone()));
         }
 
-        Ok(value)
+        // Fallback to YAML files if loader is available
+        if let Some(ref yaml_loader) = self.yaml_loader {
+            if let Ok(yaml_values) = yaml_loader.extract_all_config_values() {
+                if let Some(yaml_value) = yaml_values.get(key) {
+                    debug!("Config value found in YAML: {}", key);
+                    // Cache the YAML value
+                    let mut cache = self.cache.write().await;
+                    cache.insert(key.to_string(), yaml_value.clone());
+                    return Ok(Some(yaml_value.clone()));
+                }
+            }
+        }
+
+        // Not found in registry or YAML
+        Ok(None)
     }
 
     /// Get a configuration value with fallback
@@ -459,13 +495,199 @@ impl ConfigReader {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::governance::config_registry::ConfigRegistry;
+    use crate::governance::config_registry::{ConfigRegistry, ConfigCategory};
     use sqlx::SqlitePool;
+
+    async fn create_test_registry() -> Arc<ConfigRegistry> {
+        // Use in-memory SQLite for testing
+        let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
+        let registry = ConfigRegistry::new(pool);
+        Arc::new(registry)
+    }
 
     #[tokio::test]
     async fn test_get_i32_with_fallback() {
-        // This would require a real database, so we'll test the logic
-        // In practice, you'd use a test database
+        let registry = create_test_registry().await;
+        let reader = ConfigReader::new(registry.clone());
+        
+        // Test fallback when key doesn't exist
+        let value = reader.get_i32("nonexistent_key", 42).await.unwrap();
+        assert_eq!(value, 42);
+    }
+
+    #[tokio::test]
+    async fn test_get_i32_from_registry() {
+        let registry = create_test_registry().await;
+        
+        // Register a test value
+        registry.register_config(
+            "test_int",
+            ConfigCategory::Thresholds,
+            serde_json::json!(100),
+            Some("Test integer"),
+            5,
+            Some("test"),
+        ).await.unwrap();
+        
+        let reader = ConfigReader::new(registry.clone());
+        let value = reader.get_i32("test_int", 0).await.unwrap();
+        assert_eq!(value, 100);
+    }
+
+    #[tokio::test]
+    async fn test_get_u32_with_fallback() {
+        let registry = create_test_registry().await;
+        let reader = ConfigReader::new(registry.clone());
+        
+        let value = reader.get_u32("nonexistent_key", 99).await.unwrap();
+        assert_eq!(value, 99);
+    }
+
+    #[tokio::test]
+    async fn test_get_f64_with_fallback() {
+        let registry = create_test_registry().await;
+        let reader = ConfigReader::new(registry.clone());
+        
+        let value = reader.get_f64("nonexistent_key", 3.14).await.unwrap();
+        assert_eq!(value, 3.14);
+    }
+
+    #[tokio::test]
+    async fn test_get_bool_with_fallback() {
+        let registry = create_test_registry().await;
+        let reader = ConfigReader::new(registry.clone());
+        
+        let value = reader.get_bool("nonexistent_key", true).await.unwrap();
+        assert!(value);
+    }
+
+    #[tokio::test]
+    async fn test_get_string_with_fallback() {
+        let registry = create_test_registry().await;
+        let reader = ConfigReader::new(registry.clone());
+        
+        let value = reader.get_string("nonexistent_key", "default").await.unwrap();
+        assert_eq!(value, "default");
+    }
+
+    #[tokio::test]
+    async fn test_get_threshold_pair() {
+        let registry = create_test_registry().await;
+        let reader = ConfigReader::new(registry.clone());
+        
+        // Test fallback
+        let (n, m) = reader.get_threshold_pair("nonexistent", (5, 7)).await.unwrap();
+        assert_eq!((n, m), (5, 7));
+        
+        // Test with valid format
+        registry.register_config(
+            "test_threshold",
+            ConfigCategory::Thresholds,
+            serde_json::json!("6-of-7"),
+            Some("Test threshold"),
+            5,
+            Some("test"),
+        ).await.unwrap();
+        
+        let (n, m) = reader.get_threshold_pair("test_threshold", (0, 0)).await.unwrap();
+        assert_eq!((n, m), (6, 7));
+    }
+
+    #[tokio::test]
+    async fn test_cache_invalidation() {
+        let registry = create_test_registry().await;
+        let reader = ConfigReader::new(registry.clone());
+        
+        // Register and read value
+        registry.register_config(
+            "cache_test",
+            ConfigCategory::Thresholds,
+            serde_json::json!(100),
+            Some("Cache test"),
+            5,
+            Some("test"),
+        ).await.unwrap();
+        
+        let value1 = reader.get_i32("cache_test", 0).await.unwrap();
+        assert_eq!(value1, 100);
+        
+        // Clear cache and verify it still works
+        reader.clear_cache().await;
+        let value2 = reader.get_i32("cache_test", 0).await.unwrap();
+        assert_eq!(value2, 100);
+        
+        // Invalidate specific key
+        reader.invalidate_key("cache_test").await;
+        let value3 = reader.get_i32("cache_test", 0).await.unwrap();
+        assert_eq!(value3, 100);
+    }
+
+    #[tokio::test]
+    async fn test_tier_signatures() {
+        let registry = create_test_registry().await;
+        let reader = ConfigReader::new(registry.clone());
+        
+        // Test default values
+        let (req, total) = reader.get_tier_signatures(1).await.unwrap();
+        assert_eq!((req, total), (3, 5));
+        
+        let (req, total) = reader.get_tier_signatures(3).await.unwrap();
+        assert_eq!((req, total), (5, 5));
+    }
+
+    #[tokio::test]
+    async fn test_tier_review_period() {
+        let registry = create_test_registry().await;
+        let reader = ConfigReader::new(registry.clone());
+        
+        // Test default values
+        let period = reader.get_tier_review_period(1).await.unwrap();
+        assert_eq!(period, 7);
+        
+        let period = reader.get_tier_review_period(3).await.unwrap();
+        assert_eq!(period, 90);
+    }
+
+    #[tokio::test]
+    async fn test_layer_signatures() {
+        let registry = create_test_registry().await;
+        let reader = ConfigReader::new(registry.clone());
+        
+        // Test default values
+        let (req, total) = reader.get_layer_signatures(1).await.unwrap();
+        assert_eq!((req, total), (6, 7));
+        
+        let (req, total) = reader.get_layer_signatures(4).await.unwrap();
+        assert_eq!((req, total), (3, 5));
+    }
+
+    #[tokio::test]
+    async fn test_veto_thresholds() {
+        let registry = create_test_registry().await;
+        let reader = ConfigReader::new(registry.clone());
+        
+        // Test default values
+        let (mining, economic) = reader.get_veto_thresholds(3).await.unwrap();
+        assert_eq!((mining, economic), (30.0, 40.0));
+        
+        let (mining, economic) = reader.get_veto_thresholds(4).await.unwrap();
+        assert_eq!((mining, economic), (25.0, 35.0));
+    }
+
+    #[tokio::test]
+    async fn test_emergency_tier_config() {
+        let registry = create_test_registry().await;
+        let reader = ConfigReader::new(registry.clone());
+        
+        // Test default values
+        let review_period = reader.get_emergency_tier_config(1, "review_period_days").await.unwrap();
+        assert_eq!(review_period, 0);
+        
+        let max_duration = reader.get_emergency_tier_config(1, "max_duration_days").await.unwrap();
+        assert_eq!(max_duration, 7);
+        
+        let sig_threshold = reader.get_emergency_tier_config(2, "signature_threshold").await.unwrap();
+        assert_eq!(sig_threshold, 5);
     }
 }
 

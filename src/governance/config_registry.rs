@@ -7,9 +7,11 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{Row, SqlitePool};
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tracing::{debug, info, warn};
 use crate::error::GovernanceError;
+use crate::governance::yaml_loader::YamlConfigLoader;
 
 /// Configuration category for organizing configurable parameters
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -125,6 +127,8 @@ pub struct ConfigRegistry {
     pool: SqlitePool,
     /// Optional ConfigReader for automatic cache invalidation
     config_reader: Option<Arc<crate::governance::config_reader::ConfigReader>>,
+    /// Optional path to governance config directory (for YAML sync)
+    config_path: Option<PathBuf>,
 }
 
 impl ConfigRegistry {
@@ -132,7 +136,13 @@ impl ConfigRegistry {
         Self {
             pool,
             config_reader: None,
+            config_path: None,
         }
+    }
+
+    /// Set the governance config path for YAML sync
+    pub fn set_config_path(&mut self, config_path: PathBuf) {
+        self.config_path = Some(config_path);
     }
 
     /// Create with ConfigReader for automatic cache invalidation
@@ -143,6 +153,7 @@ impl ConfigRegistry {
         Self {
             pool,
             config_reader: Some(config_reader),
+            config_path: None,
         }
     }
 
@@ -413,6 +424,14 @@ impl ConfigRegistry {
             debug!("Invalidated ConfigReader cache for key: {}", config_key);
         }
 
+        // Sync to YAML if config path is set
+        if let Some(ref config_path) = self.config_path {
+            if let Err(e) = self.sync_to_yaml(&config_key, &change.proposed_value, config_path.clone()).await {
+                warn!("Failed to sync config change to YAML: {}", e);
+                // Don't fail activation if YAML sync fails
+            }
+        }
+
         Ok(config_key)
     }
 
@@ -620,6 +639,158 @@ impl ConfigRegistry {
         })?;
 
         info!("Linked configuration change {} to PR {}", change_id, pr_id);
+        Ok(())
+    }
+
+    /// Sync configuration values from YAML files to database
+    /// This is called on startup to ensure database is in sync with YAML source of truth
+    /// Only updates values if they differ (preserves governance-controlled changes)
+    pub async fn sync_from_yaml(
+        &self,
+        config_path: PathBuf,
+    ) -> Result<usize, GovernanceError> {
+        info!("Syncing configuration from YAML files: {:?}", config_path);
+
+        let yaml_loader = YamlConfigLoader::new(config_path);
+        let yaml_values = yaml_loader.extract_all_config_values()?;
+
+        let mut updated_count = 0;
+
+        for (config_key, yaml_value) in yaml_values {
+            // Check if config exists in database
+            if let Some(mut entry) = self.get_config(&config_key).await? {
+                // Compare YAML value with database value
+                let db_value_str = serde_json::to_string(&entry.current_value)
+                    .map_err(|e| GovernanceError::ConfigError(format!("Failed to serialize DB value: {}", e)))?;
+                let yaml_value_str = serde_json::to_string(&yaml_value)
+                    .map_err(|e| GovernanceError::ConfigError(format!("Failed to serialize YAML value: {}", e)))?;
+
+                // Only update if values differ
+                if db_value_str != yaml_value_str {
+                    // Check if this value was changed via governance (has history)
+                    let has_governance_history = sqlx::query(
+                        r#"
+                        SELECT COUNT(*) FROM governance_config_history
+                        WHERE config_key = ? AND activation_method = 'governance_approved'
+                        "#,
+                    )
+                    .bind(&config_key)
+                    .fetch_one(&self.pool)
+                    .await
+                    .map_err(|e| {
+                        GovernanceError::DatabaseError(format!("Failed to check history: {}", e))
+                    })?;
+
+                    let history_count: i64 = has_governance_history.get(0);
+
+                    // Only sync if no governance history (YAML is source of truth for initial values)
+                    if history_count == 0 {
+                        let now = Utc::now().timestamp();
+                        sqlx::query(
+                            r#"
+                            UPDATE governance_config_registry
+                            SET current_value = ?, updated_at = ?
+                            WHERE config_key = ?
+                            "#,
+                        )
+                        .bind(&yaml_value_str)
+                        .bind(now)
+                        .bind(&config_key)
+                        .execute(&self.pool)
+                        .await
+                        .map_err(|e| {
+                            GovernanceError::DatabaseError(format!("Failed to sync config: {}", e))
+                        })?;
+
+                        // Record sync in history
+                        sqlx::query(
+                            r#"
+                            INSERT INTO governance_config_history
+                            (config_key, old_value, new_value, changed_at, changed_by, activation_method)
+                            VALUES (?, ?, ?, ?, ?, 'yaml_sync')
+                            "#,
+                        )
+                        .bind(&config_key)
+                        .bind(&db_value_str)
+                        .bind(&yaml_value_str)
+                        .bind(now)
+                        .bind("yaml_sync")
+                        .execute(&self.pool)
+                        .await
+                        .map_err(|e| {
+                            GovernanceError::DatabaseError(format!("Failed to record sync history: {}", e))
+                        })?;
+
+                        updated_count += 1;
+                        info!("Synced config from YAML: {} = {}", config_key, yaml_value_str);
+                    } else {
+                        debug!("Skipping sync for {} (has governance history)", config_key);
+                    }
+                }
+            } else {
+                // Config doesn't exist in database, register it
+                // Determine category from key
+                let category = if config_key.contains("tier_") || config_key.contains("layer_") || config_key.contains("veto_") {
+                    ConfigCategory::Thresholds
+                } else if config_key.contains("review_period") || config_key.contains("duration") || config_key.contains("period") {
+                    ConfigCategory::TimeWindows
+                } else if config_key.contains("max_") || config_key.contains("min_") {
+                    ConfigCategory::Limits
+                } else {
+                    ConfigCategory::Other
+                };
+
+                self.register_config(
+                    &config_key,
+                    category,
+                    yaml_value,
+                    Some(&format!("Synced from YAML: {}", config_key)),
+                    5,
+                    Some("yaml_sync"),
+                ).await?;
+                updated_count += 1;
+            }
+        }
+
+        info!("YAML sync completed: {} configs updated", updated_count);
+        Ok(updated_count)
+    }
+
+    /// Sync a configuration change back to YAML file
+    /// This is called when a governance change is activated
+    /// Note: This is a placeholder - actual YAML file updates would require git operations
+    pub async fn sync_to_yaml(
+        &self,
+        config_key: &str,
+        new_value: &serde_json::Value,
+        config_path: PathBuf,
+    ) -> Result<(), GovernanceError> {
+        info!("Syncing config change to YAML: {} = {:?}", config_key, new_value);
+
+        // This is a placeholder implementation
+        // In a full implementation, this would:
+        // 1. Load the appropriate YAML file
+        // 2. Update the value in the YAML structure
+        // 3. Write the YAML file back
+        // 4. Optionally create a git commit or PR
+
+        // For now, we just log the change
+        // A full implementation would require:
+        // - YAML file structure mapping (reverse of extract_all_config_values)
+        // - Git operations for committing changes
+        // - Or creating a PR with the changes
+
+        warn!("YAML sync to file not yet fully implemented. Config change: {} = {:?}", config_key, new_value);
+        warn!("YAML file update would be: {:?}", config_path);
+
+        // TODO: Implement full YAML file update
+        // This would involve:
+        // 1. Mapping config_key back to YAML structure (e.g., "tier_1_signatures_required" -> "tiers.tier_1_routine.signatures.required")
+        // 2. Loading the YAML file
+        // 3. Updating the value
+        // 4. Writing back to file
+        // 5. Optionally committing to git or creating a PR
+
         Ok(())
     }
 }
