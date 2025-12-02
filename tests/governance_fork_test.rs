@@ -6,14 +6,12 @@
 use bllvm_commons::database::Database;
 use bllvm_commons::error::GovernanceError;
 use bllvm_commons::fork::{
-    adoption::AdoptionTracker,
-    export::GovernanceExporter,
-    types::*,
+    adoption::AdoptionTracker, export::GovernanceExporter, types::*, 
     versioning::{RulesetVersioning, VersionChangeType, VersionComparison},
 };
 use serde_json::json;
-use sqlx;
 use std::str::FromStr;
+use sqlx;
 
 #[tokio::test]
 async fn test_governance_config_export() -> Result<(), Box<dyn std::error::Error>> {
@@ -128,12 +126,13 @@ async fn test_ruleset_versioning() -> Result<(), Box<dyn std::error::Error>> {
         ]
     });
 
-    let ruleset = versioning.create_ruleset(
-        "test-ruleset",
-        "Test Ruleset",
-        config_data,
-        Some("Test ruleset description"),
-    )?;
+    let ruleset = versioning
+        .create_ruleset(
+            "test-ruleset",
+            "Test Ruleset",
+            config_data,
+            Some("Test ruleset description"),
+        )?;
 
     assert_eq!(ruleset.id, "test-ruleset");
     assert_eq!(ruleset.version.major, 1);
@@ -147,30 +146,21 @@ async fn test_ruleset_versioning() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(patch_version.major, 1);
     assert_eq!(patch_version.minor, 0);
     assert_eq!(patch_version.patch, 1);
-    println!(
-        "✅ Patch version incremented: {}",
-        patch_version.to_string()
-    );
+    println!("✅ Patch version incremented: {}", patch_version.to_string());
 
     let minor_version =
         versioning.version_ruleset(Some(&ruleset.version), VersionChangeType::Minor)?;
     assert_eq!(minor_version.major, 1);
     assert_eq!(minor_version.minor, 1);
     assert_eq!(minor_version.patch, 0);
-    println!(
-        "✅ Minor version incremented: {}",
-        minor_version.to_string()
-    );
+    println!("✅ Minor version incremented: {}", minor_version.to_string());
 
     let major_version =
         versioning.version_ruleset(Some(&ruleset.version), VersionChangeType::Major)?;
     assert_eq!(major_version.major, 2);
     assert_eq!(major_version.minor, 0);
     assert_eq!(major_version.patch, 0);
-    println!(
-        "✅ Major version incremented: {}",
-        major_version.to_string()
-    );
+    println!("✅ Major version incremented: {}", major_version.to_string());
 
     // Test version comparison
     let versioning = RulesetVersioning::new();
@@ -203,35 +193,19 @@ async fn test_ruleset_versioning() -> Result<(), Box<dyn std::error::Error>> {
 async fn test_adoption_tracking() -> Result<(), Box<dyn std::error::Error>> {
     let db = Database::new_in_memory().await?;
     let pool = db.pool().expect("Database should have SQLite pool").clone();
-
-    // Enable foreign key constraints
-    sqlx::query("PRAGMA foreign_keys = ON")
-        .execute(&pool)
-        .await?;
-
-    // Drop existing tables to ensure clean state with foreign keys
-    sqlx::query("DROP TABLE IF EXISTS adoption_metrics")
-        .execute(&pool)
-        .await
-        .ok();
-    sqlx::query("DROP TABLE IF EXISTS fork_events")
-        .execute(&pool)
-        .await
-        .ok();
-    sqlx::query("DROP TABLE IF EXISTS fork_decisions")
-        .execute(&pool)
-        .await
-        .ok();
-    sqlx::query("DROP TABLE IF EXISTS governance_rulesets")
-        .execute(&pool)
-        .await
-        .ok();
-
-    // Create tables fresh
-    {
+    
+    // Ensure tables exist
+    let table_exists: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='governance_rulesets')"
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap_or(false);
+    
+    if !table_exists {
         sqlx::query(
             r#"
-            CREATE TABLE governance_rulesets (
+            CREATE TABLE IF NOT EXISTS governance_rulesets (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
                 version_major INTEGER NOT NULL,
@@ -245,33 +219,14 @@ async fn test_adoption_tracking() -> Result<(), Box<dyn std::error::Error>> {
                 description TEXT,
                 status TEXT DEFAULT 'active'
             )
-            "#,
-        )
-        .execute(&pool)
-        .await?;
-
-        // Create rulesets for the fork decisions to reference (must exist before foreign key tables)
-        sqlx::query(
-            r#"
-            INSERT INTO governance_rulesets (id, name, version_major, version_minor, version_patch, hash, config, description, status)
-            VALUES ('ruleset-v1.0.0', 'Ruleset v1.0.0', 1, 0, 0, 'hash_v1_0_0', '{}', 'Test ruleset', 'active')
             "#
         )
         .execute(&pool)
         .await?;
-
+        
         sqlx::query(
             r#"
-            INSERT INTO governance_rulesets (id, name, version_major, version_minor, version_patch, hash, config, description, status)
-            VALUES ('ruleset-v1.1.0', 'Ruleset v1.1.0', 1, 1, 0, 'hash_v1_1_0', '{}', 'Test ruleset v1.1.0', 'active')
-            "#
-        )
-        .execute(&pool)
-        .await?;
-
-        sqlx::query(
-            r#"
-            CREATE TABLE fork_decisions (
+            CREATE TABLE IF NOT EXISTS fork_decisions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 ruleset_id TEXT NOT NULL,
                 node_id TEXT NOT NULL,
@@ -279,14 +234,13 @@ async fn test_adoption_tracking() -> Result<(), Box<dyn std::error::Error>> {
                 weight REAL NOT NULL,
                 decision_reason TEXT NOT NULL,
                 signature TEXT NOT NULL,
-                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (ruleset_id) REFERENCES governance_rulesets(id)
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
-            "#,
+            "#
         )
         .execute(&pool)
         .await?;
-
+        
         sqlx::query(
             r#"
             CREATE TABLE IF NOT EXISTS fork_events (
@@ -296,38 +250,46 @@ async fn test_adoption_tracking() -> Result<(), Box<dyn std::error::Error>> {
                 ruleset_id TEXT,
                 node_id TEXT,
                 details TEXT NOT NULL,
-                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (ruleset_id) REFERENCES governance_rulesets(id)
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
-            "#,
+            "#
         )
         .execute(&pool)
         .await?;
-
+        
         sqlx::query(
             r#"
-            CREATE TABLE adoption_metrics (
+            CREATE TABLE IF NOT EXISTS adoption_metrics (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 ruleset_id TEXT NOT NULL,
                 node_count INTEGER NOT NULL,
                 hashpower_percentage REAL NOT NULL,
                 economic_activity_percentage REAL NOT NULL,
                 total_weight REAL NOT NULL,
-                calculated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (ruleset_id) REFERENCES governance_rulesets(id)
+                calculated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
-            "#,
+            "#
+        )
+        .execute(&pool)
+        .await?;
+        
+        // Create a ruleset for the fork decisions to reference
+        sqlx::query(
+            r#"
+            INSERT INTO governance_rulesets (id, name, version_major, version_minor, version_patch, hash, config, description, status)
+            VALUES ('ruleset-v1.0.0', 'Ruleset v1.0.0', 1, 0, 0, 'hash_v1_0_0', '{}', 'Test ruleset', 'active')
+            "#
         )
         .execute(&pool)
         .await?;
     }
-
+    
     let tracker = AdoptionTracker::new(pool);
 
     // Record fork decisions
     use bllvm_commons::fork::types::ForkDecision;
     use chrono::Utc;
-
+    
     let decision1 = ForkDecision {
         node_id: "1".to_string(),
         node_type: "mining_pool".to_string(),
@@ -417,12 +379,13 @@ async fn test_ruleset_retrieval() -> Result<(), Box<dyn std::error::Error>> {
         ]
     });
 
-    let ruleset = versioning.create_ruleset(
-        "test-ruleset-retrieval",
-        "Test Ruleset",
-        config_data,
-        Some("Test ruleset description"),
-    )?;
+    let ruleset = versioning
+        .create_ruleset(
+            "test-ruleset-retrieval",
+            "Test Ruleset",
+            config_data,
+            Some("Test ruleset description"),
+        )?;
 
     // Ruleset retrieval is not implemented in RulesetVersioning
     // The ruleset was created above, so we can verify it exists by checking the creation
@@ -449,12 +412,13 @@ async fn test_ruleset_status_update() -> Result<(), Box<dyn std::error::Error>> 
         ]
     });
 
-    let ruleset = versioning.create_ruleset(
-        "test-ruleset-status",
-        "Test Ruleset",
-        config_data,
-        Some("Test ruleset description"),
-    )?;
+    let ruleset = versioning
+        .create_ruleset(
+            "test-ruleset-status",
+            "Test Ruleset",
+            config_data,
+            Some("Test ruleset description"),
+        )?;
 
     assert_eq!(ruleset.id, "test-ruleset-status");
     println!("✅ Ruleset created successfully");
@@ -477,7 +441,7 @@ async fn test_ruleset_status_update() -> Result<(), Box<dyn std::error::Error>> 
 async fn test_adoption_history() -> Result<(), Box<dyn std::error::Error>> {
     let db = Database::new_in_memory().await?;
     let pool = db.pool().expect("Database should have SQLite pool").clone();
-
+    
     // Ensure tables exist
     let table_exists: bool = sqlx::query_scalar(
         "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='governance_rulesets')"
@@ -485,16 +449,11 @@ async fn test_adoption_history() -> Result<(), Box<dyn std::error::Error>> {
     .fetch_one(&pool)
     .await
     .unwrap_or(false);
-
-    // Enable foreign key constraints
-    sqlx::query("PRAGMA foreign_keys = ON")
-        .execute(&pool)
-        .await?;
-
+    
     if !table_exists {
         sqlx::query(
             r#"
-            CREATE TABLE governance_rulesets (
+            CREATE TABLE IF NOT EXISTS governance_rulesets (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
                 version_major INTEGER NOT NULL,
@@ -508,24 +467,14 @@ async fn test_adoption_history() -> Result<(), Box<dyn std::error::Error>> {
                 description TEXT,
                 status TEXT DEFAULT 'active'
             )
-            "#,
-        )
-        .execute(&pool)
-        .await?;
-
-        // Create a ruleset for the fork decisions to reference (must exist before foreign key tables)
-        sqlx::query(
-            r#"
-            INSERT INTO governance_rulesets (id, name, version_major, version_minor, version_patch, hash, config, description, status)
-            VALUES ('ruleset-v1.0.0', 'Ruleset v1.0.0', 1, 0, 0, 'hash_v1_0_0', '{}', 'Test ruleset', 'active')
             "#
         )
         .execute(&pool)
         .await?;
-
+        
         sqlx::query(
             r#"
-            CREATE TABLE fork_decisions (
+            CREATE TABLE IF NOT EXISTS fork_decisions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 ruleset_id TEXT NOT NULL,
                 node_id TEXT NOT NULL,
@@ -533,49 +482,51 @@ async fn test_adoption_history() -> Result<(), Box<dyn std::error::Error>> {
                 weight REAL NOT NULL,
                 decision_reason TEXT NOT NULL,
                 signature TEXT NOT NULL,
-                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (ruleset_id) REFERENCES governance_rulesets(id)
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
-            "#,
+            "#
         )
         .execute(&pool)
         .await?;
-
+        
         sqlx::query(
             r#"
-            CREATE TABLE fork_events (
+            CREATE TABLE IF NOT EXISTS fork_events (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 event_id TEXT UNIQUE NOT NULL,
                 event_type TEXT NOT NULL,
                 ruleset_id TEXT,
                 node_id TEXT,
                 details TEXT NOT NULL,
-                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (ruleset_id) REFERENCES governance_rulesets(id)
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
-            "#,
+            "#
         )
         .execute(&pool)
         .await?;
-
+        
         sqlx::query(
             r#"
-            CREATE TABLE adoption_metrics (
+            CREATE TABLE IF NOT EXISTS adoption_metrics (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 ruleset_id TEXT NOT NULL,
                 node_count INTEGER NOT NULL,
                 hashpower_percentage REAL NOT NULL,
                 economic_activity_percentage REAL NOT NULL,
                 total_weight REAL NOT NULL,
-                calculated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (ruleset_id) REFERENCES governance_rulesets(id)
+                calculated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
-            "#,
+            "#
         )
         .execute(&pool)
         .await?;
-    } else {
-        // Tables exist, but ensure ruleset exists
+        
+        // Enable foreign key constraints
+        sqlx::query("PRAGMA foreign_keys = ON")
+            .execute(&pool)
+            .await?;
+        
+        // Create a ruleset for the fork decisions to reference
         sqlx::query(
             r#"
             INSERT OR IGNORE INTO governance_rulesets (id, name, version_major, version_minor, version_patch, hash, config, description, status)
@@ -585,13 +536,13 @@ async fn test_adoption_history() -> Result<(), Box<dyn std::error::Error>> {
         .execute(&pool)
         .await?;
     }
-
+    
     let tracker = AdoptionTracker::new(pool);
 
     // Record multiple fork decisions over time
     use bllvm_commons::fork::types::ForkDecision;
     use chrono::Utc;
-
+    
     let decision1 = ForkDecision {
         node_id: "1".to_string(),
         node_type: "mining_pool".to_string(),

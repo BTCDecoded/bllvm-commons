@@ -1,0 +1,77 @@
+#!/bin/bash
+# Bitcoin Commons Unified CLI
+# Usage: ./bllvm [command] [component] [options]
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+show_usage() {
+    cat << EOF
+Bitcoin Commons Unified CLI
+
+Usage:
+  ./bllvm [command] [component] [options]
+
+Commands:
+  install     Install a component
+  update       Update an installed component
+  uninstall   Remove an installed component
+  status       Show status of installed components
+
+Components:
+  bllvm        BLLVM node (base build)
+  experimental Experimental node (UTXO commitments + features)
+  commons      Governance app (bllvm-commons)
+
+Examples:
+  # Install
+  sudo ./bllvm install bllvm --public-ip 1.2.3.4
+  sudo ./bllvm install experimental --public-ip 1.2.3.4
+  sudo ./bllvm install commons --github-app-id 123456
+
+  # Update
+  sudo ./bllvm update bllvm
+  sudo ./bllvm update experimental --version v1.0.0
+
+  # Uninstall
+  sudo ./bllvm uninstall bllvm
+  sudo ./bllvm uninstall experimental
+
+  # Status
+  ./bllvm status
+
+EOF
+}
+
+COMMAND="${1:-}"
+if [ -z "$COMMAND" ]; then
+    show_usage
+    exit 1
+fi
+shift
+
+case "$COMMAND" in
+    install)
+        exec "$SCRIPT_DIR/install.sh" "$@"
+        ;;
+    update)
+        exec "$SCRIPT_DIR/update.sh" "$@"
+        ;;
+    uninstall)
+        exec "$SCRIPT_DIR/uninstall.sh" "$@"
+        ;;
+    status)
+        exec "$SCRIPT_DIR/status.sh" "$@"
+        ;;
+    help|--help|-h)
+        show_usage
+        exit 0
+        ;;
+    *)
+        echo "❌ Unknown command: $COMMAND"
+        show_usage
+        exit 1
+        ;;
+esac
+

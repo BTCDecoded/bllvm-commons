@@ -1,0 +1,118 @@
+version: '3.8'
+
+services:
+  # Governance App (bllvm-commons)
+  governance-app:
+    image: ghcr.io/btcdecoded/governance-app:latest
+    container_name: bllvm-commons
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_URL=sqlite:///app/data/governance.db
+      - GITHUB_APP_ID=${GITHUB_APP_ID:-123456}
+      - GITHUB_PRIVATE_KEY_PATH=/app/keys/github-app.pem
+      - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET}
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=8080
+      - SERVER_ID=governance-01
+      - NOSTR_ENABLED=true
+      - NOSTR_SERVER_NSEC_PATH=/app/keys/nostr/gov.nsec
+      - NOSTR_RELAYS=wss://relay.damus.io,wss://nos.lol,wss://relay.nostr.band
+      - NOSTR_PUBLISH_INTERVAL_SECS=3600
+      - GOVERNANCE_CONFIG=commons_mainnet
+      - NOSTR_ZAP_ADDRESS=${NOSTR_ZAP_ADDRESS:-donations@btcdecoded.org}
+      - NOSTR_LOGO_URL=https://btcdecoded.org/assets/bitcoin-commons-logo.png
+      - OTS_ENABLED=true
+      - OTS_AGGREGATOR_URL=https://alice.btc.calendar.opentimestamps.org
+      - AUDIT_ENABLED=true
+      - RUST_LOG=info
+    volumes:
+      - ./governance-data:/app/data
+      - ./governance-keys:/app/keys
+      - ./governance-config:/app/config
+      - ./governance-logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Archival Node (Base Build - Full History)
+  archival-node:
+    image: ghcr.io/btcdecoded/bllvm:latest
+    container_name: bllvm-archival
+    ports:
+      - "8332:8332"  # RPC
+      - "8333:8333"  # P2P
+    environment:
+      - RUST_LOG=info
+      - RPC_USER=${RPC_USER:-btc}
+      - RPC_PASSWORD=${RPC_PASSWORD}
+    volumes:
+      - ./archival-data:/app/data
+      - ./archival-config:/app/config
+    command: ["bllvm", "--config", "/app/config/config.toml"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-u", "${RPC_USER:-btc}:${RPC_PASSWORD}", "http://localhost:8332"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+
+  # UTXO Commitment Node 1 (Experimental Build)
+  utxo-node-1:
+    image: ghcr.io/btcdecoded/bllvm-experimental:latest
+    container_name: bllvm-utxo-1
+    ports:
+      - "8335:8335"  # RPC
+      - "8334:8334"  # P2P
+    environment:
+      - RUST_LOG=info
+      - RPC_USER=${RPC_USER:-btc}
+      - RPC_PASSWORD=${RPC_PASSWORD}
+    volumes:
+      - ./utxo-1-data:/app/data
+      - ./utxo-1-config:/app/config
+    command: ["bllvm", "--config", "/app/config/config.toml"]
+    restart: unless-stopped
+
+  # UTXO Commitment Node 2 (Experimental Build)
+  utxo-node-2:
+    image: ghcr.io/btcdecoded/bllvm-experimental:latest
+    container_name: bllvm-utxo-2
+    ports:
+      - "8336:8336"  # RPC
+      - "8337:8337"  # P2P
+    environment:
+      - RUST_LOG=info
+      - RPC_USER=${RPC_USER:-btc}
+      - RPC_PASSWORD=${RPC_PASSWORD}
+    volumes:
+      - ./utxo-2-data:/app/data
+      - ./utxo-2-config:/app/config
+    command: ["bllvm", "--config", "/app/config/config.toml"]
+    restart: unless-stopped
+
+  # UTXO Commitment Node 3 (Experimental Build)
+  utxo-node-3:
+    image: ghcr.io/btcdecoded/bllvm-experimental:latest
+    container_name: bllvm-utxo-3
+    ports:
+      - "8338:8338"  # RPC
+      - "8339:8339"  # P2P
+    environment:
+      - RUST_LOG=info
+      - RPC_USER=${RPC_USER:-btc}
+      - RPC_PASSWORD=${RPC_PASSWORD}
+    volumes:
+      - ./utxo-3-data:/app/data
+      - ./utxo-3-config:/app/config
+    command: ["bllvm", "--config", "/app/config/config.toml"]
+    restart: unless-stopped
+
+networks:
+  default:
+    name: btc-commons-network
+

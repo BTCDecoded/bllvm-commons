@@ -1,31 +1,35 @@
-# Governance App Scripts
+# Scripts Directory
 
-This directory contains setup, testing, and deployment scripts for the governance-app.
+This directory contains utility scripts for benchmarking and analysis.
 
-## Scripts
+## Scripts Overview
 
-### Setup Scripts
-- `setup-production.sh` - Set up production environment
-- `setup-testnet.sh` - Set up testnet environment
-- `setup_sqlx.sh` - Set up SQLx for database migrations
-- `generate-test-keys.sh` - Generate test cryptographic keys
+### Benchmarking Scripts
+- `benchmark_comparison.sh` - Compare benchmark results
+- `benchmark_bitcoin_core.py` - Benchmark Bitcoin Core
+- `compare_benchmarks.py` - Compare benchmark data
+- `export_benchmarks.py` - Export benchmark results
+- `view_results.py` - View benchmark results
 
-### Testing Scripts
-- `testnet-test-suite.sh` - Run testnet test suite
-- `test_cross_layer_sync.sh` - Test cross-layer synchronization
-- `verify-integration.sh` - Verify integration
-- `verify-server.sh` - Verify server setup
+### Documentation
+- `README.md` - This file
+- `README_BENCHMARKING.md` - Benchmarking guide
+- `BENCHMARK_IMPROVEMENTS.md` - Benchmark improvements
 
-### Database Scripts
-- `migrate_sqlite_to_postgres.sh` - Migrate from SQLite to PostgreSQL
-- `backup_sqlite.sh` - Backup SQLite database
+## Other Script Locations
+
+### Component Scripts
+- `commons/scripts/` - Build and CI scripts
+- `commons/tools/` - Build tools
+- `bllvm-consensus/scripts/` - Test data scripts
+- `bllvm-consensus/fuzz/` - Fuzzing scripts
+- `governance-app/scripts/` - Governance app setup scripts
+
+### Root Scripts
+- `check_and_push_all.sh` - Check git status for all repos
 
 ## Usage
 
-See [governance-app/README.md](../README.md) for governance-app documentation and usage instructions.
-
-## Related
-
-- `../config/` - Configuration files
-- `../docs/` - Application documentation
-
+See individual script files for usage instructions, or check:
+- `README_BENCHMARKING.md` for benchmarking scripts
+- Component-specific README files for component scripts

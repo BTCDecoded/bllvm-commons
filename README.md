@@ -1,463 +1,158 @@
-# Bitcoin Commons (bllvm-commons)
+# Bitcoin Commons Governance System
 
-Rust-based GitHub App for enforcing cryptographic governance rules across all Bitcoin Commons repositories.
+## Status
 
-## ⚠️ DEPLOYMENT WARNING
+**Phase 1 (Infrastructure Building)**: System not yet activated or tested in production.
 
-**This application is currently UNRELEASED and UNTESTED in production.**
+Contains the Bitcoin Commons governance and implementation ecosystem, managed by the BTCDecoded GitHub organization. Implements a constitutional governance model that makes Bitcoin governance 6x harder to capture than Bitcoin Core's current model.
 
-> **For verified system status**: See [SYSTEM_STATUS.md](https://github.com/BTCDecoded/.github/blob/main/SYSTEM_STATUS.md) in the Bitcoin Commons organization repository.
+## Important Disclaimers
 
-### Current Status: Phase 1 (Infrastructure Building)
+- **Infrastructure Complete**: All core components implemented
+- **Not Yet Activated**: Governance rules are not enforced
+- **Test Keys Only**: No real cryptographic enforcement
+- **Experimental Software**: Use at your own risk
 
-- ✅ **Core Infrastructure**: All major components implemented
-- ✅ **Database Schema**: Complete with migrations
-- ✅ **Economic Node System**: Registry and veto mechanism
-- ✅ **GitHub Integration**: Status checks and merge blocking (octocrab 0.38)
-- ✅ **Comprehensive Testing**: Full test suite implemented
-- ✅ **OTS Registry**: Database queries implemented for registry generation
-- ✅ **Nostr Integration**: Payment hash extraction and audit log info implemented
-- ✅ **Consensus Verification**: Diff parsing for import-only validation implemented
-- ⚠️ **NOT ACTIVATED**: Governance rules are not enforced
-- 🔧 **Test Keys Only**: No real cryptographic enforcement (maintainer keys need replacement)
+## 📁 Project Structure
 
-### What This Means
+For a detailed overview of the project directory structure, see [DIRECTORY_STRUCTURE.md](./DIRECTORY_STRUCTURE.md).
 
-- **Production Quality**: The codebase is well-structured and production-quality
-- **Not Battle-Tested**: Has not been tested in real-world production scenarios
-- **Rapid Development**: System is in active AI-assisted development
-- **Expect Changes**: APIs, interfaces, and behavior may change frequently
-- **Use at Your Own Risk**: This is experimental software
+For comprehensive system status and verified implementation status, see [SYSTEM_STATUS.md](./SYSTEM_STATUS.md).
 
-## Quick Navigation
+**📚 Documentation**: See [Documentation Index](./docs/INDEX.md) for complete navigation of all documentation.
 
-### For New Users
-- [Getting Started Guide](docs/GETTING_STARTED.md) - Quick setup and first steps
-- [Configuration Reference](docs/CONFIGURATION.md) - How to configure the application
-- [Verification Guide](docs/VERIFICATION.md) - How to verify system integrity
-- [Troubleshooting Guide](docs/TROUBLESHOOTING.md) - Common issues and solutions
+## 🏗️ Architecture Overview
 
-### For Developers
-- [API Reference](docs/API_REFERENCE.md) - Complete API documentation
-- [Development Guide](docs/DEVELOPMENT.md) - Development and contribution guidelines
-- [Configuration Integration](docs/CONFIG_INTEGRATION.md) - How app uses governance configs
-- [Nostr Integration](docs/NOSTR_INTEGRATION.md) - Real-time transparency system
-- [OTS Integration](docs/OTS_INTEGRATION.md) - Bitcoin blockchain anchoring
-- [Audit Log System](docs/AUDIT_LOG_SYSTEM.md) - Tamper-evident logging
-- [Server Authorization](docs/SERVER_AUTHORIZATION.md) - Server authorization system
+### Constitutional Governance Model
 
-### For Administrators
-- [Deployment Guide](docs/deployment/DEPLOYMENT.md) - Production deployment guide
-- [Deployment Requirements](docs/deployment/DEPLOYMENT_REQUIREMENTS.md) - Quick deployment reference
-- [Security Guide](SECURITY.md) - Security configuration and best practices
-- [Main Governance Documentation](../governance/README.md) - System overview
+Bitcoin Commons implements a 5-tier constitutional governance system:
 
-### For Build System
-- [Build Orchestration](docs/build/BUILD_ORCHESTRATION_IMPLEMENTATION.md) - Build system implementation
-- [Build System Consistency](docs/build/BUILD_SYSTEM_CONSISTENCY_ANALYSIS.md) - Workflow consistency analysis
-- [Completion Plan](docs/build/BLLVM_COMMONS_COMPLETION_PLAN.md) - Build system completion roadmap
-- [Release Inclusion](docs/build/RELEASE_INCLUSION.md) - How binaries are included in releases
+1. **Tier 1: Routine Maintenance** (3-of-5, 7 days)
+   - Bug fixes, documentation, performance optimizations
+   - Non-consensus changes only
 
-### For Testing
-- [Testing Strategy](docs/testing/TESTING_STRATEGY.md) - Overall testing approach
-- [Proof of Work Testing](docs/testing/PROOF_OF_WORK_TESTING.md) - Comprehensive test plan
-- [Prove It Works](docs/testing/PROVE_IT_WORKS.md) - Quick testing summary
+2. **Tier 2: Feature Changes** (4-of-5, 30 days)
+   - New RPC methods, P2P changes, wallet features
+   - Must include technical specification
 
-### For Auditors
-- [Audit Materials](../audit-materials/README.md) - Security and audit information
-- [Architecture Documentation](../audit-materials/01-technical/ARCHITECTURE.md) - System design
-- [Security Analysis](../audit-materials/02-security/README.md) - Security details
+3. **Tier 3: Consensus-Adjacent** (5-of-5, 90 days + economic node veto)
+   - Changes affecting consensus validation code
+   - Economic nodes can veto (30%+ hashpower or 40%+ economic activity)
 
-## Architecture
+4. **Tier 4: Emergency Actions** (4-of-5, 24-hour notification)
+   - Critical security patches, network-threatening bugs
+   - Real-time economic node oversight, post-mortem required
+
+5. **Tier 5: Governance Changes** (Special process, 180 days)
+   - Changes to governance rules themselves
+   - Requires economic node signaling (50%+ hashpower, 60%+ economic activity)
 
 ### Core Components
 
-- **Database Layer**: SQLite (development) / PostgreSQL (production) with migrations for governance data
-- **Economic Nodes**: Registry and veto signal collection
-- **Governance Fork**: Export and adoption tracking
-- **GitHub Integration**: Status checks and merge blocking
-- **Validation**: Tier classification and requirement checking
-- **Enforcement**: Merge blocking and status updates
-- **Nostr Integration**: Real-time transparency and communication
-- **OpenTimestamps**: Bitcoin blockchain anchoring
-- **Audit Log System**: Tamper-evident logging with hash chains
-- **Server Authorization**: Authorized server registry and verification
+- `bllvm-commons/` - GitHub App for governance enforcement
+- `bllvm-sdk/` - Cryptographic primitives and CLI tools
+- `governance/` - Governance configuration and documentation
 
-### Key Features
-
-- **Tier Classification**: Automatic PR tier detection using governance config files
-- **Signature Collection**: Maintainer signature verification
-- **Economic Node Veto**: Mining pool and exchange veto signals
-- **Status Checks**: Detailed GitHub status reporting
-- **Merge Blocking**: Prevents merging until requirements met
-- **Audit Logging**: Complete governance event tracking with hash chains
-- **Nostr Publishing**: Real-time status updates via Nostr protocol
-- **Bitcoin Anchoring**: Monthly registry anchoring via OpenTimestamps
-- **Server Authorization**: Explicit authorization of governance servers
-- **Configuration Integration**: Loads and validates governance repository configs
-
-## Development Setup
+## Quick Start
 
 ### Prerequisites
-
 - Rust 1.70+
 - SQLite3
 - Git
 
-### Installation
+### Setup Development Environment
 
 ```bash
-# Clone the repository
-git clone https://github.com/btcdecoded/governance-system.git
-cd governance-system/bllvm-commons
+# Clone repositories (BTCDecoded is the GitHub organization)
+git clone https://github.com/btcdecoded/bllvm-commons.git
+cd bllvm-commons
 
-# Install dependencies
+# Set up bllvm-commons
+cd bllvm-commons
 cargo build
-
-# Run tests
 cargo test
 
-# Build verification tools
-cargo build --bin verify-audit-log
-```
-
-### Configuration
-
-Create a `.env` file in the bllvm-commons directory:
-
-```bash
-# Database
-DATABASE_URL=sqlite:governance.db
-
-# GitHub App (Test Keys Only)
-GITHUB_APP_ID=12345
-GITHUB_PRIVATE_KEY_PATH=/path/to/test-private-key.pem
-GITHUB_WEBHOOK_SECRET=test-webhook-secret
-
-# Governance Configuration
-GOVERNANCE_CONFIG_PATH=../governance
-```
-
-### Running Locally
-
-```bash
-# Development mode
-cargo run
-
-# With logging
-RUST_LOG=debug cargo run
-```
-
-## Testing
-
-### Run All Tests
-
-```bash
+# Set up developer-sdk
+cd ../developer-sdk
+cargo build
 cargo test
 ```
 
-### Run Specific Test Suites
+### Running Tests
 
 ```bash
-# Economic node tests
+# Run all tests
+cargo test
+
+# Run specific test suites
 cargo test --test economic_nodes_test
-
-# Governance fork tests
 cargo test --test governance_fork_test
-
-# GitHub integration tests
 cargo test --test github_integration_test
-
-# End-to-end tests
 cargo test --test e2e_test
 ```
 
-### Test Coverage
-
-The test suite includes:
-
-- **Unit Tests**: Individual component functionality
-- **Integration Tests**: Component interaction testing
-- **End-to-End Tests**: Complete workflow testing
-- **Error Handling Tests**: Edge cases and error conditions
-- **Performance Tests**: System performance validation
-
-## API Endpoints
-
-### Webhook Endpoints
-
-- `POST /webhooks/github` - GitHub webhook handler
-- `POST /webhooks/pull-request` - Pull request events
-- `POST /webhooks/issue-comment` - Comment events
-
-### Governance Endpoints
-
-- `GET /governance/status` - System status
-- `GET /governance/events` - Governance events
-- `POST /governance/sign` - Signature submission
-- `GET /governance/nodes` - Economic node registry
-
-### Fork Endpoints
-
-- `GET /fork/export` - Export governance configuration
-- `GET /fork/adoption` - Adoption metrics
-- `POST /fork/decision` - Fork decision submission
-
-## Database Schema
-
-### Core Tables
-
-- `pull_requests` - PR tracking and status
-- `signatures` - Maintainer signatures
-- `economic_nodes` - Economic node registry
-- `veto_signals` - Veto signal collection
-- `governance_events` - Audit log
-- `governance_rulesets` - Fork rulesets
-- `fork_decisions` - Node fork decisions
-
-### Migrations
-
-```bash
-# Run migrations
-cargo run --bin migrate
-
-# Create new migration
-cargo run --bin migrate -- create migration_name
-```
-
-## GitHub Integration
-
-### Status Checks
-
-The app posts detailed status checks to GitHub PRs:
-
-- **Review Period**: Time remaining and requirements
-- **Signatures**: Current signature count and required signatures
-- **Economic Veto**: Veto status and threshold information
-- **Combined Status**: Overall governance status
-
-### Merge Blocking
-
-- **Automatic Blocking**: PRs are blocked until requirements met
-- **Status Updates**: Real-time status updates as requirements are met
-- **Merge Enablement**: Automatic merge enablement when all requirements satisfied
-
-### Webhook Events
-
-- **Pull Request**: Opened, updated, closed events
-- **Issue Comment**: Signature collection via comments
-- **Push**: Branch updates and force pushes
-
-## Verification Tools
-
-### Audit Log Verification
-
-```bash
-# Verify audit log integrity
-cargo run --bin verify-audit-log -- --log-path /var/lib/governance/audit-log.jsonl
-
-# Verify with expected Merkle root
-cargo run --bin verify-audit-log -- --log-path /var/lib/governance/audit-log.jsonl --merkle-root "sha256:abc123..."
-
-# Verbose output
-cargo run --bin verify-audit-log -- --log-path /var/lib/governance/audit-log.jsonl --verbose
-```
-
-### Server Verification
-
-```bash
-# Verify server authorization
-./scripts/verify-server.sh governance-01
-
-# Verify with Nostr public key
-./scripts/verify-server.sh governance-01 npub1abc123...
-```
-
-### Integration Verification
-
-```bash
-# Verify complete system integration
-./scripts/verify-integration.sh
-```
-
-### Nostr Event Verification
-
-```bash
-# Subscribe to governance events
-nostr-cli --relay wss://relay.damus.io --filter '{"kinds":[30078],"#d":["governance-status"]}'
-
-# Verify specific server events
-nostr-cli --relay wss://relay.damus.io --filter '{"kinds":[30078],"#server":["governance-01"]}'
-```
-
-### OTS Proof Verification
-
-```bash
-# Verify OTS proof
-ots verify /var/lib/governance/ots-proofs/2024-01.json.ots
-
-# Get Bitcoin block height
-ots info /var/lib/governance/ots-proofs/2024-01.json.ots
-```
-
-## Economic Node System
-
-### Node Types
-
-- **Mining Pool**: Hashpower-based qualification
-- **Exchange**: Volume and holdings-based qualification
-- **Custodian**: Holdings-based qualification
-- **Payment Processor**: Volume-based qualification
-- **Major Holder**: Holdings-based qualification
-
-### Veto Mechanism
-
-- **Signal Collection**: Nodes can submit veto, support, or abstain signals
-- **Threshold Calculation**: 30%+ hashpower or 40%+ economic activity
-- **Weight Calculation**: Dynamic weight based on qualification data
-- **Verification**: Cryptographic signature verification
-
-## Governance Fork System
-
-### Configuration Export
-
-- **Complete Export**: All governance configuration in single YAML
-- **Versioning**: Semantic versioning for rulesets
-- **Hash Verification**: Cryptographic hash for integrity
-- **Metadata**: Export metadata and provenance
-
-### Adoption Tracking
-
-- **Node Decisions**: Track node adoption decisions
-- **Metrics Calculation**: Adoption percentages and statistics
-- **Dashboard**: Real-time adoption metrics
-- **History**: Adoption decision history
-
-## Security Considerations
-
-### Current Limitations
-
-- **Test Keys Only**: All cryptographic operations use test keys
-- **Not Audited**: Code has not undergone security audit
-- **Experimental**: New cryptographic governance model
-- **Untested**: Not tested in adversarial conditions
-
-### Security Features
-
-- **Signature Verification**: All signatures are cryptographically verified
-- **Audit Logging**: Complete audit trail of all governance actions
-- **Access Control**: Role-based access to governance functions
-- **Rate Limiting**: Protection against abuse and spam
-
-## Monitoring and Logging
-
-### Logging
-
-- **Structured Logging**: JSON-formatted logs
-- **Log Levels**: Debug, info, warn, error
-- **Context**: Rich context information in logs
-- **Correlation**: Request correlation IDs
-
-### Metrics
-
-- **Performance Metrics**: Response times and throughput
-- **Governance Metrics**: Signature collection rates
-- **Error Metrics**: Error rates and types
-- **System Metrics**: Resource usage and health
-
-## Deployment
-
-### Development Deployment
-
-```bash
-# Build for development
-cargo build
-
-# Run with development configuration
-cargo run --bin bllvm-commons
-```
-
-### Production Deployment (Phase 2+)
-
-**⚠️ DO NOT DEPLOY IN PRODUCTION UNTIL PHASE 2 ACTIVATION**
-
-When Phase 2 is activated, deployment will include:
-
-- Production key management
-- Security audit completion
-- Battle testing in production
-- Community validation
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Database Connection**: Check DATABASE_URL configuration
-2. **GitHub API**: Verify GITHUB_APP_ID and private key
-3. **Webhook Delivery**: Check webhook secret and endpoint
-4. **Signature Verification**: Verify key format and permissions
-
-### Debug Mode
-
-```bash
-# Enable debug logging
-RUST_LOG=debug cargo run
-
-# Enable trace logging
-RUST_LOG=trace cargo run
-```
-
-### Health Checks
-
-```bash
-# Check system health
-curl http://localhost:3000/health
-
-# Check governance status
-curl http://localhost:3000/governance/status
-```
+## Documentation
+
+### Core Documentation
+- [Governance Process](governance/GOVERNANCE.md) - How governance works
+- [System Design](governance/DESIGN.md) - Architecture and design decisions
+- [Developer Guide](bllvm-sdk/README.md) - SDK usage and examples
+
+### Development Guides
+- [Maintainer Guide](governance/MAINTAINER_GUIDE.md) - For maintainers
+- [Economic Node Guide](governance/ECONOMIC_NODE_GUIDE.md) - For economic nodes
+- [Deployment Guide](bllvm-commons/DEPLOYMENT.md) - Deployment instructions
+
+## Implementation Status
+
+### Completed Features
+- Economic Node Infrastructure: Database schema, node registry, veto signal collection
+- Governance Fork Capability: Configuration export, adoption tracking, multiple ruleset support
+- GitHub Status Check Integration: Status check posting, merge blocking, webhook integration
+- Comprehensive Testing: Economic node tests, governance fork tests, GitHub integration tests
+- Documentation: Organization-level disclaimers, repository-level warnings
 
 ## Contributing
 
-### Development Guidelines
+### For Developers
+1. Read the documentation to understand the system architecture
+2. Set up development environment following setup guides
+3. Run tests to ensure all tests pass
+4. Submit pull requests and improvements
+5. Report issues to help identify and fix bugs
 
-1. **Read the Documentation**: Understand the system architecture
-2. **Run Tests**: Ensure all tests pass before submitting
-3. **Follow Conventions**: Use consistent coding style
-4. **Document Changes**: Update documentation for new features
-5. **Test Thoroughly**: Add tests for new functionality
+### For Organizations
+1. Monitor development progress and updates
+2. Provide feedback and share requirements and use cases
+3. Test in development environment
+4. Wait for Phase 2 before deploying in production
 
-### Code Review Process
-
-1. **Create Pull Request**: Submit changes via GitHub
-2. **Run Tests**: Ensure all tests pass
-3. **Code Review**: Maintainers review the changes
-4. **Merge**: Changes are merged after approval
+### For Researchers
+1. Study the architecture to understand the governance model
+2. Analyze the code and review implementation and design
+3. Provide feedback and share insights and recommendations
+4. Collaborate with the development team
 
 ## Support
 
-### Getting Help
+### Development Team
+- GitHub Issues: Report bugs and feature requests
+- GitHub Discussions: Ask questions and provide feedback
+- Pull Requests: Contribute code and improvements
 
-- **GitHub Issues**: Report bugs and feature requests
-- **GitHub Discussions**: Ask questions and provide feedback
-- **Documentation**: Check the documentation first
-- **Community**: Join the development community
-
-### Reporting Issues
-
-1. **Check Existing Issues**: Search for similar issues
-2. **Provide Details**: Include error messages and logs
-3. **Reproduction Steps**: Describe how to reproduce the issue
-4. **Environment**: Include system and version information
+### Security
+- Security Issues: Report privately to maintainers
+- Vulnerabilities: Follow responsible disclosure
+- Audit Results: Published when available
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](../LICENSE) file for details.
+MIT License - see [LICENSE](LICENSE) file for details.
 
-## ⚠️ Final Warning
+## Warning
 
-**This is experimental software in active development. Use at your own risk and do not deploy in production until Phase 2 activation.**
+Experimental software in active development. Use at your own risk. Do not deploy in production until Phase 2 activation.
 
----
 
-**Remember**: This system is designed to make Bitcoin governance more transparent, accountable, and resistant to capture. But it's still in development. Stay informed, provide feedback, and wait for the official release.
+
+
