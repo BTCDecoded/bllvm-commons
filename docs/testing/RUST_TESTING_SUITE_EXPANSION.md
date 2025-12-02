@@ -59,7 +59,7 @@ proptest = "1.4"        # Property-based testing
 insta = { version = "1.38", features = ["redactions"] }  # Snapshot testing
 ```
 
-**Note**: Benchmarking is handled separately in `bllvm-bench` repository.
+**Note**: Benchmarking is handled separately in `blvm-bench` repository.
 
 ## Test Structure
 
