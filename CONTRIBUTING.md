@@ -1,21 +1,33 @@
-# Contributing to BTCDecoded Governance App
+# Contributing to BTCDecoded Governance App (blvm-commons)
 
-Thank you for your interest in contributing to the BTCDecoded Governance App!
+Thank you for your interest in contributing to the BTCDecoded Governance App! This document contains **repo-specific guidelines only**. For comprehensive contributing guidelines, see the [BLVM Documentation](https://docs.thebitcoincommons.org/development/contributing.html).
 
-## Development Setup
+## Quick Links
 
-### Prerequisites
+- **[Complete Contributing Guide](https://docs.thebitcoincommons.org/development/contributing.html)** - Full developer workflow
+- **[PR Process](https://docs.thebitcoincommons.org/development/pr-process.html)** - Governance tiers and review process
+- **[Governance Documentation](https://docs.thebitcoincommons.org/governance/overview.html)** - Governance system
+
+## Code of Conduct
+
+This project follows the [Rust Code of Conduct](https://www.rust-lang.org/policies/code-of-conduct). By participating, you agree to uphold this code.
+
+## Repository-Specific Guidelines
+
+### Development Setup
+
+#### Prerequisites
 
 - Rust 1.70+
 - PostgreSQL 13+
 - Git
 
-### Getting Started
+#### Getting Started
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/BTCDecoded/governance-app.git
-   cd governance-app
+   git clone https://github.com/BTCDecoded/blvm-commons.git
+   cd blvm-commons
    ```
 
 2. Set up environment:
@@ -34,76 +46,45 @@ Thank you for your interest in contributing to the BTCDecoded Governance App!
    cargo test
    ```
 
-## Code Style
+### Code Style
 
 - Use `cargo fmt` for formatting
 - Use `cargo clippy` for linting
 - Follow Rust naming conventions
 - Document public APIs with `///` comments
 
-## Testing
-
-### Unit Tests
+### Testing
 
 ```bash
+# Unit tests
 cargo test
-```
 
-### Integration Tests
-
-```bash
+# Integration tests
 cargo test --test integration_tests
-```
 
-### Coverage
-
-```bash
+# Coverage
 cargo tarpaulin --out Html
 ```
 
-## Pull Request Process
+### GitHub App Development
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests for new functionality
-5. Ensure all tests pass
-6. Submit a pull request
+- **Test locally** with GitHub App development tools
+- **Use test keys** for development (never commit real keys)
+- **Follow GitHub App best practices** for webhook handling
+- **Document webhook events** and their handling
 
-### PR Requirements
+### Security Considerations
 
-- All tests must pass
-- Code must be formatted with `cargo fmt`
-- No clippy warnings
-- Documentation updated for public APIs
-- Security considerations addressed
+- Never commit secrets or API keys
+- Use environment variables for sensitive configuration
+- Follow security boundaries defined in SECURITY.md
+- All cryptographic operations require security review
 
-## Governance
+## Getting Help
 
-This project follows the BTCDecoded governance system:
+- **Documentation**: [docs.thebitcoincommons.org](https://docs.thebitcoincommons.org)
+- **Issues**: Use GitHub issues for bugs and feature requests
+- **Discussions**: Use GitHub discussions for questions
+- **Security**: See [SECURITY.md](SECURITY.md)
 
-- **Layer 3 (Implementation)**: 4-of-5 maintainers, 90 days
-- Changes require maintainer signatures
-- Review period must be met
-- Cross-layer dependencies validated
-
-## Security
-
-- Never commit private keys or secrets
-- Use environment variables for configuration
-- Follow secure coding practices
-- Report security issues to security@btcdecoded.org
-
-## Questions?
-
-- GitHub Issues for bug reports and feature requests
-- GitHub Discussions for questions
-- security@btcdecoded.org for security issues
-
-## License
-
-By contributing, you agree that your contributions will be licensed under the MIT License.
-
-
-
-
+Thank you for contributing to the BTCDecoded Governance App!
