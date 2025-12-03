@@ -119,16 +119,16 @@ impl ZapTracker {
     fn extract_payment_hash(invoice: &str) -> Option<String> {
         use lightning_invoice::Invoice;
         use std::str::FromStr;
-        
+
         // Parse bolt11 invoice
         let parsed = Invoice::from_str(invoice).ok()?;
-        
-        // Extract payment hash - the payment_hash() method returns PaymentHash
-        // which implements AsRef<[u8; 32]>
+
+        // Extract payment hash - the payment_hash() method returns &Sha256
+        // Convert to hex string via Display trait
         let payment_hash = parsed.payment_hash();
-        
-        // Convert to hex string (PaymentHash is a 32-byte array)
-        Some(hex::encode(payment_hash.as_ref()))
+        let hash_str = format!("{}", payment_hash.0);
+        let hash_bytes = hex::decode(&hash_str).ok()?;
+        Some(hex::encode(hash_bytes))
     }
 
     /// Get total zaps for a pubkey in time period

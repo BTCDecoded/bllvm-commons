@@ -3,9 +3,9 @@
 //! Allows subjects to respond to cases with their side of the story
 //! and counter-evidence
 
+use crate::governance_review::models::GovernanceReviewResponse;
 use chrono::{DateTime, Utc};
 use sqlx::{Row, SqlitePool};
-use crate::governance_review::models::GovernanceReviewResponse;
 
 pub struct ResponseManager {
     pool: SqlitePool,
@@ -27,7 +27,7 @@ impl ResponseManager {
     ) -> Result<GovernanceReviewResponse, sqlx::Error> {
         // Verify maintainer is the subject of the case
         let case_subject: i32 = sqlx::query_scalar(
-            "SELECT subject_maintainer_id FROM governance_review_cases WHERE id = ?"
+            "SELECT subject_maintainer_id FROM governance_review_cases WHERE id = ?",
         )
         .bind(case_id)
         .fetch_one(&self.pool)
@@ -39,7 +39,7 @@ impl ResponseManager {
 
         // Check if response deadline has passed
         let response_deadline: Option<DateTime<Utc>> = sqlx::query_scalar(
-            "SELECT response_deadline FROM governance_review_cases WHERE id = ?"
+            "SELECT response_deadline FROM governance_review_cases WHERE id = ?",
         )
         .bind(case_id)
         .fetch_optional(&self.pool)
@@ -52,10 +52,11 @@ impl ResponseManager {
             }
         }
 
-        let counter_evidence_json = serde_json::to_string(&counter_evidence)?;
+        let counter_evidence_json = serde_json::to_string(&counter_evidence)
+            .map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
         let submitted_at = Utc::now();
 
-        let response_id: i32 = sqlx::query_scalar(
+        let response_id: i32 = sqlx::query_scalar::<_, i32>(
             r#"
             INSERT INTO governance_review_responses
             (case_id, maintainer_id, response_text, counter_evidence, submitted_at)
@@ -69,14 +70,16 @@ impl ResponseManager {
         .bind(&counter_evidence_json)
         .bind(submitted_at)
         .fetch_one(&self.pool)
-        .await?
-        .get(0);
+        .await?;
 
         self.get_response_by_id(response_id).await
     }
 
     /// Get response by ID
-    pub async fn get_response_by_id(&self, response_id: i32) -> Result<GovernanceReviewResponse, sqlx::Error> {
+    pub async fn get_response_by_id(
+        &self,
+        response_id: i32,
+    ) -> Result<GovernanceReviewResponse, sqlx::Error> {
         let row = sqlx::query(
             r#"
             SELECT id, case_id, maintainer_id, response_text, counter_evidence, submitted_at
@@ -93,13 +96,17 @@ impl ResponseManager {
             case_id: row.get(1),
             maintainer_id: row.get(2),
             response_text: row.get(3),
-            counter_evidence: serde_json::from_str(row.get::<String, _>(4).as_str()).unwrap_or_default(),
+            counter_evidence: serde_json::from_str(row.get::<String, _>(4).as_str())
+                .unwrap_or_default(),
             submitted_at: row.get(5),
         })
     }
 
     /// Get responses for a case
-    pub async fn get_responses_for_case(&self, case_id: i32) -> Result<Vec<GovernanceReviewResponse>, sqlx::Error> {
+    pub async fn get_responses_for_case(
+        &self,
+        case_id: i32,
+    ) -> Result<Vec<GovernanceReviewResponse>, sqlx::Error> {
         let rows = sqlx::query(
             r#"
             SELECT id, case_id, maintainer_id, response_text, counter_evidence, submitted_at
@@ -119,11 +126,11 @@ impl ResponseManager {
                     case_id: row.get(1),
                     maintainer_id: row.get(2),
                     response_text: row.get(3),
-                    counter_evidence: serde_json::from_str(row.get::<String, _>(4).as_str()).unwrap_or_default(),
+                    counter_evidence: serde_json::from_str(row.get::<String, _>(4).as_str())
+                        .unwrap_or_default(),
                     submitted_at: row.get(5),
                 })
             })
             .collect()
     }
 }
-

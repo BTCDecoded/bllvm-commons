@@ -8,11 +8,9 @@ use crate::validation::nested_multisig::{Team, TeamMaintainer};
 use std::path::Path;
 
 /// Load teams configuration and convert to nested multisig format
-pub fn load_teams_for_nested_multisig(
-    config_path: &Path,
-) -> Result<Vec<Team>, GovernanceError> {
+pub fn load_teams_for_nested_multisig(config_path: &Path) -> Result<Vec<Team>, GovernanceError> {
     let teams_path = config_path.join("maintainers/teams.yml");
-    
+
     if !teams_path.exists() {
         return Ok(Vec::new()); // Return empty if teams config doesn't exist
     }
@@ -43,4 +41,3 @@ pub fn load_teams_for_nested_multisig(
 
     Ok(teams)
 }
-

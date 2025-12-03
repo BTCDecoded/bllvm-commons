@@ -825,7 +825,7 @@ mod tests {
     fn create_test_checker() -> Option<CrossLayerStatusChecker> {
         let temp_dir = tempfile::tempdir().ok()?;
         let key_path = temp_dir.path().join("test_key.pem");
-        let valid_key = include_str!("../../../test_fixtures/test_rsa_key.pem");
+        let valid_key = include_str!("../../test_fixtures/test_rsa_key.pem");
         std::fs::write(&key_path, valid_key).ok()?;
 
         let github_client = GitHubClient::new(123456, key_path.to_str()?).ok()?;
@@ -1472,7 +1472,7 @@ mod tests {
         // Generate a valid RSA private key for testing
         // Using a minimal valid RSA private key that jsonwebtoken can parse
         // Note: This is a test key only, not for production use
-        let valid_key = include_str!("../../../test_fixtures/test_rsa_key.pem");
+        let valid_key = include_str!("../../test_fixtures/test_rsa_key.pem");
         std::fs::write(&key_path, valid_key).unwrap();
 
         // Try to create GitHub client - if it fails due to invalid key, skip the test

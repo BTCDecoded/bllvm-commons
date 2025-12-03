@@ -6,8 +6,8 @@ use sqlx::{Row, SqlitePool};
 use tracing::{info, warn};
 
 use super::types::*;
-use crate::error::GovernanceError;
 use crate::config::loader::CommonsContributorThresholdsConfig;
+use crate::error::GovernanceError;
 
 pub struct EconomicNodeRegistry {
     pool: SqlitePool,
@@ -18,7 +18,7 @@ pub struct EconomicNodeRegistry {
 
 impl EconomicNodeRegistry {
     pub fn new(pool: SqlitePool) -> Self {
-        Self { 
+        Self {
             pool,
             commons_contributor_thresholds: None,
         }
@@ -167,7 +167,9 @@ impl EconomicNodeRegistry {
 
         // Check Commons contributor thresholds (maintainer-configurable)
         if node_type == NodeType::CommonsContributor {
-            return self.verify_commons_contributor_qualification(qualification_data).await;
+            return self
+                .verify_commons_contributor_qualification(qualification_data)
+                .await;
         }
 
         Ok(true)
@@ -183,7 +185,9 @@ impl EconomicNodeRegistry {
             None => {
                 warn!("Commons contributor thresholds not configured, using defaults");
                 // Fall back to hardcoded defaults if config not loaded
-                return self.verify_commons_contributor_defaults(qualification_data).await;
+                return self
+                    .verify_commons_contributor_defaults(qualification_data)
+                    .await;
             }
         };
 
@@ -200,7 +204,8 @@ impl EconomicNodeRegistry {
         // Check merge mining threshold
         if thresholds_config.merge_mining.enabled {
             if let Some(merge_proof) = &proof.merge_mining_proof {
-                if merge_proof.total_revenue_btc >= thresholds_config.merge_mining.minimum_contribution_btc
+                if merge_proof.total_revenue_btc
+                    >= thresholds_config.merge_mining.minimum_contribution_btc
                     && merge_proof.period_days >= thresholds_config.measurement_period_days
                 {
                     qualifications_met.push("merge_mining");
@@ -211,7 +216,8 @@ impl EconomicNodeRegistry {
         // Check fee forwarding threshold
         if thresholds_config.fee_forwarding.enabled {
             if let Some(fee_proof) = &proof.fee_forwarding_proof {
-                if fee_proof.total_fees_forwarded_btc >= thresholds_config.fee_forwarding.minimum_contribution_btc
+                if fee_proof.total_fees_forwarded_btc
+                    >= thresholds_config.fee_forwarding.minimum_contribution_btc
                     && fee_proof.period_days >= thresholds_config.measurement_period_days
                 {
                     qualifications_met.push("fee_forwarding");
@@ -256,11 +262,14 @@ impl EconomicNodeRegistry {
                 .iter()
                 .filter(|&&enabled| enabled)
                 .count();
-                
+
                 qualifications_met.len() == enabled_count
             }
             _ => {
-                warn!("Invalid qualification_logic: {}, defaulting to OR", thresholds_config.qualification_logic);
+                warn!(
+                    "Invalid qualification_logic: {}, defaulting to OR",
+                    thresholds_config.qualification_logic
+                );
                 !qualifications_met.is_empty()
             }
         };
@@ -382,7 +391,8 @@ impl EconomicNodeRegistry {
             NodeType::CommonsContributor => {
                 // Weight = sqrt(total_contribution_btc / normalization_factor)
                 // Uses quadratic weighting for fairness
-                self.calculate_commons_contributor_weight(qualification_data).await
+                self.calculate_commons_contributor_weight(qualification_data)
+                    .await
             }
         }
     }
@@ -523,16 +533,16 @@ impl EconomicNodeRegistry {
 
         let node_type =
             NodeType::from_str(&row.get::<String, _>("node_type")).ok_or_else(|| {
-                    GovernanceError::CryptoError(format!(
-                        "Invalid node type: {}",
-                        row.get::<String, _>("node_type")
+                GovernanceError::CryptoError(format!(
+                    "Invalid node type: {}",
+                    row.get::<String, _>("node_type")
                 ))
             })?;
 
         let status = NodeStatus::from_str(&row.get::<String, _>("status")).ok_or_else(|| {
-                GovernanceError::CryptoError(format!(
-                    "Invalid status: {}",
-                    row.get::<String, _>("status")
+            GovernanceError::CryptoError(format!(
+                "Invalid status: {}",
+                row.get::<String, _>("status")
             ))
         })?;
 

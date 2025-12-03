@@ -288,7 +288,11 @@ impl GitHubIntegration {
 
     /// Check economic node veto status
     /// This now integrates with the new voting system (zap votes + participation votes)
-    async fn check_economic_veto(&self, pr_id: i32, tier: u32) -> Result<(bool, String, crate::economic_nodes::VetoThreshold), GovernanceError> {
+    async fn check_economic_veto(
+        &self,
+        pr_id: i32,
+        tier: u32,
+    ) -> Result<(bool, String, crate::economic_nodes::VetoThreshold), GovernanceError> {
         use crate::economic_nodes::VetoManager;
         use crate::governance::VoteAggregator;
 
@@ -334,28 +338,36 @@ impl GitHubIntegration {
                 Mining Veto: {:.1}% (threshold: {:.0}%)\n\
                 Economic Veto: {:.1}% (threshold: {:.0}%)\n\
                 Status: BLOCKED (Both thresholds required)",
-                veto_threshold.mining_veto_percent, mining_threshold,
-                veto_threshold.economic_veto_percent, economic_threshold
+                veto_threshold.mining_veto_percent,
+                mining_threshold,
+                veto_threshold.economic_veto_percent,
+                economic_threshold
             );
-            
+
             // Add review period information if available
             if let Some(ends_at) = veto_threshold.review_period_ends_at {
                 let remaining = ends_at - Utc::now();
                 if remaining.num_days() > 0 {
-                    msg.push_str(&format!("\nReview Period: {} days remaining", remaining.num_days()));
+                    msg.push_str(&format!(
+                        "\nReview Period: {} days remaining",
+                        remaining.num_days()
+                    ));
                 } else if remaining.num_hours() > 0 {
-                    msg.push_str(&format!("\nReview Period: {} hours remaining", remaining.num_hours()));
+                    msg.push_str(&format!(
+                        "\nReview Period: {} hours remaining",
+                        remaining.num_hours()
+                    ));
                 } else if veto_threshold.maintainer_override {
                     msg.push_str("\nReview Period: Expired - Maintainer override active");
                 } else {
                     msg.push_str("\nReview Period: Expired - Override available");
                 }
             }
-            
+
             if let Some(path) = &veto_threshold.resolution_path {
                 msg.push_str(&format!("\nResolution: {}", path));
             }
-            
+
             msg
         } else {
             format!(
@@ -363,12 +375,18 @@ impl GitHubIntegration {
                 Mining Veto: {:.1}% (threshold: {:.0}%)\n\
                 Economic Veto: {:.1}% (threshold: {:.0}%)\n\
                 Status: No veto (Both thresholds required)",
-                veto_threshold.mining_veto_percent, mining_threshold,
-                veto_threshold.economic_veto_percent, economic_threshold
+                veto_threshold.mining_veto_percent,
+                mining_threshold,
+                veto_threshold.economic_veto_percent,
+                economic_threshold
             )
         };
 
-        Ok((veto_threshold.veto_active || economic_veto_blocks, status, veto_threshold))
+        Ok((
+            veto_threshold.veto_active || economic_veto_blocks,
+            status,
+            veto_threshold,
+        ))
     }
 
     /// Post review period status check

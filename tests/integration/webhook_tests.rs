@@ -1,5 +1,5 @@
-use bllvm_commons::webhooks::github;
-use bllvm_commons::database::Database;
+use blvm_commons::webhooks::github;
+use blvm_commons::database::Database;
 use serde_json::Value;
 use axum::http::StatusCode;
 
@@ -12,7 +12,7 @@ async fn test_pull_request_opened_webhook() {
     let payload = github_mocks::pull_request_opened_payload("BTCDecoded/bllvm-consensus", 123);
     
     // Test webhook processing
-    let result = bllvm_commons::webhooks::pull_request::handle_pull_request_event(&db, &payload).await;
+    let result = blvm_commons::webhooks::pull_request::handle_pull_request_event(&db, &payload).await;
     assert!(result.is_ok());
     
     // Verify PR was stored in database
@@ -31,7 +31,7 @@ async fn test_pull_request_synchronize_webhook() {
     let payload = github_mocks::pull_request_synchronize_payload("BTCDecoded/bllvm-protocol", 456);
     
     // Test webhook processing
-    let result = bllvm_commons::webhooks::pull_request::handle_pull_request_event(&db, &payload).await;
+    let result = blvm_commons::webhooks::pull_request::handle_pull_request_event(&db, &payload).await;
     assert!(result.is_ok());
     
     // Verify PR was updated in database
@@ -50,7 +50,7 @@ async fn test_review_submitted_webhook() {
     let payload = github_mocks::review_submitted_payload("BTCDecoded/bllvm-node", 789, "alice", "approved");
     
     // Test webhook processing
-    let result = bllvm_commons::webhooks::review::handle_review_event(&db, &payload).await;
+    let result = blvm_commons::webhooks::review::handle_review_event(&db, &payload).await;
     assert!(result.is_ok());
 }
 
@@ -60,7 +60,7 @@ async fn test_review_dismissed_webhook() {
     let payload = github_mocks::review_submitted_payload("BTCDecoded/bllvm-sdk", 101, "bob", "dismissed");
     
     // Test webhook processing
-    let result = bllvm_commons::webhooks::review::handle_review_event(&db, &payload).await;
+    let result = blvm_commons::webhooks::review::handle_review_event(&db, &payload).await;
     assert!(result.is_ok());
 }
 
@@ -71,7 +71,7 @@ async fn test_comment_governance_signature() {
     let payload = github_mocks::comment_created_payload("BTCDecoded/bllvm-consensus", 123, "alice", signature_body);
     
     // Test webhook processing
-    let result = bllvm_commons::webhooks::comment::handle_comment_event(&db, &payload).await;
+    let result = blvm_commons::webhooks::comment::handle_comment_event(&db, &payload).await;
     assert!(result.is_ok());
     
     // Verify signature was added to database
@@ -90,7 +90,7 @@ async fn test_comment_empty_signature() {
     let payload = github_mocks::comment_created_payload("BTCDecoded/bllvm-consensus", 123, "alice", empty_signature_body);
     
     // Test webhook processing
-    let result = bllvm_commons::webhooks::comment::handle_comment_event(&db, &payload).await;
+    let result = blvm_commons::webhooks::comment::handle_comment_event(&db, &payload).await;
     assert!(result.is_ok());
     
     // Verify no signature was added
@@ -108,7 +108,7 @@ async fn test_comment_non_governance() {
     let payload = github_mocks::comment_created_payload("BTCDecoded/bllvm-consensus", 123, "alice", regular_comment);
     
     // Test webhook processing
-    let result = bllvm_commons::webhooks::comment::handle_comment_event(&db, &payload).await;
+    let result = blvm_commons::webhooks::comment::handle_comment_event(&db, &payload).await;
     assert!(result.is_ok());
     
     // Verify no signature was added
@@ -125,7 +125,7 @@ async fn test_push_to_main_detection() {
     let payload = github_mocks::push_payload("BTCDecoded/bllvm-consensus", "alice", "refs/heads/main");
     
     // Test webhook processing
-    let result = bllvm_commons::webhooks::push::handle_push_event(&db, &payload).await;
+    let result = blvm_commons::webhooks::push::handle_push_event(&db, &payload).await;
     assert!(result.is_ok());
     
     // Verify bypass attempt was logged
@@ -143,7 +143,7 @@ async fn test_push_to_feature_branch() {
     let payload = github_mocks::push_payload("BTCDecoded/bllvm-consensus", "alice", "refs/heads/feature/new-feature");
     
     // Test webhook processing
-    let result = bllvm_commons::webhooks::push::handle_push_event(&db, &payload).await;
+    let result = blvm_commons::webhooks::push::handle_push_event(&db, &payload).await;
     assert!(result.is_ok());
     
     // Verify no bypass attempt was logged
@@ -174,7 +174,7 @@ async fn test_webhook_invalid_payload() {
     });
     
     // Test webhook processing with invalid payload
-    let result = bllvm_commons::webhooks::pull_request::handle_pull_request_event(&db, &invalid_payload).await;
+    let result = blvm_commons::webhooks::pull_request::handle_pull_request_event(&db, &invalid_payload).await;
     // Should handle gracefully
     assert!(result.is_ok() || result.is_err());
 }
@@ -193,7 +193,7 @@ async fn test_webhook_malformed_json() {
     });
     
     // Test webhook processing with malformed payload
-    let result = bllvm_commons::webhooks::pull_request::handle_pull_request_event(&db, &malformed_payload).await;
+    let result = blvm_commons::webhooks::pull_request::handle_pull_request_event(&db, &malformed_payload).await;
     // Should handle gracefully
     assert!(result.is_ok() || result.is_err());
 }
@@ -204,7 +204,7 @@ async fn test_webhook_unknown_repository() {
     let payload = github_mocks::pull_request_opened_payload("Unknown/Repository", 123);
     
     // Test webhook processing with unknown repository
-    let result = bllvm_commons::webhooks::pull_request::handle_pull_request_event(&db, &payload).await;
+    let result = blvm_commons::webhooks::pull_request::handle_pull_request_event(&db, &payload).await;
     assert!(result.is_ok());
     
     // Should return unknown_repo status
@@ -223,7 +223,7 @@ async fn test_webhook_concurrent_processing() {
         let payload = github_mocks::pull_request_opened_payload("BTCDecoded/bllvm-consensus", i as u64);
         
         tokio::spawn(async move {
-            bllvm_commons::webhooks::pull_request::handle_pull_request_event(db, &payload).await
+            blvm_commons::webhooks::pull_request::handle_pull_request_event(db, &payload).await
         })
     }).collect();
     
@@ -242,7 +242,7 @@ async fn test_webhook_database_transaction_rollback() {
     let payload = github_mocks::pull_request_opened_payload("BTCDecoded/bllvm-consensus", 999);
     
     // Process webhook
-    let result = bllvm_commons::webhooks::pull_request::handle_pull_request_event(&db, &payload).await;
+    let result = blvm_commons::webhooks::pull_request::handle_pull_request_event(&db, &payload).await;
     assert!(result.is_ok());
     
     // Verify data consistency

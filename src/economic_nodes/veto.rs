@@ -111,12 +111,16 @@ impl VetoManager {
     }
 
     /// Check if veto threshold is met for a PR
-    /// 
+    ///
     /// Tier-specific thresholds:
     /// - Tier 3: 30% hashpower AND 40% economic activity (90-day review)
     /// - Tier 4: 25% hashpower AND 35% economic activity (24-hour review)
     /// - Tier 5: 50% hashpower AND 60% economic activity (180-day review)
-    pub async fn check_veto_threshold(&self, pr_id: i32, tier: u32) -> Result<VetoThreshold, GovernanceError> {
+    pub async fn check_veto_threshold(
+        &self,
+        pr_id: i32,
+        tier: u32,
+    ) -> Result<VetoThreshold, GovernanceError> {
         // Get all veto signals for this PR
         let signals = sqlx::query(
             r#"
@@ -223,43 +227,54 @@ impl VetoManager {
 
         // Get base tier-specific thresholds
         let (base_mining_threshold, base_economic_threshold, review_days_default) = match tier {
-            3 => (30.0, 40.0, 90u32),   // Tier 3: 30%+40%, 90 days
-            4 => (25.0, 35.0, 0u32),    // Tier 4: 25%+35%, 24 hours (0 days = immediate)
-            5 => (50.0, 60.0, 180u32),  // Tier 5: 50%+60%, 180 days
-            _ => (30.0, 40.0, 90u32),   // Default to Tier 3 thresholds
+            3 => (30.0, 40.0, 90u32),  // Tier 3: 30%+40%, 90 days
+            4 => (25.0, 35.0, 0u32),   // Tier 4: 25%+35%, 24 hours (0 days = immediate)
+            5 => (50.0, 60.0, 180u32), // Tier 5: 50%+60%, 180 days
+            _ => (30.0, 40.0, 90u32),  // Default to Tier 3 thresholds
         };
 
         // Apply adaptive thresholds based on governance phase and consolidation
-        let (mining_threshold, economic_threshold) = if let (Some(ref phase_calc), Some(ref consol_monitor)) = 
-            (&self.phase_calculator, &self.consolidation_monitor) 
-        {
-            // Get adaptive parameters from phase calculator
-            match phase_calc.get_adaptive_parameters().await {
-                Ok(adaptive_params) => {
-                    // Apply consolidation-based adjustments on top of phase-based thresholds
-                    consol_monitor.calculate_adaptive_thresholds(
-                        adaptive_params.mining_veto_threshold,
-                        adaptive_params.economic_veto_threshold,
-                    ).await.unwrap_or((adaptive_params.mining_veto_threshold, adaptive_params.economic_veto_threshold))
+        let (mining_threshold, economic_threshold) =
+            if let (Some(ref phase_calc), Some(ref consol_monitor)) =
+                (&self.phase_calculator, &self.consolidation_monitor)
+            {
+                // Get adaptive parameters from phase calculator
+                match phase_calc.get_adaptive_parameters().await {
+                    Ok(adaptive_params) => {
+                        // Apply consolidation-based adjustments on top of phase-based thresholds
+                        consol_monitor
+                            .calculate_adaptive_thresholds(
+                                adaptive_params.mining_veto_threshold,
+                                adaptive_params.economic_veto_threshold,
+                            )
+                            .await
+                            .unwrap_or((
+                                adaptive_params.mining_veto_threshold,
+                                adaptive_params.economic_veto_threshold,
+                            ))
+                    }
+                    Err(_) => {
+                        // Fall back to consolidation-only if phase calculator fails
+                        consol_monitor
+                            .calculate_adaptive_thresholds(
+                                base_mining_threshold,
+                                base_economic_threshold,
+                            )
+                            .await
+                            .unwrap_or((base_mining_threshold, base_economic_threshold))
+                    }
                 }
-                Err(_) => {
-                    // Fall back to consolidation-only if phase calculator fails
-                    consol_monitor.calculate_adaptive_thresholds(
-                        base_mining_threshold,
-                        base_economic_threshold,
-                    ).await.unwrap_or((base_mining_threshold, base_economic_threshold))
-                }
-            }
-        } else {
-            // Fall back to base thresholds if calculators not available
-            (base_mining_threshold, base_economic_threshold)
-        };
+            } else {
+                // Fall back to base thresholds if calculators not available
+                (base_mining_threshold, base_economic_threshold)
+            };
 
         // Check thresholds using AND logic (both required)
         // Both mining and economic thresholds must be met
         // This prevents single-group veto and requires coordination
-        let threshold_met = mining_veto_percent >= mining_threshold && economic_veto_percent >= economic_threshold;
-        
+        let threshold_met =
+            mining_veto_percent >= mining_threshold && economic_veto_percent >= economic_threshold;
+
         // Get veto state from database (if exists)
         let veto_state = sqlx::query(
             r#"
@@ -267,7 +282,7 @@ impl VetoManager {
                    maintainer_override, override_timestamp, override_by, resolution_path
             FROM pr_veto_state
             WHERE pr_id = ?
-            "#
+            "#,
         )
         .bind(pr_id)
         .fetch_optional(&self.pool)
@@ -277,66 +292,81 @@ impl VetoManager {
         })?;
 
         // If threshold just met, trigger veto (start review period)
-        let (review_period_start, review_period_days, review_period_ends_at, maintainer_override, override_timestamp, override_by, resolution_path) = 
-            if threshold_met && veto_state.is_none() {
-                // First time threshold met - trigger veto
-                let now = Utc::now();
-                let review_days = review_days_default;
-                // For Tier 4 (0 days), use 24 hours instead
-                let ends_at = if review_days == 0 {
-                    now + chrono::Duration::hours(24)
-                } else {
-                    now + chrono::Duration::days(review_days as i64)
-                };
-                
-                // Insert veto state
-                sqlx::query(
-                    r#"
+        let (
+            review_period_start,
+            review_period_days,
+            review_period_ends_at,
+            maintainer_override,
+            override_timestamp,
+            override_by,
+            resolution_path,
+        ) = if threshold_met && veto_state.is_none() {
+            // First time threshold met - trigger veto
+            let now = Utc::now();
+            let review_days = review_days_default;
+            // For Tier 4 (0 days), use 24 hours instead
+            let ends_at = if review_days == 0 {
+                now + chrono::Duration::hours(24)
+            } else {
+                now + chrono::Duration::days(review_days as i64)
+            };
+
+            // Insert veto state
+            sqlx::query(
+                r#"
                     INSERT INTO pr_veto_state 
                     (pr_id, veto_triggered_at, review_period_days, review_period_ends_at,
                      mining_veto_percent, economic_veto_percent, threshold_met, veto_active)
                     VALUES (?, ?, ?, ?, ?, ?, ?, TRUE)
-                    "#
-                )
-                .bind(pr_id)
-                .bind(now.to_rfc3339())
-                .bind(review_days as i32)
-                .bind(ends_at.to_rfc3339())
-                .bind(mining_veto_percent)
-                .bind(economic_veto_percent)
-                .bind(threshold_met)
-                .execute(&self.pool)
-                .await
-                .map_err(|e| {
-                    GovernanceError::DatabaseError(format!("Failed to insert veto state: {}", e))
-                })?;
-                
-                (Some(now), review_days, Some(ends_at), false, None, None, None)
-            } else if let Some(state) = veto_state {
-                // Veto state exists - get current state
-                let triggered_at_str = state.get::<String, _>("veto_triggered_at");
-                let triggered_at = DateTime::parse_from_rfc3339(&triggered_at_str)
+                    "#,
+            )
+            .bind(pr_id)
+            .bind(now.to_rfc3339())
+            .bind(review_days as i32)
+            .bind(ends_at.to_rfc3339())
+            .bind(mining_veto_percent)
+            .bind(economic_veto_percent)
+            .bind(threshold_met)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| {
+                GovernanceError::DatabaseError(format!("Failed to insert veto state: {}", e))
+            })?;
+
+            (
+                Some(now),
+                review_days,
+                Some(ends_at),
+                false,
+                None,
+                None,
+                None,
+            )
+        } else if let Some(state) = veto_state {
+            // Veto state exists - get current state
+            let triggered_at_str = state.get::<String, _>("veto_triggered_at");
+            let triggered_at = DateTime::parse_from_rfc3339(&triggered_at_str)
+                .map(|dt| dt.with_timezone(&Utc))
+                .ok();
+
+            let review_days = state.get::<i32, _>("review_period_days") as u32;
+            let ends_at_str = state.get::<String, _>("review_period_ends_at");
+            let ends_at = DateTime::parse_from_rfc3339(&ends_at_str)
+                .map(|dt| dt.with_timezone(&Utc))
+                .ok();
+
+            let override_flag = state.get::<i32, _>("maintainer_override") != 0;
+            let override_ts_str = state.get::<Option<String>, _>("override_timestamp");
+            let override_ts = override_ts_str.and_then(|s| {
+                DateTime::parse_from_rfc3339(&s)
                     .map(|dt| dt.with_timezone(&Utc))
-                    .ok();
-                
-                let review_days = state.get::<i32, _>("review_period_days") as u32;
-                let ends_at_str = state.get::<String, _>("review_period_ends_at");
-                let ends_at = DateTime::parse_from_rfc3339(&ends_at_str)
-                    .map(|dt| dt.with_timezone(&Utc))
-                    .ok();
-                
-                let override_flag = state.get::<i32, _>("maintainer_override") != 0;
-                let override_ts_str = state.get::<Option<String>, _>("override_timestamp");
-                let override_ts = override_ts_str.and_then(|s| {
-                    DateTime::parse_from_rfc3339(&s)
-                        .map(|dt| dt.with_timezone(&Utc))
-                        .ok()
-                });
-                let override_by = state.get::<Option<String>, _>("override_by");
-                let resolution = state.get::<Option<String>, _>("resolution_path");
-                
-                // Update veto percentages if changed
-                sqlx::query(
+                    .ok()
+            });
+            let override_by = state.get::<Option<String>, _>("override_by");
+            let resolution = state.get::<Option<String>, _>("resolution_path");
+
+            // Update veto percentages if changed
+            sqlx::query(
                     r#"
                     UPDATE pr_veto_state
                     SET mining_veto_percent = ?, economic_veto_percent = ?, threshold_met = ?, veto_active = ?
@@ -353,13 +383,21 @@ impl VetoManager {
                 .map_err(|e| {
                     GovernanceError::DatabaseError(format!("Failed to update veto state: {}", e))
                 })?;
-                
-                (triggered_at, review_days, ends_at, override_flag, override_ts, override_by, resolution)
-            } else {
-                // No veto state, threshold not met
-                (None, review_days_default, None, false, None, None, None)
-            };
-        
+
+            (
+                triggered_at,
+                review_days,
+                ends_at,
+                override_flag,
+                override_ts,
+                override_by,
+                resolution,
+            )
+        } else {
+            // No veto state, threshold not met
+            (None, review_days_default, None, false, None, None, None)
+        };
+
         // Veto is active if threshold met and not overridden
         let veto_active = threshold_met && !maintainer_override;
 
@@ -391,7 +429,7 @@ impl VetoManager {
             SELECT review_period_ends_at, maintainer_override
             FROM pr_veto_state
             WHERE pr_id = ?
-            "#
+            "#,
         )
         .bind(pr_id)
         .fetch_optional(&self.pool)
@@ -407,7 +445,7 @@ impl VetoManager {
         // Check if already overridden
         if veto_state.get::<i32, _>("maintainer_override") != 0 {
             return Err(GovernanceError::CryptoError(
-                "Veto already overridden".to_string()
+                "Veto already overridden".to_string(),
             ));
         }
 
@@ -415,14 +453,13 @@ impl VetoManager {
         let ends_at_str = veto_state.get::<String, _>("review_period_ends_at");
         let ends_at = DateTime::parse_from_rfc3339(&ends_at_str)
             .map(|dt| dt.with_timezone(&Utc))
-            .map_err(|e| {
-                GovernanceError::CryptoError(format!("Invalid timestamp: {}", e))
-            })?;
+            .map_err(|e| GovernanceError::CryptoError(format!("Invalid timestamp: {}", e)))?;
 
         if Utc::now() < ends_at {
-            return Err(GovernanceError::CryptoError(
-                format!("Review period not ended yet. Ends at: {}", ends_at)
-            ));
+            return Err(GovernanceError::CryptoError(format!(
+                "Review period not ended yet. Ends at: {}",
+                ends_at
+            )));
         }
 
         // Override veto
@@ -437,16 +474,14 @@ impl VetoManager {
                 veto_active = FALSE,
                 updated_at = CURRENT_TIMESTAMP
             WHERE pr_id = ?
-            "#
+            "#,
         )
         .bind(now.to_rfc3339())
         .bind(override_by)
         .bind(pr_id)
         .execute(&self.pool)
         .await
-        .map_err(|e| {
-            GovernanceError::DatabaseError(format!("Failed to override veto: {}", e))
-        })?;
+        .map_err(|e| GovernanceError::DatabaseError(format!("Failed to override veto: {}", e)))?;
 
         info!(
             "Veto overridden for PR {} by maintainer {} (clean fork expected)",
@@ -458,9 +493,13 @@ impl VetoManager {
 
     /// Check if opposition has dropped below threshold (consensus achieved)
     /// This implements Path A: Consensus Achieved
-    pub async fn check_consensus_achieved(&self, pr_id: i32, tier: u32) -> Result<bool, GovernanceError> {
+    pub async fn check_consensus_achieved(
+        &self,
+        pr_id: i32,
+        tier: u32,
+    ) -> Result<bool, GovernanceError> {
         let threshold = self.check_veto_threshold(pr_id, tier).await?;
-        
+
         // If threshold no longer met, consensus achieved
         if !threshold.threshold_met && threshold.veto_active {
             // Update resolution path
@@ -471,7 +510,7 @@ impl VetoManager {
                     veto_active = FALSE,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE pr_id = ?
-                "#
+                "#,
             )
             .bind(pr_id)
             .execute(&self.pool)
@@ -479,10 +518,10 @@ impl VetoManager {
             .map_err(|e| {
                 GovernanceError::DatabaseError(format!("Failed to update resolution: {}", e))
             })?;
-            
+
             return Ok(true);
         }
-        
+
         Ok(false)
     }
 
@@ -551,7 +590,7 @@ impl VetoManager {
     }
 
     /// Get node by ID (helper for tests)
-    async fn get_node_by_id(&self, node_id: i32) -> Result<EconomicNode, GovernanceError> {
+    pub async fn get_node_by_id(&self, node_id: i32) -> Result<EconomicNode, GovernanceError> {
         let registry = EconomicNodeRegistry::new(self.pool.clone());
         registry.get_node_by_id(node_id).await
     }

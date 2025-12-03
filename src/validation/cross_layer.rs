@@ -347,17 +347,29 @@ impl CrossLayerValidator {
                                 }
                                 Err(e) => {
                                     warn!("Failed to parse diff: {}. Falling back to file pattern check.", e);
-                                    return Self::check_consensus_patterns(&consensus_patterns, &changed_files);
+                                    return Self::check_consensus_patterns(
+                                        &consensus_patterns,
+                                        &changed_files,
+                                    );
                                 }
                             }
                         }
                         Ok(None) => {
                             warn!("No diff available for PR. Falling back to file pattern check.");
-                            return Self::check_consensus_patterns(&consensus_patterns, &changed_files);
+                            return Self::check_consensus_patterns(
+                                &consensus_patterns,
+                                &changed_files,
+                            );
                         }
                         Err(e) => {
-                            warn!("Failed to get PR diff: {}. Falling back to file pattern check.", e);
-                            return Self::check_consensus_patterns(&consensus_patterns, &changed_files);
+                            warn!(
+                                "Failed to get PR diff: {}. Falling back to file pattern check.",
+                                e
+                            );
+                            return Self::check_consensus_patterns(
+                                &consensus_patterns,
+                                &changed_files,
+                            );
                         }
                     }
                 } else {

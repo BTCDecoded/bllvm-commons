@@ -5,10 +5,10 @@
 //! - Time limits (180 days for resolution)
 //! - Response periods (30 days for subject)
 
+use crate::governance_review::models::{policy, GovernanceReviewCase};
 use chrono::{DateTime, Duration, Utc};
-use sqlx::{SqlitePool, Row, FromRow};
+use sqlx::{Row, SqlitePool};
 use uuid::Uuid;
-use crate::governance_review::models::{GovernanceReviewCase, policy};
 
 pub struct GovernanceReviewCaseManager {
     pool: SqlitePool,
@@ -20,7 +20,7 @@ impl GovernanceReviewCaseManager {
     }
 
     /// Create a new governance review case
-    /// 
+    ///
     /// Policy: Only on-platform activity considered
     pub async fn create_case(
         &self,
@@ -42,15 +42,16 @@ impl GovernanceReviewCaseManager {
         let response_deadline = now + Duration::days(policy::RESPONSE_DEADLINE_DAYS);
         let resolution_deadline = now + Duration::days(policy::RESOLUTION_DEADLINE_DAYS);
 
-        let evidence_json = serde_json::to_string(&evidence)?;
-        
+        let evidence_json =
+            serde_json::to_string(&evidence).map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
+
         // Start transaction for atomic case + time limits creation
         let mut tx = self.pool.begin().await?;
 
         // Generate case number with retry logic for collision handling
         let case_number = Self::generate_case_number_with_retry(&mut tx, now).await?;
-        
-        let case_id: i32 = sqlx::query_scalar(
+
+        let case_id: i32 = sqlx::query_scalar::<_, i32>(
             r#"
             INSERT INTO governance_review_cases (
                 case_number, subject_maintainer_id, reporter_maintainer_id,
@@ -72,8 +73,7 @@ impl GovernanceReviewCaseManager {
         .bind(response_deadline)
         .bind(resolution_deadline)
         .fetch_one(&mut *tx)
-        .await?
-        .get(0);
+        .await?;
 
         // Create time limit tracking within same transaction
         // Response deadline
@@ -123,12 +123,11 @@ impl GovernanceReviewCaseManager {
             let case_number = format!("GR-{}-{:04}", base_format, suffix);
 
             // Check if case number already exists
-            let exists: Option<i32> = sqlx::query_scalar(
-                "SELECT id FROM governance_review_cases WHERE case_number = ?"
-            )
-            .bind(&case_number)
-            .fetch_optional(&mut **tx)
-            .await?;
+            let exists: Option<i32> =
+                sqlx::query_scalar("SELECT id FROM governance_review_cases WHERE case_number = ?")
+                    .bind(&case_number)
+                    .fetch_optional(&mut **tx)
+                    .await?;
 
             if exists.is_none() {
                 return Ok(case_number);
@@ -199,7 +198,7 @@ impl GovernanceReviewCaseManager {
                 FROM governance_review_cases 
                 WHERE subject_maintainer_id = ? 
                 ORDER BY created_at DESC
-                "#
+                "#,
             )
             .bind(maintainer_id)
             .fetch_all(&self.pool)
@@ -215,7 +214,7 @@ impl GovernanceReviewCaseManager {
                 FROM governance_review_cases 
                 WHERE reporter_maintainer_id = ? 
                 ORDER BY created_at DESC
-                "#
+                "#,
             )
             .bind(maintainer_id)
             .fetch_all(&self.pool)
@@ -233,7 +232,8 @@ impl GovernanceReviewCaseManager {
                     severity: row.get(5),
                     status: row.get(6),
                     description: row.get(7),
-                    evidence: serde_json::from_str(row.get::<String, _>(8).as_str()).unwrap_or_default(),
+                    evidence: serde_json::from_str(row.get::<String, _>(8).as_str())
+                        .unwrap_or_default(),
                     on_platform: row.get(9),
                     created_at: row.get(10),
                     response_deadline: row.get(11),
@@ -262,15 +262,13 @@ impl GovernanceReviewCaseManager {
         // Mark as expired
         for row in &expired {
             let case_id: i32 = row.get(0);
-            sqlx::query(
-                "UPDATE governance_review_cases SET status = 'expired' WHERE id = ?"
-            )
-            .bind(case_id)
-            .execute(&self.pool)
-            .await?;
+            sqlx::query("UPDATE governance_review_cases SET status = 'expired' WHERE id = ?")
+                .bind(case_id)
+                .execute(&self.pool)
+                .await?;
         }
 
-        Ok(expired.iter().map(|row| row.get::<i32>(0)).collect())
+        Ok(expired.iter().map(|row| row.get::<i32, _>(0)).collect())
     }
 
     /// Update case status
@@ -303,4 +301,3 @@ impl GovernanceReviewCaseManager {
         Ok(())
     }
 }
-

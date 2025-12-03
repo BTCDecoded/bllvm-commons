@@ -1,7 +1,7 @@
-use bllvm_commons::database::Database;
-use bllvm_commons::validation::*;
-use bllvm_commons::enforcement::*;
-use bllvm_commons::crypto::*;
+use blvm_commons::database::Database;
+use blvm_commons::validation::*;
+use blvm_commons::enforcement::*;
+use blvm_commons::crypto::*;
 use chrono::{DateTime, Utc, Duration};
 use secp256k1::{SecretKey, Secp256k1, PublicKey};
 use rand::rngs::OsRng;
@@ -230,7 +230,7 @@ async fn test_review_period_with_emergency_tier_override() {
     assert_eq!(emergency_period, 30); // Emergency mode period
     
     // Step 4: Test with different emergency tiers
-    use bllvm_commons::validation::emergency::*;
+    use blvm_commons::validation::emergency::*;
     
     // Critical tier (0 days review)
     assert_eq!(EmergencyTier::Critical.review_period_days(), 0);

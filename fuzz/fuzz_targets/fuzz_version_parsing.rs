@@ -1,6 +1,6 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
-use bllvm_commons::validation::version_pinning::VersionPinningValidator;
+use blvm_commons::validation::version_pinning::VersionPinningValidator;
 
 fuzz_target!(|data: &str| {
     let validator = VersionPinningValidator::default();

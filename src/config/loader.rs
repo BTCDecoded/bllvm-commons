@@ -197,16 +197,13 @@ impl GovernanceConfigFiles {
         let action_tiers = Self::load_yaml(path.join("action-tiers.yml"))?;
         let repository_layers = Self::load_yaml(path.join("repository-layers.yml"))?;
         let tier_classification = Self::load_yaml(path.join("tier-classification-rules.yml"))?;
-        
+
         // Load Commons contributor thresholds (optional - may not exist)
-        let commons_contributor_thresholds = Self::load_yaml_optional(
-            path.join("commons-contributor-thresholds.yml")
-        ).ok();
+        let commons_contributor_thresholds =
+            Self::load_yaml_optional(path.join("commons-contributor-thresholds.yml")).ok();
 
         // Load teams configuration (optional - may not exist initially)
-        let teams = Self::load_yaml_optional(
-            path.join("maintainers/teams.yml")
-        ).ok();
+        let teams = Self::load_yaml_optional(path.join("maintainers/teams.yml")).ok();
 
         info!("Successfully loaded all governance configuration files");
 
@@ -220,7 +217,9 @@ impl GovernanceConfigFiles {
     }
 
     /// Load a YAML file optionally (returns None if file doesn't exist)
-    fn load_yaml_optional<T: for<'de> Deserialize<'de>>(path: PathBuf) -> Result<T, GovernanceError> {
+    fn load_yaml_optional<T: for<'de> Deserialize<'de>>(
+        path: PathBuf,
+    ) -> Result<T, GovernanceError> {
         if !path.exists() {
             return Err(GovernanceError::ConfigError(format!(
                 "Configuration file not found: {:?}",
@@ -231,7 +230,9 @@ impl GovernanceConfigFiles {
     }
 
     /// Load a YAML file optionally (returns Ok(None) if file doesn't exist, Ok(Some(T)) if it does)
-    fn load_yaml_optional_safe<T: for<'de> Deserialize<'de>>(path: PathBuf) -> Result<Option<T>, GovernanceError> {
+    fn load_yaml_optional_safe<T: for<'de> Deserialize<'de>>(
+        path: PathBuf,
+    ) -> Result<Option<T>, GovernanceError> {
         if !path.exists() {
             return Ok(None);
         }
@@ -497,6 +498,8 @@ mod tests {
             action_tiers,
             repository_layers,
             tier_classification,
+            commons_contributor_thresholds: None,
+            teams: None,
         };
 
         // This should fail because repository_layers is empty
@@ -535,6 +538,8 @@ mod tests {
             action_tiers,
             repository_layers,
             tier_classification,
+            commons_contributor_thresholds: None,
+            teams: None,
         };
 
         let tier_1 = config.get_tier_config(1);

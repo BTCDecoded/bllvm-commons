@@ -64,7 +64,10 @@ impl GovernancePhaseCalculator {
 
         info!(
             "Governance phase: {} (height: {}, nodes: {}, contributors: {})",
-            phase.as_str(), block_height, economic_nodes, contributors
+            phase.as_str(),
+            block_height,
+            economic_nodes,
+            contributors
         );
 
         Ok(phase)
@@ -76,7 +79,7 @@ impl GovernancePhaseCalculator {
         let height: Option<i64> = sqlx::query_scalar(
             r#"
             SELECT MAX(height) FROM blocks
-            "#
+            "#,
         )
         .fetch_optional(&self.pool)
         .await
@@ -92,7 +95,7 @@ impl GovernancePhaseCalculator {
         let count: Option<i64> = sqlx::query_scalar(
             r#"
             SELECT COUNT(*) FROM economic_nodes WHERE status = 'active'
-            "#
+            "#,
         )
         .fetch_optional(&self.pool)
         .await
@@ -110,7 +113,7 @@ impl GovernancePhaseCalculator {
             SELECT COUNT(DISTINCT contributor_id) 
             FROM unified_contributions 
             WHERE contributor_type IN ('merge_miner', 'fee_forwarder', 'zap_user')
-            "#
+            "#,
         )
         .fetch_optional(&self.pool)
         .await
@@ -162,20 +165,20 @@ impl GovernancePhaseCalculator {
             GovernancePhase::Early => AdaptiveParameters {
                 mining_pool_weight_cap: 0.10,  // 10% cap
                 mining_veto_threshold: 25.0,   // 25% hashpower
-                economic_veto_threshold: 35.0,  // 35% economic activity
-                tier_4_threshold: 2,            // 2 nodes can block
+                economic_veto_threshold: 35.0, // 35% economic activity
+                tier_4_threshold: 2,           // 2 nodes can block
             },
             GovernancePhase::Growth => AdaptiveParameters {
                 mining_pool_weight_cap: 0.20,  // 20% cap
                 mining_veto_threshold: 30.0,   // 30% hashpower
                 economic_veto_threshold: 40.0, // 40% economic activity
-                tier_4_threshold: 3,            // 3 nodes can block
+                tier_4_threshold: 3,           // 3 nodes can block
             },
             GovernancePhase::Mature => AdaptiveParameters {
                 mining_pool_weight_cap: 0.10,  // 10% cap (back to conservative)
                 mining_veto_threshold: 35.0,   // 35% hashpower
-                economic_veto_threshold: 45.0,  // 45% economic activity
-                tier_4_threshold: 5,            // 5 nodes can block
+                economic_veto_threshold: 45.0, // 45% economic activity
+                tier_4_threshold: 5,           // 5 nodes can block
             },
         })
     }
@@ -193,4 +196,3 @@ pub struct AdaptiveParameters {
     /// Tier 4 threshold (number of nodes that can block)
     pub tier_4_threshold: u32,
 }
-

@@ -2,7 +2,7 @@
 //!
 //! These tests snapshot GitHub API responses and status checks.
 
-use bllvm_commons::github::cross_layer_status::CrossLayerStatusChecker;
+use blvm_commons::github::cross_layer_status::CrossLayerStatusChecker;
 use insta::assert_snapshot;
 
 #[test]

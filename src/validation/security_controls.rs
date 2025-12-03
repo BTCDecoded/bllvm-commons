@@ -292,7 +292,7 @@ impl SecurityControlValidator {
     fn simple_glob_match(&self, file: &str, pattern: &str) -> bool {
         // Convert glob pattern to regex-like matching
         let pattern_parts: Vec<&str> = pattern.split('*').collect();
-        let file_parts: Vec<&str> = file.split('/').collect();
+        let _file_parts: Vec<&str> = file.split('/').collect();
 
         if pattern_parts.len() == 1 {
             // No wildcards, exact match
@@ -333,6 +333,7 @@ impl SecurityControlValidator {
         match max_priority {
             "P0" if p0_count > 1 => ImpactLevel::Critical,
             "P0" => ImpactLevel::High,
+            "P1" if p1_count > 1 => ImpactLevel::High,
             "P1" => ImpactLevel::Medium,
             "P2" => ImpactLevel::Low,
             _ => ImpactLevel::None,

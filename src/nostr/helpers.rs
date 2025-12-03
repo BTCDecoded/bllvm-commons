@@ -351,16 +351,9 @@ mod tests {
         let db = Database::new_in_memory().await.unwrap();
 
         // Should return Ok immediately when Nostr is disabled
-        let result = publish_merge_action(
-            &config,
-            &db,
-            "BTCDecoded/blvm-consensus",
-            1,
-            "abc123",
-            2,
-            3,
-        )
-        .await;
+        let result =
+            publish_merge_action(&config, &db, "BTCDecoded/blvm-consensus", 1, "abc123", 2, 3)
+                .await;
 
         assert!(result.is_ok());
     }

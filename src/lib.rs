@@ -18,4 +18,7 @@ pub mod services;
 pub mod validation;
 pub mod webhooks;
 
+#[cfg(feature = "opentimestamps")]
+pub mod ots;
+
 pub use error::GovernanceError;

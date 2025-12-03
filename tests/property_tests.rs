@@ -2,7 +2,7 @@
 //!
 //! Run with: cargo test --test property_tests
 
-use bllvm_commons::validation::content_hash::ContentHashValidator;
+use blvm_commons::validation::content_hash::ContentHashValidator;
 use proptest::prelude::*;
 
 proptest! {
@@ -40,7 +40,7 @@ fn test_empty_hash() {
     assert_eq!(hash, expected, "Empty content must produce known hash");
 }
 
-use bllvm_commons::validation::version_pinning::VersionPinningValidator;
+use blvm_commons::validation::version_pinning::VersionPinningValidator;
 
 proptest! {
     /// Property: Version parsing is deterministic
@@ -78,7 +78,7 @@ proptest! {
     }
 }
 
-use bllvm_commons::github::cross_layer_status::CrossLayerStatusChecker;
+use blvm_commons::github::cross_layer_status::CrossLayerStatusChecker;
 
 proptest! {
     /// Property: Test count extraction handles various formats
@@ -118,18 +118,21 @@ proptest! {
     }
 }
 
-use bllvm_commons::crypto::signatures::SignatureManager;
+use blvm_commons::crypto::signatures::SignatureManager;
+use rand::rngs::StdRng;
+use rand::SeedableRng;
 use secp256k1::{PublicKey, Secp256k1, SecretKey};
 
 proptest! {
     /// Property: Signature creation and verification round-trip
     #[test]
     fn test_signature_round_trip(
-        message in prop::string::string_regex(".*").unwrap()
+        message in prop::string::string_regex(".*").unwrap(),
+        seed in prop::array::uniform32(any::<u8>())
     ) {
         let manager = SignatureManager::new();
         let secp = Secp256k1::new();
-        let mut rng = proptest::test_runner::TestRng::deterministic_rng(proptest::test_runner::RngAlgorithm::ChaCha);
+        let mut rng = StdRng::from_seed(seed);
         let secret_key = SecretKey::new(&mut rng);
         let public_key = PublicKey::from_secret_key(&secp, &secret_key);
 
@@ -143,13 +146,14 @@ proptest! {
     #[test]
     fn test_signature_different_message(
         message1 in prop::string::string_regex(".+").unwrap(),
-        message2 in prop::string::string_regex(".+").unwrap()
+        message2 in prop::string::string_regex(".+").unwrap(),
+        seed in prop::array::uniform32(any::<u8>())
     ) {
         prop_assume!(message1 != message2);
 
         let manager = SignatureManager::new();
         let secp = Secp256k1::new();
-        let mut rng = proptest::test_runner::TestRng::deterministic_rng(proptest::test_runner::RngAlgorithm::ChaCha);
+        let mut rng = StdRng::from_seed(seed);
         let secret_key = SecretKey::new(&mut rng);
         let public_key = PublicKey::from_secret_key(&secp, &secret_key);
 

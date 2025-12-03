@@ -3,8 +3,8 @@
 //! These tests use test cases with multiple inputs to verify edge cases
 //! and boundary conditions systematically.
 
-use bllvm_commons::validation::content_hash::ContentHashValidator;
-use bllvm_commons::validation::version_pinning::VersionPinningValidator;
+use blvm_commons::validation::content_hash::ContentHashValidator;
+use blvm_commons::validation::version_pinning::VersionPinningValidator;
 
 /// Test cases for hash computation with known inputs
 #[test]

@@ -2,9 +2,9 @@
 //!
 //! Notifies maintainers about approaching deadlines for cases, appeals, mediations
 
+use crate::governance_review::github_integration::GovernanceReviewGitHubIntegration;
 use chrono::{DateTime, Duration, Utc};
 use sqlx::{Row, SqlitePool};
-use crate::governance_review::github_integration::GovernanceReviewGitHubIntegration;
 use tracing::{info, warn};
 
 /// Days before deadline to send notification
@@ -58,7 +58,10 @@ impl DeadlineNotificationManager {
 
             for mediation_id in &mediation_deadlines {
                 if let Err(e) = self.notify_mediation_deadline(*mediation_id, github).await {
-                    warn!("Failed to notify mediation deadline {}: {}", mediation_id, e);
+                    warn!(
+                        "Failed to notify mediation deadline {}: {}",
+                        mediation_id, e
+                    );
                 }
             }
         } else {
@@ -138,10 +141,10 @@ impl DeadlineNotificationManager {
         github: &GovernanceReviewGitHubIntegration,
     ) -> Result<(), sqlx::Error> {
         use crate::governance_review::case::GovernanceReviewCaseManager;
-        
+
         let case_manager = GovernanceReviewCaseManager::new(self.pool.clone());
         let case = case_manager.get_case_by_id(case_id).await?;
-        
+
         if let Some(deadline) = case.resolution_deadline {
             let days_remaining = (deadline - Utc::now()).num_days();
             let message = format!(
@@ -161,17 +164,23 @@ This case must be resolved within the deadline per governance review policy.
 
             // Post comment to GitHub issue if linked
             if let Some(issue_number) = case.github_issue_number {
-                if let Err(e) = github.post_issue_comment(
-                    issue_number,
-                    &message,
-                ).await {
-                    warn!("Failed to post deadline notification to issue #{}: {}", issue_number, e);
+                if let Err(e) = github.post_issue_comment(issue_number, &message).await {
+                    warn!(
+                        "Failed to post deadline notification to issue #{}: {}",
+                        issue_number, e
+                    );
                 } else {
-                    info!("Posted deadline notification to issue #{} for case {}", issue_number, case.case_number);
+                    info!(
+                        "Posted deadline notification to issue #{} for case {}",
+                        issue_number, case.case_number
+                    );
                 }
             } else {
                 // Log notification if no issue linked
-                info!("Case deadline notification: {} ({} days remaining) - no GitHub issue linked", case.case_number, days_remaining);
+                info!(
+                    "Case deadline notification: {} ({} days remaining) - no GitHub issue linked",
+                    case.case_number, days_remaining
+                );
             }
         }
 
@@ -199,10 +208,13 @@ This case must be resolved within the deadline per governance review policy.
         if let Some(row) = row {
             let case_id: i32 = row.get(1);
             let appeal_deadline: Option<DateTime<Utc>> = row.get(2);
-            
+
             if let Some(deadline) = appeal_deadline {
                 let days_remaining = (deadline - Utc::now()).num_days();
-                info!("Appeal deadline notification: case {} ({} days remaining)", case_id, days_remaining);
+                info!(
+                    "Appeal deadline notification: case {} ({} days remaining)",
+                    case_id, days_remaining
+                );
             }
         }
 
@@ -230,10 +242,13 @@ This case must be resolved within the deadline per governance review policy.
         if let Some(row) = row {
             let case_id: i32 = row.get(1);
             let mediation_deadline: Option<DateTime<Utc>> = row.get(2);
-            
+
             if let Some(deadline) = mediation_deadline {
                 let days_remaining = (deadline - Utc::now()).num_days();
-                info!("Mediation deadline notification: case {} ({} days remaining)", case_id, days_remaining);
+                info!(
+                    "Mediation deadline notification: case {} ({} days remaining)",
+                    case_id, days_remaining
+                );
             }
         }
 
@@ -247,4 +262,3 @@ pub struct DeadlineNotificationResult {
     pub appeals_notified: usize,
     pub mediations_notified: usize,
 }
-

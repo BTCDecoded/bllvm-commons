@@ -3,8 +3,8 @@
 //! These tests use insta to snapshot complex data structures and verify
 //! they don't change unexpectedly.
 
-use bllvm_commons::validation::content_hash::{ContentHashValidator, DirectoryHashResult};
-use bllvm_commons::validation::version_pinning::VersionPinningValidator;
+use blvm_commons::validation::content_hash::{ContentHashValidator, DirectoryHashResult};
+use blvm_commons::validation::version_pinning::VersionPinningValidator;
 use insta::assert_snapshot;
 
 #[test]

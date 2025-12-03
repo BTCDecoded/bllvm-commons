@@ -5,9 +5,9 @@
 //! - False report consequences
 //! - Privacy for reporters
 
+use crate::governance_review::models::{FalseReport, Retaliation};
 use chrono::{DateTime, Utc};
-use sqlx::{SqlitePool, Row};
-use crate::governance_review::models::{Retaliation, FalseReport};
+use sqlx::{Row, SqlitePool};
 
 pub struct ProtectionManager {
     pool: SqlitePool,
@@ -28,7 +28,7 @@ impl ProtectionManager {
         retaliation_type: &str,
         description: &str,
     ) -> Result<Retaliation, sqlx::Error> {
-        let retaliation_id: i32 = sqlx::query_scalar(
+        let retaliation_id: i32 = sqlx::query_scalar::<_, i32>(
             r#"
             INSERT INTO governance_review_retaliation
             (original_case_id, reporter_maintainer_id, retaliator_maintainer_id,
@@ -43,14 +43,16 @@ impl ProtectionManager {
         .bind(retaliation_type)
         .bind(description)
         .fetch_one(&self.pool)
-        .await?
-        .get(0);
+        .await?;
 
         self.get_retaliation_by_id(retaliation_id).await
     }
 
     /// Get retaliation by ID
-    pub async fn get_retaliation_by_id(&self, retaliation_id: i32) -> Result<Retaliation, sqlx::Error> {
+    pub async fn get_retaliation_by_id(
+        &self,
+        retaliation_id: i32,
+    ) -> Result<Retaliation, sqlx::Error> {
         let row = sqlx::query(
             r#"
             SELECT 
@@ -132,10 +134,16 @@ impl ProtectionManager {
             VALUES (?, ?, ?, 'retaliation', 'gross_misconduct', 'removed', ?, '{}', true, ?, ?, ?)
             "#,
         )
-        .bind(format!("GR-RETALIATION-{}", Utc::now().format("%Y%m%d-%H%M%S")))
+        .bind(format!(
+            "GR-RETALIATION-{}",
+            Utc::now().format("%Y%m%d-%H%M%S")
+        ))
         .bind(retaliation.retaliator_maintainer_id)
         .bind(retaliation.reporter_maintainer_id)
-        .bind(format!("Retaliation confirmed: {}", retaliation.description))
+        .bind(format!(
+            "Retaliation confirmed: {}",
+            retaliation.description
+        ))
         .bind(Utc::now())
         .bind(Utc::now())
         .bind("Immediate removal due to confirmed retaliation")
@@ -156,7 +164,7 @@ impl ProtectionManager {
         false_reporter_maintainer_id: i32,
         false_report_evidence: &str,
     ) -> Result<FalseReport, sqlx::Error> {
-        let false_report_id: i32 = sqlx::query_scalar(
+        let false_report_id: i32 = sqlx::query_scalar::<_, i32>(
             r#"
             INSERT INTO governance_review_false_reports
             (original_case_id, false_reporter_maintainer_id, false_report_evidence, sanction_applied)
@@ -168,14 +176,16 @@ impl ProtectionManager {
         .bind(false_reporter_maintainer_id)
         .bind(false_report_evidence)
         .fetch_one(&self.pool)
-        .await?
-        .get(0);
+        .await?;
 
         self.get_false_report_by_id(false_report_id).await
     }
 
     /// Get false report by ID
-    pub async fn get_false_report_by_id(&self, false_report_id: i32) -> Result<FalseReport, sqlx::Error> {
+    pub async fn get_false_report_by_id(
+        &self,
+        false_report_id: i32,
+    ) -> Result<FalseReport, sqlx::Error> {
         let row = sqlx::query(
             r#"
             SELECT 
@@ -200,4 +210,3 @@ impl ProtectionManager {
         })
     }
 }
-

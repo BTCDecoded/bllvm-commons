@@ -1,8 +1,8 @@
 //! Integration tests for build orchestration
 
-use bllvm_commons::build::*;
-use bllvm_commons::github::client::GitHubClient;
-use bllvm_commons::database::Database;
+use blvm_commons::build::*;
+use blvm_commons::github::client::GitHubClient;
+use blvm_commons::database::Database;
 use serde_json::json;
 
 // Mock GitHub client for testing

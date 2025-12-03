@@ -96,7 +96,11 @@ impl VoteAggregator {
 
     /// Get participation-based votes (from economic nodes and contributors)
     /// This integrates with the economic node veto system and participation weights
-    async fn get_participation_votes(&self, pr_id: i32, tier: u32) -> Result<ParticipationVoteTotals> {
+    async fn get_participation_votes(
+        &self,
+        pr_id: i32,
+        tier: u32,
+    ) -> Result<ParticipationVoteTotals> {
         // Check economic node veto threshold with tier-specific thresholds
         // AND logic: both mining and economic thresholds must be met
         let veto_threshold = self

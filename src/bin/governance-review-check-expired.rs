@@ -2,9 +2,9 @@
 //!
 //! This binary is designed to be run by GitHub Actions workflows on a schedule
 
-use bllvm_commons::governance_review::{
-    AppealManager, DeadlineNotificationManager, GovernanceReviewCaseManager, MediationManager,
-    TimeLimitManager, get_database_url, get_github_token, get_governance_repo,
+use blvm_commons::governance_review::{
+    get_database_url, get_github_token, get_governance_repo, AppealManager,
+    DeadlineNotificationManager, GovernanceReviewCaseManager, MediationManager, TimeLimitManager,
 };
 use sqlx::SqlitePool;
 use tracing::{error, info};
@@ -21,21 +21,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let notify_deadlines = args.contains(&"--notify-deadlines".to_string());
 
     // If no specific check specified, run all
-    let run_all = !check_cases && !check_time_limits && !check_appeals && !check_mediations && !notify_deadlines;
+    let run_all = !check_cases
+        && !check_time_limits
+        && !check_appeals
+        && !check_mediations
+        && !notify_deadlines;
 
     let database_url = get_database_url();
     let pool = SqlitePool::connect(&database_url).await?;
 
     // Setup GitHub integration (optional)
-    let github_integration = if let (Some(_token), Some((owner, name))) = (get_github_token(), get_governance_repo()) {
-        // TODO: Create GitHubClient with token
-        // For now, create integration without client (will log only)
-        info!("GitHub integration available (token found)");
-        None // Placeholder - would create actual integration here
-    } else {
-        info!("GitHub integration not available (no token or repo config)");
-        None
-    };
+    let github_integration =
+        if let (Some(_token), Some((owner, name))) = (get_github_token(), get_governance_repo()) {
+            // TODO: Create GitHubClient with token
+            // For now, create integration without client (will log only)
+            info!("GitHub integration available (token found)");
+            None // Placeholder - would create actual integration here
+        } else {
+            info!("GitHub integration not available (no token or repo config)");
+            None
+        };
 
     if run_all || check_cases {
         info!("Checking for expired cases...");
@@ -104,4 +109,3 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("Background job completed successfully");
     Ok(())
 }
-

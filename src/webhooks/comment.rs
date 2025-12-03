@@ -1,9 +1,10 @@
 use serde_json::Value;
-use tracing::{info, warn, error};
+use tracing::{error, info, warn};
 
 use crate::crypto::signatures::SignatureManager;
 use crate::database::Database;
-use crate::governance_review::{GovernanceReviewCaseManager, policy};
+use crate::governance_review::models::policy;
+use crate::governance_review::GovernanceReviewCaseManager;
 
 pub async fn handle_comment_event(
     database: &Database,
@@ -307,8 +308,11 @@ async fn handle_governance_review_case(
     };
 
     // Parse command: /governance-review-case @subject case_type severity "description" [evidence_json]
-    let remainder = body.strip_prefix("/governance-review-case").unwrap_or("").trim();
-    
+    let remainder = body
+        .strip_prefix("/governance-review-case")
+        .unwrap_or("")
+        .trim();
+
     if remainder.is_empty() {
         return Ok(axum::response::Json(
             serde_json::json!({"status": "error", "error": "Missing required parameters. Format: /governance-review-case @subject case_type severity \"description\" [evidence_json]"}),
@@ -324,7 +328,7 @@ async fn handle_governance_review_case(
     }
 
     let subject_username = &parts[0][1..]; // Remove @
-    
+
     // Get subject maintainer
     let subject = match database.get_maintainer_by_username(subject_username).await {
         Ok(Some(maintainer)) => maintainer,
@@ -348,14 +352,14 @@ async fn handle_governance_review_case(
 
     let case_type = parts[1];
     let severity = parts[2];
-    
+
     // Validate case_type and severity
     if !policy::CASE_TYPES.contains(&case_type) {
         return Ok(axum::response::Json(
             serde_json::json!({"status": "error", "error": format!("Invalid case_type: {}. Valid types: {:?}", case_type, policy::CASE_TYPES)}),
         ));
     }
-    
+
     if !policy::SEVERITY_LEVELS.contains(&severity) {
         return Ok(axum::response::Json(
             serde_json::json!({"status": "error", "error": format!("Invalid severity: {}. Valid levels: {:?}", severity, policy::SEVERITY_LEVELS)}),
@@ -365,13 +369,13 @@ async fn handle_governance_review_case(
     // Parse description (quoted string)
     let description_start = remainder.find('"');
     let description_end = if let Some(start) = description_start {
-        remainder[start+1..].find('"').map(|end| start + 1 + end)
+        remainder[start + 1..].find('"').map(|end| start + 1 + end)
     } else {
         None
     };
 
     let description = if let (Some(start), Some(end)) = (description_start, description_end) {
-        &remainder[start+1..end]
+        &remainder[start + 1..end]
     } else {
         return Ok(axum::response::Json(
             serde_json::json!({"status": "error", "error": "Description must be in quotes"}),
@@ -387,30 +391,34 @@ async fn handle_governance_review_case(
     };
 
     // Create case (on-platform only per policy)
-    let pool = database.get_sqlite_pool()
+    let pool = database
+        .get_sqlite_pool()
         .ok_or_else(|| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-    
-    let case_manager = GovernanceReviewCaseManager::new(pool);
-    
-    match case_manager.create_case(
-        subject.id,
-        reporter.id,
-        case_type,
-        severity,
-        description,
-        evidence,
-        true, // on-platform only
-    ).await {
+
+    let case_manager = GovernanceReviewCaseManager::new(pool.clone());
+
+    match case_manager
+        .create_case(
+            subject.id,
+            reporter.id,
+            case_type,
+            severity,
+            description,
+            evidence,
+            true, // on-platform only
+        )
+        .await
+    {
         Ok(case) => {
-            info!("Created governance review case {} by {} for {}", 
-                case.case_number, commenter, subject_username);
-            Ok(axum::response::Json(
-                serde_json::json!({
-                    "status": "ok",
-                    "case_number": case.case_number,
-                    "message": format!("Governance review case {} created", case.case_number)
-                }),
-            ))
+            info!(
+                "Created governance review case {} by {} for {}",
+                case.case_number, commenter, subject_username
+            );
+            Ok(axum::response::Json(serde_json::json!({
+                "status": "ok",
+                "case_number": case.case_number,
+                "message": format!("Governance review case {} created", case.case_number)
+            })))
         }
         Err(e) => {
             error!("Failed to create governance review case: {}", e);

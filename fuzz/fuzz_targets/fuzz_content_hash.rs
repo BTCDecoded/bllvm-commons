@@ -1,6 +1,6 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
-use bllvm_commons::validation::content_hash::ContentHashValidator;
+use blvm_commons::validation::content_hash::ContentHashValidator;
 
 fuzz_target!(|data: &[u8]| {
     let validator = ContentHashValidator::new();

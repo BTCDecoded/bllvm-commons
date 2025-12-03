@@ -205,10 +205,7 @@ fn load_governance_config() -> Result<GovernanceConfig> {
     };
 
     // Add both formats for compatibility
-    repos.insert(
-        "blvm-consensus".to_string(),
-        consensus_proof_config.clone(),
-    );
+    repos.insert("blvm-consensus".to_string(), consensus_proof_config.clone());
     repos.insert(
         "BTCDecoded/blvm-consensus".to_string(),
         consensus_proof_config,

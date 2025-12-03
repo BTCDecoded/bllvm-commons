@@ -1,9 +1,9 @@
 //! Tests for governance review system
 
-use bllvm_commons::governance_review::{
-    AppealManager, GovernanceReviewCaseManager, MediationManager, RemovalManager,
-    SanctionManager, TimeLimitManager, get_database_url, get_github_token, get_governance_repo,
-    is_github_actions,
+use blvm_commons::governance_review::{
+    get_database_url, get_github_token, get_governance_repo, is_github_actions, AppealManager,
+    GovernanceReviewCaseManager, MediationManager, RemovalManager, SanctionManager,
+    TimeLimitManager,
 };
 use chrono::{Duration, Utc};
 use sqlx::SqlitePool;
@@ -58,7 +58,7 @@ async fn test_env_variables() {
 #[tokio::test]
 async fn test_case_creation_off_platform_rejection() {
     let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
-    
+
     // Run migrations
     sqlx::query(
         r#"
@@ -106,7 +106,7 @@ async fn test_case_creation_off_platform_rejection() {
 #[tokio::test]
 async fn test_sanction_thresholds() {
     let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
-    
+
     // Run migrations
     sqlx::query(
         r#"
@@ -149,6 +149,16 @@ async fn test_sanction_thresholds() {
             sanction_type TEXT NOT NULL,
             approved_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             signature TEXT
+        );
+        CREATE TABLE IF NOT EXISTS governance_review_time_limits (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            case_id INTEGER NOT NULL,
+            limit_type TEXT NOT NULL,
+            deadline TEXT NOT NULL,
+            extended BOOLEAN DEFAULT false,
+            extension_approved_by INTEGER,
+            extension_reason TEXT,
+            extension_until TEXT
         )
         "#,
     )
@@ -191,7 +201,7 @@ async fn test_sanction_thresholds() {
 #[tokio::test]
 async fn test_time_limits() {
     let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
-    
+
     sqlx::query(
         r#"
         CREATE TABLE IF NOT EXISTS governance_review_time_limits (
@@ -230,7 +240,7 @@ async fn test_time_limits() {
 #[tokio::test]
 async fn test_removal_deactivation() {
     let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
-    
+
     sqlx::query(
         r#"
         CREATE TABLE IF NOT EXISTS maintainers (
@@ -265,6 +275,16 @@ async fn test_removal_deactivation() {
             sanction_type TEXT NOT NULL,
             approved_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             signature TEXT
+        );
+        CREATE TABLE IF NOT EXISTS governance_review_time_limits (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            case_id INTEGER NOT NULL,
+            limit_type TEXT NOT NULL,
+            deadline TEXT NOT NULL,
+            extended BOOLEAN DEFAULT false,
+            extension_approved_by INTEGER,
+            extension_reason TEXT,
+            extension_until TEXT
         )
         "#,
     )
@@ -274,7 +294,7 @@ async fn test_removal_deactivation() {
 
     // Create a maintainer
     sqlx::query(
-        "INSERT INTO maintainers (github_username, public_key, layer, active) VALUES (?, ?, ?, ?)"
+        "INSERT INTO maintainers (github_username, public_key, layer, active) VALUES (?, ?, ?, ?)",
     )
     .bind("test_maintainer")
     .bind("test_key")
@@ -310,7 +330,7 @@ async fn test_removal_deactivation() {
             case.id,
             1,
             vec![10, 11, 12, 13, 14, 15], // 6 approvals
-            4, // 4 teams
+            4,                            // 4 teams
         )
         .await;
 
@@ -319,4 +339,3 @@ async fn test_removal_deactivation() {
     // Check maintainer is now inactive
     assert!(!removal_manager.is_maintainer_active(1).await.unwrap());
 }
-

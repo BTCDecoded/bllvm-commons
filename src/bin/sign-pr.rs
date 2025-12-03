@@ -8,7 +8,7 @@ use std::fs;
 use std::path::Path;
 use std::str::FromStr;
 
-use bllvm_commons::crypto::signatures::SignatureManager;
+use blvm_commons::crypto::signatures::SignatureManager;
 
 #[derive(Parser)]
 #[command(name = "sign-pr")]

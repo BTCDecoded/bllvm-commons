@@ -5,9 +5,9 @@
 //! - Optional neutral mediator
 //! - Conflict resolution before escalation
 
+use crate::governance_review::models::{policy, Mediation};
 use chrono::{DateTime, Duration, Utc};
 use sqlx::{Row, SqlitePool};
-use crate::governance_review::models::{Mediation, policy};
 
 pub struct MediationManager {
     pool: SqlitePool,
@@ -28,7 +28,7 @@ impl MediationManager {
         // Policy: 30-day mediation period
         let mediation_deadline = Utc::now() + Duration::days(policy::MEDIATION_PERIOD_DAYS);
 
-        let mediation_id: i32 = sqlx::query_scalar(
+        let mediation_id: i32 = sqlx::query_scalar::<_, i32>(
             r#"
             INSERT INTO governance_review_mediation
             (case_id, mediator_maintainer_id, mediation_deadline, status)
@@ -40,16 +40,13 @@ impl MediationManager {
         .bind(mediator_maintainer_id)
         .bind(mediation_deadline)
         .fetch_one(&self.pool)
-        .await?
-        .get(0);
+        .await?;
 
         // Update case status
-        sqlx::query(
-            "UPDATE governance_review_cases SET status = 'mediation' WHERE id = ?"
-        )
-        .bind(case_id)
-        .execute(&self.pool)
-        .await?;
+        sqlx::query("UPDATE governance_review_cases SET status = 'mediation' WHERE id = ?")
+            .bind(case_id)
+            .execute(&self.pool)
+            .await?;
 
         self.get_mediation_by_id(mediation_id).await
     }
@@ -170,10 +167,10 @@ impl MediationManager {
         // Mark as failed (expired = failed)
         for row in &expired {
             let mediation_id: i32 = row.get(0);
-            self.fail_mediation(mediation_id, "Mediation period expired without resolution").await?;
+            self.fail_mediation(mediation_id, "Mediation period expired without resolution")
+                .await?;
         }
 
         Ok(expired.iter().map(|row| row.get::<i32, _>(0)).collect())
     }
 }
-

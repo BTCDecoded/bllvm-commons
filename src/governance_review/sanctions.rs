@@ -5,9 +5,9 @@
 //! - Level 2: Public warning (5-of-7 team, 90-day improvement)
 //! - Level 3: Removal (6-of-7 team + 4-of-7 teams)
 
+use crate::governance_review::models::{policy, GovernanceReviewWarning, SanctionApproval};
 use chrono::{DateTime, Duration, Utc};
-use sqlx::{SqlitePool, Row};
-use crate::governance_review::models::{GovernanceReviewWarning, SanctionApproval, policy};
+use sqlx::{Row, SqlitePool};
 
 pub struct SanctionManager {
     pool: SqlitePool,
@@ -37,21 +37,21 @@ impl SanctionManager {
         // Record approvals
         for approver_id in &approvals {
             sqlx::query(
-            r#"
+                r#"
             INSERT INTO governance_review_sanction_approvals 
             (case_id, maintainer_id, sanction_type)
             VALUES (?, ?, 'private_warning')
             "#,
-        )
-        .bind(case_id)
-        .bind(approver_id)
-        .execute(&mut *tx)
-        .await?;
+            )
+            .bind(case_id)
+            .bind(approver_id)
+            .execute(&mut *tx)
+            .await?;
         }
 
         // Create warning
         let approval_count = approvals.len() as i32;
-        let warning_id: i32 = sqlx::query_scalar(
+        let warning_id: i32 = sqlx::query_scalar::<_, i32>(
             r#"
             INSERT INTO governance_review_warnings
             (case_id, maintainer_id, warning_level, warning_type, issued_by_team_approval)
@@ -63,8 +63,7 @@ impl SanctionManager {
         .bind(maintainer_id)
         .bind(approval_count)
         .fetch_one(&mut *tx)
-        .await?
-        .get(0);
+        .await?;
 
         // Commit transaction
         tx.commit().await?;
@@ -92,16 +91,16 @@ impl SanctionManager {
         // Record approvals
         for approver_id in &approvals {
             sqlx::query(
-            r#"
+                r#"
             INSERT INTO governance_review_sanction_approvals 
             (case_id, maintainer_id, sanction_type)
             VALUES (?, ?, 'public_warning')
             "#,
-        )
-        .bind(case_id)
-        .bind(approver_id)
-        .execute(&mut *tx)
-        .await?;
+            )
+            .bind(case_id)
+            .bind(approver_id)
+            .execute(&mut *tx)
+            .await?;
         }
 
         // Policy: 90-day improvement period
@@ -109,7 +108,7 @@ impl SanctionManager {
 
         // Create warning
         let approval_count = approvals.len() as i32;
-        let warning_id: i32 = sqlx::query_scalar(
+        let warning_id: i32 = sqlx::query_scalar::<_, i32>(
             r#"
             INSERT INTO governance_review_warnings
             (case_id, maintainer_id, warning_level, warning_type, 
@@ -124,8 +123,7 @@ impl SanctionManager {
         .bind(improvement_deadline)
         .bind(&warning_file_path)
         .fetch_one(&mut *tx)
-        .await?
-        .get(0);
+        .await?;
 
         // Commit transaction
         tx.commit().await?;
@@ -134,7 +132,10 @@ impl SanctionManager {
     }
 
     /// Get warning by ID
-    pub async fn get_warning_by_id(&self, warning_id: i32) -> Result<GovernanceReviewWarning, sqlx::Error> {
+    pub async fn get_warning_by_id(
+        &self,
+        warning_id: i32,
+    ) -> Result<GovernanceReviewWarning, sqlx::Error> {
         let row = sqlx::query(
             r#"
             SELECT 
@@ -179,10 +180,9 @@ impl SanctionManager {
         .bind(maintainer_id)
         .fetch_one(&self.pool)
         .await?;
-        
+
         let count: i64 = row.get(0);
 
         Ok(count > 0)
     }
 }
-

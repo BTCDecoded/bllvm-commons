@@ -215,19 +215,19 @@ impl DiffParser {
     pub fn contains_consensus_logic_changes(file_diff: &FileDiff) -> bool {
         // Patterns that indicate logic changes
         let logic_patterns = vec![
-            "fn ",           // Function definitions
-            "pub fn ",       // Public function definitions
-            "struct ",       // Struct definitions
-            "enum ",         // Enum definitions
-            "trait ",        // Trait definitions
-            "impl ",         // Implementation blocks
-            "macro_rules!",  // Macro definitions
+            "fn ",             // Function definitions
+            "pub fn ",         // Public function definitions
+            "struct ",         // Struct definitions
+            "enum ",           // Enum definitions
+            "trait ",          // Trait definitions
+            "impl ",           // Implementation blocks
+            "macro_rules!",    // Macro definitions
             "#[macro_export]", // Macro exports
-            "if ",           // Conditional logic
-            "match ",        // Pattern matching
-            "return ",       // Return statements
-            "-> ",           // Function return types
-            "=> ",           // Match arms, closures
+            "if ",             // Conditional logic
+            "match ",          // Pattern matching
+            "return ",         // Return statements
+            "-> ",             // Function return types
+            "=> ",             // Match arms, closures
         ];
 
         for line in &file_diff.additions {
@@ -236,8 +236,7 @@ impl DiffParser {
                 if trimmed.contains(pattern) && !Self::is_import_or_comment_line(line) {
                     debug!(
                         "Consensus logic change detected in {}: {}",
-                        file_diff.filename,
-                        trimmed
+                        file_diff.filename, trimmed
                     );
                     return true;
                 }
@@ -250,8 +249,7 @@ impl DiffParser {
                 if trimmed.contains(pattern) && !Self::is_import_or_comment_line(line) {
                     debug!(
                         "Consensus logic change detected in {}: {}",
-                        file_diff.filename,
-                        trimmed
+                        file_diff.filename, trimmed
                     );
                     return true;
                 }
@@ -436,4 +434,3 @@ mod tests {
         assert!(DiffParser::is_import_only_changes(&diff));
     }
 }
-

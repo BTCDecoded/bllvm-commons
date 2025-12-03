@@ -3,9 +3,9 @@
 //! These tests verify the extract_test_counts_from_ci functionality
 //! using mocked GitHub API responses.
 
-use bllvm_commons::github::cross_layer_status::CrossLayerStatusChecker;
-use bllvm_commons::github::client::GitHubClient;
-use bllvm_commons::github::types::CheckRun;
+use blvm_commons::github::cross_layer_status::CrossLayerStatusChecker;
+use blvm_commons::github::client::GitHubClient;
+use blvm_commons::github::types::CheckRun;
 use wiremock::{Mock, MockServer, ResponseTemplate};
 use wiremock::matchers::{method, path};
 use serde_json::json;

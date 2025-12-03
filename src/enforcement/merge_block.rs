@@ -17,7 +17,7 @@ impl MergeBlocker {
     }
 
     /// Determine if merge should be blocked based on governance requirements
-    /// 
+    ///
     /// For sequential veto mechanism:
     /// - If veto active and review period not expired: Block
     /// - If veto active and review period expired but not overridden: Block

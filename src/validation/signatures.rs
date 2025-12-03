@@ -56,7 +56,7 @@ impl SignatureValidator {
         signatures: &[(String, String)],    // (signer, signature)
         required_threshold: (usize, usize), // (required, total)
         maintainer_keys: &std::collections::HashMap<String, String>, // username -> public_key
-        tier: Option<u32>, // Optional tier for nested multisig
+        tier: Option<u32>,                  // Optional tier for nested multisig
     ) -> Result<bool, GovernanceError> {
         // For Tier 3+, use nested multisig if available
         if let Some(tier_val) = tier {
@@ -72,9 +72,10 @@ impl SignatureValidator {
                             }
                         }
                     }
-                    
+
                     // Use nested multisig verification
-                    let result = nested_verifier.verify_nested_multisig(&verified_sigs, tier_val)?;
+                    let result =
+                        nested_verifier.verify_nested_multisig(&verified_sigs, tier_val)?;
                     return Ok(result.inter_team_approved);
                 }
             }

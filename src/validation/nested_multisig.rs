@@ -32,12 +32,12 @@ impl NestedMultisigVerifier {
     }
 
     /// Verify nested multisig signatures
-    /// 
+    ///
     /// Process:
     /// 1. Group signatures by team
     /// 2. Count team approvals (6-of-7 per team required)
     /// 3. Count inter-team approvals (6-of-7 teams required)
-    /// 
+    ///
     /// Returns: (teams_approved, teams_required, maintainers_approved, maintainers_required)
     pub fn verify_nested_multisig(
         &self,
@@ -49,7 +49,7 @@ impl NestedMultisigVerifier {
 
         // Group signatures by team
         let mut team_signatures: HashMap<String, Vec<(String, String)>> = HashMap::new();
-        
+
         for (github, signature) in signatures {
             // Find which team this maintainer belongs to
             if let Some(team_id) = self.find_maintainer_team(github) {
@@ -68,7 +68,7 @@ impl NestedMultisigVerifier {
         for team in &self.teams {
             let team_sigs = team_signatures.get(&team.id).map(|v| v.len()).unwrap_or(0);
             let team_approved = team_sigs >= maintainers_per_team_required;
-            
+
             if team_approved {
                 teams_approved += 1;
                 total_maintainers_approved += team_sigs;
@@ -109,11 +109,11 @@ impl NestedMultisigVerifier {
     /// Get tier requirements for nested multisig
     fn get_tier_requirements(tier: u32) -> (usize, usize) {
         match tier {
-            1 => (4, 5),  // Tier 1: 4-of-7 teams × 5-of-7 per team = 20 maintainers
-            2 => (5, 6),  // Tier 2: 5-of-7 teams × 6-of-7 per team = 30 maintainers
-            3 => (6, 6),  // Tier 3: 6-of-7 teams × 6-of-7 per team = 36 maintainers (73.5%)
-            4 => (5, 5),  // Tier 4: 5-of-7 teams × 5-of-7 per team = 25 maintainers
-            5 => (7, 6),  // Tier 5: 7-of-7 teams × 6-of-7 per team = 42 maintainers (86%)
+            1 => (4, 5), // Tier 1: 4-of-7 teams × 5-of-7 per team = 20 maintainers
+            2 => (5, 6), // Tier 2: 5-of-7 teams × 6-of-7 per team = 30 maintainers
+            3 => (6, 6), // Tier 3: 6-of-7 teams × 6-of-7 per team = 36 maintainers (73.5%)
+            4 => (5, 5), // Tier 4: 5-of-7 teams × 5-of-7 per team = 25 maintainers
+            5 => (7, 6), // Tier 5: 7-of-7 teams × 6-of-7 per team = 42 maintainers (86%)
             _ => (1, 1), // Default fallback
         }
     }
@@ -138,4 +138,3 @@ pub struct TeamApprovalStatus {
     pub maintainers_required: usize,
     pub approved: bool,
 }
-

@@ -9,7 +9,7 @@
 use governance_app::fork::{ForkExecutor, ForkStatus, verify_fork_decision_signature};
 use governance_app::fork::types::{Ruleset, ForkDecision};
 use governance_app::error::GovernanceError;
-use bllvm_sdk::governance::GovernanceKeypair;
+use blvm_sdk::governance::GovernanceKeypair;
 use secp256k1::SecretKey;
 use chrono::Utc;
 use tempfile::tempdir;
@@ -76,7 +76,7 @@ async fn test_fork_decision_signature_verification() -> Result<(), Box<dyn std::
     };
     
     // Sign the decision
-    use bllvm_sdk::governance::signatures::sign_message;
+    use blvm_sdk::governance::signatures::sign_message;
     use hex;
     use serde_json;
     
@@ -106,7 +106,7 @@ async fn test_fork_decision_tampering_detection() -> Result<(), Box<dyn std::err
     let public_key = keypair.public_key();
     let secret_key = keypair.secret_key();
     
-    use bllvm_sdk::governance::signatures::sign_message;
+    use blvm_sdk::governance::signatures::sign_message;
     use hex;
     use serde_json;
     
@@ -228,7 +228,7 @@ async fn test_fork_decision_wrong_public_key() -> Result<(), Box<dyn std::error:
     let secret_key1 = keypair1.secret_key();
     let public_key2 = keypair2.public_key();
     
-    use bllvm_sdk::governance::signatures::sign_message;
+    use blvm_sdk::governance::signatures::sign_message;
     use hex;
     use serde_json;
     

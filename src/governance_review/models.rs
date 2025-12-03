@@ -11,8 +11,8 @@ pub struct GovernanceReviewCase {
     pub subject_maintainer_id: i32,
     pub reporter_maintainer_id: i32,
     pub case_type: String, // 'abuse', 'harassment', 'malicious_code', etc.
-    pub severity: String, // 'minor', 'moderate', 'serious', 'gross_misconduct'
-    pub status: String, // 'open', 'under_review', 'mediation', etc.
+    pub severity: String,  // 'minor', 'moderate', 'serious', 'gross_misconduct'
+    pub status: String,    // 'open', 'under_review', 'mediation', etc.
     pub description: String,
     pub evidence: serde_json::Value,
     pub on_platform: bool, // Policy: only on-platform considered
@@ -39,8 +39,8 @@ pub struct GovernanceReviewWarning {
     pub id: i32,
     pub case_id: i32,
     pub maintainer_id: i32,
-    pub warning_level: i32, // 1 = private, 2 = public
-    pub warning_type: String, // 'private_warning', 'public_warning'
+    pub warning_level: i32,           // 1 = private, 2 = public
+    pub warning_type: String,         // 'private_warning', 'public_warning'
     pub issued_by_team_approval: i32, // Number of maintainers who approved
     pub issued_at: DateTime<Utc>,
     pub improvement_deadline: Option<DateTime<Utc>>,
@@ -158,12 +158,7 @@ pub mod policy {
     ];
 
     // Severity levels (from policy)
-    pub const SEVERITY_LEVELS: &[&str] = &[
-        "minor",
-        "moderate",
-        "serious",
-        "gross_misconduct",
-    ];
+    pub const SEVERITY_LEVELS: &[&str] = &["minor", "moderate", "serious", "gross_misconduct"];
 
     // Status values
     pub const STATUS_OPEN: &str = "open";
@@ -176,4 +171,3 @@ pub mod policy {
     pub const STATUS_DISMISSED: &str = "dismissed";
     pub const STATUS_EXPIRED: &str = "expired";
 }
-

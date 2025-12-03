@@ -222,7 +222,7 @@ mod tests {
         let temp_dir = tempdir().unwrap();
         let private_key_path = temp_dir.path().join("test_key.pem");
         // Use the actual test RSA key from test_fixtures
-        let valid_key = include_str!("../../../test_fixtures/test_rsa_key.pem");
+        let valid_key = include_str!("../../test_fixtures/test_rsa_key.pem");
         std::fs::write(&private_key_path, valid_key).unwrap();
         GitHubClient::new(123456, private_key_path.to_str().unwrap()).unwrap()
     }

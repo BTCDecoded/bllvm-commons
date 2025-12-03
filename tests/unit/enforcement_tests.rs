@@ -1,7 +1,7 @@
-use bllvm_commons::enforcement::*;
-use bllvm_commons::enforcement::status_checks::StatusCheckGenerator;
-use bllvm_commons::enforcement::merge_block::MergeBlocker;
-use bllvm_commons::validation::emergency::*;
+use blvm_commons::enforcement::*;
+use blvm_commons::enforcement::status_checks::StatusCheckGenerator;
+use blvm_commons::enforcement::merge_block::MergeBlocker;
+use blvm_commons::validation::emergency::*;
 use chrono::{DateTime, Utc, Duration};
 
 mod common;

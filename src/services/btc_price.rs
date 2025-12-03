@@ -61,7 +61,7 @@ impl BtcPriceService {
     /// Get current moving average price
     pub fn get_moving_average(&self) -> f64 {
         let cutoff = Utc::now() - chrono::Duration::days(self.ma_window_days as i64);
-        
+
         let recent_prices: Vec<f64> = self
             .prices
             .iter()
@@ -75,11 +75,7 @@ impl BtcPriceService {
                 self.ma_window_days
             );
             // Fallback to latest price if available
-            return self
-                .prices
-                .back()
-                .map(|p| p.price_usd)
-                .unwrap_or(50000.0); // Default fallback
+            return self.prices.back().map(|p| p.price_usd).unwrap_or(50000.0); // Default fallback
         }
 
         let sum: f64 = recent_prices.iter().sum();
@@ -87,7 +83,9 @@ impl BtcPriceService {
 
         info!(
             "BTC price MA ({} days): ${:.2} (from {} price points)",
-            self.ma_window_days, avg, recent_prices.len()
+            self.ma_window_days,
+            avg,
+            recent_prices.len()
         );
 
         avg
@@ -111,10 +109,7 @@ impl BtcPriceService {
     /// Get number of price points in window
     pub fn price_point_count(&self) -> usize {
         let cutoff = Utc::now() - chrono::Duration::days(self.ma_window_days as i64);
-        self.prices
-            .iter()
-            .filter(|p| p.timestamp >= cutoff)
-            .count()
+        self.prices.iter().filter(|p| p.timestamp >= cutoff).count()
     }
 }
 
@@ -148,7 +143,7 @@ mod tests {
     #[test]
     fn test_usd_to_btc_conversion() {
         let mut service = BtcPriceService::new(30);
-        
+
         // Add some prices
         for i in 0..10 {
             service.add_price(50000.0, Utc::now() - chrono::Duration::days(i));
@@ -162,10 +157,9 @@ mod tests {
     #[test]
     fn test_empty_price_data() {
         let service = BtcPriceService::new(30);
-        
+
         // Should return default when no data
         let ma = service.get_moving_average();
         assert_eq!(ma, 50000.0); // Default fallback
     }
 }
-

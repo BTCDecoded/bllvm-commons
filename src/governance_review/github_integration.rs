@@ -2,9 +2,9 @@
 //!
 //! Creates GitHub issues for cases, links to PRs/comments, generates warning files
 
+use crate::error::GovernanceError;
 use crate::github::client::GitHubClient;
 use crate::governance_review::models::{GovernanceReviewCase, GovernanceReviewWarning};
-use crate::error::GovernanceError;
 use chrono::Utc;
 use tracing::{info, warn};
 
@@ -34,8 +34,11 @@ impl GovernanceReviewGitHubIntegration {
         subject_username: &str,
         reporter_username: &str,
     ) -> Result<u64, GovernanceError> {
-        let title = format!("Governance Review: {} ({})", case.case_number, subject_username);
-        
+        let title = format!(
+            "Governance Review: {} ({})",
+            case.case_number, subject_username
+        );
+
         let body = format!(
             r#"# Governance Review Case: {}
 
@@ -102,7 +105,8 @@ This case is subject to the [Governance Review Policy](https://github.com/{}/{}/
         // In production, get installation token from GitHubClient
         // TODO: Add installation token support to GitHubClient
         Err(GovernanceError::GitHubError(
-            "Issue creation requires installation token - use GitHub Actions workflow instead".to_string()
+            "Issue creation requires installation token - use GitHub Actions workflow instead"
+                .to_string(),
         ))
     }
 
@@ -153,7 +157,8 @@ This case is subject to the [Governance Review Policy](https://github.com/{}/{}/
             case.case_type,
             case.severity,
             case.case_number,
-            warning.improvement_deadline
+            warning
+                .improvement_deadline
                 .map(|d| format!("**Deadline:** {}", d.format("%Y-%m-%d")))
                 .unwrap_or_else(|| "No improvement deadline set".to_string()),
         );
@@ -181,16 +186,16 @@ This case is subject to the [Governance Review Policy](https://github.com/{}/{}/
             r#"This PR is related to governance review case: **{}**
 
 See: https://github.com/{}/{}/issues?q=is:issue+{}"#,
-            case_number,
-            self.governance_repo_owner,
-            self.governance_repo_name,
-            case_number
+            case_number, self.governance_repo_owner, self.governance_repo_name, case_number
         );
 
         // Create PR comment
         // Note: This requires installation token
         // For now, log the comment - actual creation should be done via workflow
-        info!("PR comment ready for PR #{} - create via workflow", pr_number);
+        info!(
+            "PR comment ready for PR #{} - create via workflow",
+            pr_number
+        );
         Ok(())
     }
 
@@ -222,7 +227,10 @@ See: https://github.com/{}/{}/issues?q=is:issue+{}"#,
         // Create issue comment
         // Note: This requires installation token
         // For now, log the comment - actual creation should be done via workflow
-        info!("Issue comment ready for issue #{} - create via workflow", issue_number);
+        info!(
+            "Issue comment ready for issue #{} - create via workflow",
+            issue_number
+        );
         Ok(())
     }
 
@@ -235,8 +243,10 @@ See: https://github.com/{}/{}/issues?q=is:issue+{}"#,
         // Note: This requires installation token - for now, return placeholder
         // In production, get installation token from GitHubClient
         // TODO: Add installation token support to GitHubClient
-        info!("Issue comment ready for issue #{} - create via workflow", issue_number);
+        info!(
+            "Issue comment ready for issue #{} - create via workflow",
+            issue_number
+        );
         Ok(())
     }
 }
-

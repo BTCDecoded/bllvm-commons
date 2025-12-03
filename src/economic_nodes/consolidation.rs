@@ -19,7 +19,9 @@ impl ConsolidationMonitor {
     }
 
     /// Get mining consolidation metrics
-    pub async fn get_mining_consolidation(&self) -> Result<MiningConsolidationMetrics, GovernanceError> {
+    pub async fn get_mining_consolidation(
+        &self,
+    ) -> Result<MiningConsolidationMetrics, GovernanceError> {
         // Get top pool hashpower
         let top_pool: Option<(String, f64)> = sqlx::query_as(
             r#"
@@ -28,13 +30,11 @@ impl ConsolidationMonitor {
             WHERE node_type = 'mining_pool' AND status = 'active'
             ORDER BY weight DESC
             LIMIT 1
-            "#
+            "#,
         )
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| {
-            GovernanceError::DatabaseError(format!("Failed to get top pool: {}", e))
-        })?;
+        .map_err(|e| GovernanceError::DatabaseError(format!("Failed to get top pool: {}", e)))?;
 
         // Get total mining weight
         let total_mining_weight: Option<f64> = sqlx::query_scalar(
@@ -42,7 +42,7 @@ impl ConsolidationMonitor {
             SELECT COALESCE(SUM(weight), 0.0)
             FROM economic_nodes
             WHERE node_type = 'mining_pool' AND status = 'active'
-            "#
+            "#,
         )
         .fetch_optional(&self.pool)
         .await
@@ -60,16 +60,17 @@ impl ConsolidationMonitor {
             WHERE node_type = 'mining_pool' AND status = 'active'
             ORDER BY weight DESC
             LIMIT 3
-            "#
+            "#,
         )
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| {
-            GovernanceError::DatabaseError(format!("Failed to get top 3 pools: {}", e))
-        })?;
+        .map_err(|e| GovernanceError::DatabaseError(format!("Failed to get top 3 pools: {}", e)))?;
 
         let top_pool_percent = if total_mining_weight > 0.0 {
-            top_pool.as_ref().map(|(_, w)| (w / total_mining_weight) * 100.0).unwrap_or(0.0)
+            top_pool
+                .as_ref()
+                .map(|(_, w)| (w / total_mining_weight) * 100.0)
+                .unwrap_or(0.0)
         } else {
             0.0
         };
@@ -90,7 +91,9 @@ impl ConsolidationMonitor {
     }
 
     /// Get economic node consolidation metrics
-    pub async fn get_economic_consolidation(&self) -> Result<EconomicConsolidationMetrics, GovernanceError> {
+    pub async fn get_economic_consolidation(
+        &self,
+    ) -> Result<EconomicConsolidationMetrics, GovernanceError> {
         // Get top 3 economic nodes (non-mining pools)
         let top_3_nodes: Vec<(String, f64)> = sqlx::query_as(
             r#"
@@ -99,7 +102,7 @@ impl ConsolidationMonitor {
             WHERE node_type != 'mining_pool' AND status = 'active'
             ORDER BY weight DESC
             LIMIT 3
-            "#
+            "#,
         )
         .fetch_all(&self.pool)
         .await
@@ -113,7 +116,7 @@ impl ConsolidationMonitor {
             SELECT COALESCE(SUM(weight), 0.0)
             FROM economic_nodes
             WHERE node_type != 'mining_pool' AND status = 'active'
-            "#
+            "#,
         )
         .fetch_optional(&self.pool)
         .await
@@ -191,4 +194,3 @@ pub struct EconomicConsolidationMetrics {
     pub top_3_percent: f64,
     pub total_nodes: u32,
 }
-

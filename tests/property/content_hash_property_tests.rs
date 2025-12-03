@@ -3,7 +3,7 @@
 //! These tests use proptest to verify mathematical properties of hash functions
 //! and ensure correctness across a wide range of inputs.
 
-use bllvm_commons::validation::content_hash::ContentHashValidator;
+use blvm_commons::validation::content_hash::ContentHashValidator;
 use proptest::prelude::*;
 
 proptest! {

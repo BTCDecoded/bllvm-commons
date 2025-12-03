@@ -107,7 +107,7 @@ impl NodeType {
                     minimum_zap_quantity_btc: Some(0.01), // Default: 0.01 BTC
                     minimum_marketplace_sales_btc: Some(0.01), // Default: 0.01 BTC
                 }
-            },
+            }
         }
     }
 }
@@ -120,12 +120,12 @@ pub struct QualificationThresholds {
     pub minimum_holdings_btc: Option<u64>,
     pub minimum_volume_usd: Option<u64>,
     pub minimum_transactions_monthly: Option<u64>,
-    
+
     // Commons contributor thresholds (maintainer-configurable)
     // All thresholds are in BTC - no USD conversion needed
     pub minimum_merge_mining_btc: Option<f64>, // Minimum merge mining contribution (90-day period)
     pub minimum_fee_forwarding_btc: Option<f64>, // Minimum fee forwarding contribution (90-day period)
-    pub minimum_zap_quantity_btc: Option<f64>, // Minimum zap contributions (90-day period)
+    pub minimum_zap_quantity_btc: Option<f64>,   // Minimum zap contributions (90-day period)
     pub minimum_marketplace_sales_btc: Option<f64>, // Minimum module marketplace sales (90-day period, BIP70 payments)
 }
 
@@ -332,7 +332,7 @@ pub struct MarketplaceSalesProof {
 pub struct ModulePaymentProof {
     pub payment_id: String,
     pub module_id: String,
-    pub amount_btc: f64, // BIP70 payments are in BTC (satoshis)
+    pub amount_btc: f64,      // BIP70 payments are in BTC (satoshis)
     pub payment_hash: String, // BIP70 payment hash
     pub timestamp: i64,
 }

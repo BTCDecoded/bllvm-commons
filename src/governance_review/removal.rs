@@ -5,10 +5,10 @@
 //! - Deactivates maintainer key
 //! - Handles emergency removal
 
-use chrono::{DateTime, Utc};
-use sqlx::SqlitePool;
-use crate::governance_review::models::policy;
 use crate::database::queries::Queries;
+use crate::governance_review::models::policy;
+use chrono::{DateTime, Utc};
+use sqlx::{Row, SqlitePool};
 
 pub struct RemovalManager {
     pool: SqlitePool,
@@ -148,17 +148,14 @@ impl RemovalManager {
 
     /// Check if maintainer is active
     pub async fn is_maintainer_active(&self, maintainer_id: i32) -> Result<bool, sqlx::Error> {
-        let row = sqlx::query(
-            "SELECT active FROM maintainers WHERE id = ?"
-        )
-        .bind(maintainer_id)
-        .fetch_optional(&self.pool)
-        .await?;
+        let row = sqlx::query("SELECT active FROM maintainers WHERE id = ?")
+            .bind(maintainer_id)
+            .fetch_optional(&self.pool)
+            .await?;
 
         match row {
-            Some(r) => Ok(r.get::<bool>(0)),
+            Some(r) => Ok(r.get::<bool, _>(0)),
             None => Ok(false),
         }
     }
 }
-

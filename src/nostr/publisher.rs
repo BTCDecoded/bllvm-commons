@@ -155,7 +155,10 @@ impl StatusPublisher {
         let logger = match AuditLogger::new(log_path.clone()) {
             Ok(l) => l,
             Err(e) => {
-                warn!("Failed to create audit logger: {}. Audit log info unavailable.", e);
+                warn!(
+                    "Failed to create audit logger: {}. Audit log info unavailable.",
+                    e
+                );
                 return Ok((None, None));
             }
         };
@@ -164,7 +167,10 @@ impl StatusPublisher {
         let entries = match logger.get_all_entries().await {
             Ok(entries) => entries,
             Err(e) => {
-                warn!("Failed to read audit log entries: {}. Audit log info unavailable.", e);
+                warn!(
+                    "Failed to read audit log entries: {}. Audit log info unavailable.",
+                    e
+                );
                 return Ok((None, None));
             }
         };
@@ -172,7 +178,10 @@ impl StatusPublisher {
         // If no entries, return empty state
         if entries.is_empty() {
             return Ok((
-                Some("sha256:0000000000000000000000000000000000000000000000000000000000000000".to_string()),
+                Some(
+                    "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+                        .to_string(),
+                ),
                 Some(0),
             ));
         }
@@ -189,7 +198,10 @@ impl StatusPublisher {
         use sha2::{Digest, Sha256};
 
         if entries.is_empty() {
-            return Ok("sha256:0000000000000000000000000000000000000000000000000000000000000000".to_string());
+            return Ok(
+                "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+                    .to_string(),
+            );
         }
 
         // Hash each entry using its this_log_hash (which is already a hash of the entry)
@@ -198,13 +210,15 @@ impl StatusPublisher {
             .iter()
             .map(|e| {
                 // Extract hex from "sha256:hexstring"
-                let hex_str = e.this_log_hash.strip_prefix("sha256:").unwrap_or(&e.this_log_hash);
-                let hash_bytes = hex::decode(hex_str)
-                    .unwrap_or_else(|_| {
-                        // Fallback: hash the entry's canonical string
-                        let canonical = e.canonical_string();
-                        Sha256::digest(canonical.as_bytes()).into()
-                    });
+                let hex_str = e
+                    .this_log_hash
+                    .strip_prefix("sha256:")
+                    .unwrap_or(&e.this_log_hash);
+                let hash_bytes = hex::decode(hex_str).unwrap_or_else(|_| {
+                    // Fallback: hash the entry's canonical string
+                    let canonical = e.canonical_string();
+                    Sha256::digest(canonical.as_bytes()).to_vec()
+                });
                 // Ensure we have exactly 32 bytes
                 let mut hash = [0u8; 32];
                 hash.copy_from_slice(&hash_bytes[..32.min(hash_bytes.len())]);
@@ -219,11 +233,17 @@ impl StatusPublisher {
                 if chunk.len() == 2 {
                     // Combine two hashes
                     let combined = [chunk[0].as_slice(), chunk[1].as_slice()].concat();
-                    next_level.push(Sha256::digest(&combined).into());
+                    let hash_vec = Sha256::digest(&combined).to_vec();
+                    let mut hash = [0u8; 32];
+                    hash.copy_from_slice(&hash_vec[..32.min(hash_vec.len())]);
+                    next_level.push(hash);
                 } else {
                     // Odd number, duplicate last hash
                     let combined = [chunk[0].as_slice(), chunk[0].as_slice()].concat();
-                    next_level.push(Sha256::digest(&combined).into());
+                    let hash_vec = Sha256::digest(&combined).to_vec();
+                    let mut hash = [0u8; 32];
+                    hash.copy_from_slice(&hash_vec[..32.min(hash_vec.len())]);
+                    next_level.push(hash);
                 }
             }
             hashes = next_level;

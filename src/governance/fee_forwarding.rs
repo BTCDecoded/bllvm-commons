@@ -174,13 +174,7 @@ impl FeeForwardingTracker {
     /// Calculate transaction hash using proper Bitcoin transaction ID calculation
     /// Uses bllvm-consensus's calculate_tx_id which properly serializes and hashes transactions
     /// This ensures we match Bitcoin Core's txid calculation exactly
-    #[cfg(test)]
-    pub(crate) fn calculate_tx_hash(&self, tx: &blvm_protocol::Transaction) -> String {
-        self.calculate_tx_hash_impl(tx)
-    }
-
-    #[cfg(not(test))]
-    fn calculate_tx_hash(&self, tx: &blvm_protocol::Transaction) -> String {
+    pub fn calculate_tx_hash(&self, tx: &blvm_protocol::Transaction) -> String {
         self.calculate_tx_hash_impl(tx)
     }
 
@@ -197,7 +191,6 @@ impl FeeForwardingTracker {
         // but for internal storage and duplicate detection, we use the standard byte order
         hex::encode(txid)
     }
-
 
     /// Look up contributor ID from node registry based on address
     async fn lookup_contributor_from_address(&self, address: &str) -> Option<String> {

@@ -1,4 +1,4 @@
-use bllvm_commons::github::client::GitHubClient;
+use blvm_commons::github::client::GitHubClient;
 use wiremock::{Mock, MockServer, ResponseTemplate};
 use wiremock::matchers::{method, path, header, body_json};
 use serde_json::json;

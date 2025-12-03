@@ -3,12 +3,12 @@
 //! These tests verify the complete cross-layer validation workflow,
 //! including content hash verification, version pinning, and equivalence proof validation.
 
-use bllvm_commons::error::GovernanceError;
-use bllvm_commons::validation::content_hash::{ContentHashValidator, SyncStatus};
-use bllvm_commons::validation::version_pinning::{VersionPinningValidator, VersionReference};
-use bllvm_commons::validation::equivalence_proof::{EquivalenceProofValidator, VerificationStatus};
-use bllvm_commons::github::cross_layer_status::{CrossLayerStatusChecker, StatusState};
-use bllvm_commons::github::client::GitHubClient;
+use blvm_commons::error::GovernanceError;
+use blvm_commons::validation::content_hash::{ContentHashValidator, SyncStatus};
+use blvm_commons::validation::version_pinning::{VersionPinningValidator, VersionReference};
+use blvm_commons::validation::equivalence_proof::{EquivalenceProofValidator, VerificationStatus};
+use blvm_commons::github::cross_layer_status::{CrossLayerStatusChecker, StatusState};
+use blvm_commons::github::client::GitHubClient;
 use std::collections::HashMap;
 use tokio;
 
@@ -292,8 +292,8 @@ async fn test_cross_layer_validation_concurrent() {
 }
 
 /// Helper function to create mock version manifest
-fn create_mock_version_manifest() -> bllvm_commons::validation::version_pinning::VersionManifest {
-    use bllvm_commons::validation::version_pinning::{VersionManifest, VersionManifestEntry, VersionSignature};
+fn create_mock_version_manifest() -> blvm_commons::validation::version_pinning::VersionManifest {
+    use blvm_commons::validation::version_pinning::{VersionManifest, VersionManifestEntry, VersionSignature};
     use chrono::Utc;
 
     VersionManifest {

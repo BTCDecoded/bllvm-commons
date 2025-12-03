@@ -68,8 +68,8 @@ rand = "0.8"
 # Nostr protocol
 nostr-sdk = "0.27"
 
-# OpenTimestamps
-opentimestamps = "0.1"
+# OpenTimestamps (behind feature flag)
+opentimestamps = { version = "0.1", optional = true }
 
 # Lightning invoice parsing (bolt11)
 lightning-invoice = "0.2"
@@ -94,6 +94,8 @@ optional = true
 
 [features]
 default = []
+# Enable OpenTimestamps support
+opentimestamps = ["dep:opentimestamps"]
 # Enable formal verification tools
 verify = ["kani-verifier"]
 # Enable PostgreSQL support
@@ -131,3 +133,4 @@ tempfile = "3.8"
 async-trait = "0.1"
 proptest = { version = "1.4", features = ["std"] }
 insta = { version = "1.38", features = ["redactions"] }
+smallvec = "1.11"

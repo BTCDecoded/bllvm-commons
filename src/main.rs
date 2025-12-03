@@ -25,8 +25,10 @@ mod enforcement;
 mod error;
 mod github;
 mod governance;
+mod governance_review;
 mod node_registry;
 mod nostr;
+#[cfg(feature = "opentimestamps")]
 mod ots;
 mod resilience;
 mod validation;
@@ -37,6 +39,7 @@ use config::AppConfig;
 use database::Database;
 use governance::{ContributionAggregator, FeeForwardingTracker};
 use nostr::{NostrClient, StatusPublisher, ZapTracker};
+#[cfg(feature = "opentimestamps")]
 use ots::{OtsClient, RegistryAnchorer};
 
 #[tokio::main]
@@ -45,7 +48,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "bllvm_commons=debug,tower_http=debug".into()),
+                .unwrap_or_else(|_| "blvm_commons=debug,tower_http=debug".into()),
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
@@ -190,13 +193,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         None
     };
 
-    // Initialize OTS client and registry anchorer
+    // Initialize OTS client and registry anchorer (only if feature enabled)
+    #[cfg(feature = "opentimestamps")]
     let ots_client = if config.ots.enabled {
         Some(OtsClient::new(config.ots.aggregator_url.clone()))
     } else {
         None
     };
+    #[cfg(not(feature = "opentimestamps"))]
+    let ots_client: Option<()> = None;
 
+    #[cfg(feature = "opentimestamps")]
     let registry_anchorer = if let Some(client) = ots_client {
         Some(RegistryAnchorer::new(
             client,
@@ -207,6 +214,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         None
     };
+    #[cfg(not(feature = "opentimestamps"))]
+    let registry_anchorer: Option<()> = None;
 
     // Start background tasks
     let config_clone = config.clone();
@@ -228,7 +237,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         info!("Nostr status publisher started");
     }
 
-    // OTS monthly anchoring task
+    // OTS monthly anchoring task (only if feature enabled)
+    #[cfg(feature = "opentimestamps")]
     if let Some(anchorer) = registry_anchorer {
         tokio::spawn(async move {
             let mut interval = tokio::time::interval(Duration::from_secs(86400)); // Check daily

@@ -449,6 +449,7 @@ mod tests {
 }
 
 // Conversion from ots::anchor::AuthorizedServer to authorization::server::AuthorizedServer
+#[cfg(feature = "opentimestamps")]
 impl From<crate::ots::anchor::AuthorizedServer> for AuthorizedServer {
     fn from(ots_server: crate::ots::anchor::AuthorizedServer) -> Self {
         use std::str::FromStr;

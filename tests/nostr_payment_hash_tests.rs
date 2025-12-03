@@ -14,4 +14,3 @@
 //
 // Since the function is simple and well-integrated, we rely on integration
 // tests to verify it works correctly with real bolt11 invoices.
-

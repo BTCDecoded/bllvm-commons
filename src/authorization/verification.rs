@@ -8,7 +8,114 @@ use std::collections::HashMap;
 use tracing::{debug, info, warn};
 
 use crate::authorization::server::ServerStatus;
+#[cfg(feature = "opentimestamps")]
 use crate::ots::anchor::{AuthorizedServer, GovernanceRegistry};
+
+// Re-export types for use when feature is disabled (stub types)
+#[cfg(not(feature = "opentimestamps"))]
+mod ots_stub {
+    use chrono::{DateTime, Utc};
+    use serde::{Deserialize, Serialize};
+    use std::collections::HashMap;
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct GovernanceRegistry {
+        pub version: String,
+        pub timestamp: DateTime<Utc>,
+        pub previous_registry_hash: String,
+        pub maintainers: Vec<Maintainer>,
+        pub authorized_servers: Vec<AuthorizedServer>,
+        pub audit_logs: HashMap<String, AuditLogSummary>,
+        pub multisig_config: MultisigConfig,
+    }
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct Maintainer {
+        pub id: i32,
+        pub name: String,
+        pub npub: String,
+        pub added_at: DateTime<Utc>,
+        pub status: String,
+    }
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct AuthorizedServer {
+        pub server_id: String,
+        pub operator: OperatorInfo,
+        pub keys: ServerKeys,
+        pub status: String,
+        pub infrastructure: InfrastructureInfo,
+        pub added_at: DateTime<Utc>,
+    }
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct OperatorInfo {
+        pub name: String,
+        pub jurisdiction: String,
+        pub contact: Option<String>,
+    }
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct ServerKeys {
+        pub nostr_npub: String,
+        pub ssh_fingerprint: String,
+    }
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct InfrastructureInfo {
+        pub vpn_ip: Option<String>,
+        pub github_runner: bool,
+        pub ots_enabled: bool,
+    }
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct AuditLogSummary {
+        pub head_hash: String,
+        pub entry_count: i32,
+        pub merkle_root: String,
+    }
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct MultisigConfig {
+        pub required_signatures: i32,
+        pub total_maintainers: i32,
+    }
+}
+
+#[cfg(not(feature = "opentimestamps"))]
+use ots_stub::{AuthorizedServer, GovernanceRegistry};
+
+// Conversion from stub types to authorization::server::AuthorizedServer
+#[cfg(not(feature = "opentimestamps"))]
+impl From<ots_stub::AuthorizedServer> for crate::authorization::server::AuthorizedServer {
+    fn from(ots_server: ots_stub::AuthorizedServer) -> Self {
+        use crate::authorization::server::{
+            InfrastructureInfo, OperatorInfo, ServerKeys, ServerStatus,
+        };
+        use std::str::FromStr;
+
+        Self {
+            server_id: ots_server.server_id,
+            operator: OperatorInfo {
+                name: ots_server.operator.name,
+                jurisdiction: ots_server.operator.jurisdiction,
+                contact: ots_server.operator.contact,
+            },
+            keys: ServerKeys {
+                nostr_npub: ots_server.keys.nostr_npub,
+                ssh_fingerprint: ots_server.keys.ssh_fingerprint,
+            },
+            infrastructure: InfrastructureInfo {
+                vpn_ip: ots_server.infrastructure.vpn_ip,
+                github_runner: ots_server.infrastructure.github_runner,
+                ots_enabled: ots_server.infrastructure.ots_enabled,
+            },
+            status: ServerStatus::from_str(&ots_server.status).unwrap_or(ServerStatus::Inactive),
+            added_at: ots_server.added_at,
+            last_verified: None,
+        }
+    }
+}
 
 /// Verify if a server is authorized
 pub fn verify_server_authorization(
@@ -268,6 +375,7 @@ impl ServerStatistics {
 }
 
 /// Validate server configuration
+#[cfg(feature = "opentimestamps")]
 pub fn validate_server_config(server: &crate::ots::anchor::AuthorizedServer) -> Result<()> {
     // Check required fields
     if server.server_id.is_empty() {

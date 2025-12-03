@@ -5,7 +5,7 @@
 use std::env;
 
 /// Get GitHub token from environment
-/// 
+///
 /// Priority:
 /// 1. GITHUB_TOKEN (for workflows/CI)
 /// 2. GITHUB_INSTALLATION_TOKEN (for app installations)
@@ -57,7 +57,5 @@ pub fn is_github_actions() -> bool {
 
 /// Get database URL from environment
 pub fn get_database_url() -> String {
-    env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "sqlite://governance.db".to_string())
+    env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite://governance.db".to_string())
 }
-

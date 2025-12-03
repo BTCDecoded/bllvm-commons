@@ -1,8 +1,8 @@
 //! Integration tests for bllvm-commons
 //! Tests the core functionality with test data
 
-use bllvm_commons::database::Database;
-use bllvm_commons::validation::tier_classification;
+use blvm_commons::database::Database;
+use blvm_commons::validation::tier_classification;
 use serde_json::json;
 
 #[tokio::test]
@@ -56,8 +56,8 @@ async fn test_database_operations() {
 
 #[tokio::test]
 async fn test_signature_verification() {
-    use bllvm_commons::crypto::signatures::SignatureManager;
-    use bllvm_sdk::governance::GovernanceKeypair;
+    use blvm_commons::crypto::signatures::SignatureManager;
+    use blvm_sdk::governance::GovernanceKeypair;
 
     // Generate test keypair
     let keypair = GovernanceKeypair::generate().expect("Failed to generate keypair");

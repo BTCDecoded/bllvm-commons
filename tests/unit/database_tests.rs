@@ -1,5 +1,5 @@
-use bllvm_commons::database::Database;
-use bllvm_commons::database::models::*;
+use blvm_commons::database::Database;
+use blvm_commons::database::models::*;
 use chrono::{DateTime, Utc, Duration};
 use serde_json::json;
 
