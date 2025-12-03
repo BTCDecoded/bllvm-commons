@@ -12,15 +12,15 @@ mod tests {
         let graph = DependencyGraph::new("BTCDecoded".to_string());
         let order = graph.get_build_order().unwrap();
 
-        // Verify bllvm-consensus comes first (no dependencies)
-        let consensus_pos = order.iter().position(|r| r == "bllvm-consensus").unwrap();
-        assert_eq!(consensus_pos, 0, "bllvm-consensus should be first");
+        // Verify blvm-consensus comes first (no dependencies)
+        let consensus_pos = order.iter().position(|r| r == "blvm-consensus").unwrap();
+        assert_eq!(consensus_pos, 0, "blvm-consensus should be first");
 
-        // Verify bllvm-protocol comes after bllvm-consensus
+        // Verify bllvm-protocol comes after blvm-consensus
         let protocol_pos = order.iter().position(|r| r == "bllvm-protocol").unwrap();
         assert!(
             protocol_pos > consensus_pos,
-            "bllvm-protocol should come after bllvm-consensus"
+            "bllvm-protocol should come after blvm-consensus"
         );
 
         // Verify bllvm-node comes after bllvm-protocol
@@ -70,8 +70,8 @@ mod tests {
 
         // Check that dependencies come before dependents
         for (repo, deps) in [
-            ("bllvm-protocol", vec!["bllvm-consensus"]),
-            ("bllvm-node", vec!["bllvm-protocol", "bllvm-consensus"]),
+            ("bllvm-protocol", vec!["blvm-consensus"]),
+            ("bllvm-node", vec!["bllvm-protocol", "blvm-consensus"]),
             ("bllvm-commons", vec!["bllvm-sdk"]),
             ("bllvm", vec!["bllvm-node"]),
         ] {
@@ -99,10 +99,10 @@ mod tests {
             "Should have at least one parallel group"
         );
 
-        // bllvm-consensus and bllvm-sdk can be built in parallel (no dependencies)
+        // blvm-consensus and bllvm-sdk can be built in parallel (no dependencies)
         let first_group = &groups[0];
         assert!(
-            first_group.contains(&"bllvm-consensus".to_string())
+            first_group.contains(&"blvm-consensus".to_string())
                 || first_group.contains(&"bllvm-sdk".to_string()),
             "First group should contain repos with no dependencies"
         );

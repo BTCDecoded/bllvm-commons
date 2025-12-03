@@ -510,7 +510,7 @@ mod tests {
         // Verify dependency graph is initialized
         let repos = orchestrator.dependency_graph.repositories();
         assert!(!repos.is_empty());
-        assert!(repos.contains(&"bllvm-consensus".to_string()));
+        assert!(repos.contains(&"blvm-consensus".to_string()));
     }
 
     #[tokio::test]

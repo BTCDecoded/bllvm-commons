@@ -4,7 +4,7 @@
 
 use super::types::ForkDecision;
 use crate::error::GovernanceError;
-use bllvm_sdk::governance::{verify_signature, PublicKey, Signature};
+use blvm_sdk::governance::{verify_signature, PublicKey, Signature};
 use hex;
 use serde_json;
 
@@ -46,7 +46,7 @@ pub fn verify_fork_decision_signature(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bllvm_sdk::governance::{signatures::sign_message, GovernanceKeypair};
+    use blvm_sdk::governance::{signatures::sign_message, GovernanceKeypair};
     use chrono::Utc;
 
     #[test]

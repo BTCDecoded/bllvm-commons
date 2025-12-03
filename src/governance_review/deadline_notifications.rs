@@ -3,7 +3,7 @@
 //! Notifies maintainers about approaching deadlines for cases, appeals, mediations
 
 use chrono::{DateTime, Duration, Utc};
-use sqlx::SqlitePool;
+use sqlx::{Row, SqlitePool};
 use crate::governance_review::github_integration::GovernanceReviewGitHubIntegration;
 use tracing::{info, warn};
 
@@ -69,7 +69,7 @@ impl DeadlineNotificationManager {
     }
 
     /// Check for cases with approaching deadlines
-    fn check_case_deadlines(&self) -> impl std::future::Future<Output = Result<Vec<i32>, sqlx::Error>> {
+    async fn check_case_deadlines(&self) -> Result<Vec<i32>, sqlx::Error> {
         let threshold = Utc::now() + Duration::days(NOTIFICATION_DAYS_BEFORE);
 
         let rows = sqlx::query(

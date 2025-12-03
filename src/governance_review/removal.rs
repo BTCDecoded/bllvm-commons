@@ -156,7 +156,7 @@ impl RemovalManager {
         .await?;
 
         match row {
-            Some(r) => Ok(r.get::<bool, _>(0)),
+            Some(r) => Ok(r.get::<bool>(0)),
             None => Ok(false),
         }
     }

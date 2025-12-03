@@ -6,7 +6,7 @@
 //! - New evidence can be submitted
 
 use chrono::{DateTime, Duration, Utc};
-use sqlx::SqlitePool;
+use sqlx::{Row, SqlitePool};
 use crate::governance_review::models::{Appeal, policy};
 use crate::governance_review::case::GovernanceReviewCaseManager;
 

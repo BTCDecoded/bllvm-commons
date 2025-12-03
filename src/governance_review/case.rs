@@ -270,7 +270,7 @@ impl GovernanceReviewCaseManager {
             .await?;
         }
 
-        Ok(expired.iter().map(|row| row.get::<i32, _>(0)).collect())
+        Ok(expired.iter().map(|row| row.get::<i32>(0)).collect())
     }
 
     /// Update case status

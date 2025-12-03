@@ -179,10 +179,10 @@ async fn check_tool_status<C: GitHubVerificationClient>(
 /// Load governance configuration from config files
 fn load_governance_config() -> Result<GovernanceConfig> {
     // In a real implementation, this would load from actual config files
-    // For now, we'll return a hardcoded config for bllvm-consensus
+    // For now, we'll return a hardcoded config for blvm-consensus
     let mut repos = HashMap::new();
 
-    // Add both "bllvm-consensus" and "BTCDecoded/bllvm-consensus" for compatibility
+    // Add both "blvm-consensus" and "BTCDecoded/blvm-consensus" for compatibility
     let consensus_proof_config = RepositoryConfig {
         verification: Some(VerificationConfig {
             required: true,
@@ -206,11 +206,11 @@ fn load_governance_config() -> Result<GovernanceConfig> {
 
     // Add both formats for compatibility
     repos.insert(
-        "bllvm-consensus".to_string(),
+        "blvm-consensus".to_string(),
         consensus_proof_config.clone(),
     );
     repos.insert(
-        "BTCDecoded/bllvm-consensus".to_string(),
+        "BTCDecoded/blvm-consensus".to_string(),
         consensus_proof_config,
     );
 
@@ -404,7 +404,7 @@ mod tests {
 
         let pr = PullRequest {
             id: 0,
-            repo_name: "BTCDecoded/bllvm-consensus".to_string(),
+            repo_name: "BTCDecoded/blvm-consensus".to_string(),
             pr_number: 123,
             opened_at: chrono::Utc::now(),
             layer: 2,
@@ -439,7 +439,7 @@ mod tests {
 
         let pr = PullRequest {
             id: 0,
-            repo_name: "BTCDecoded/bllvm-consensus".to_string(),
+            repo_name: "BTCDecoded/blvm-consensus".to_string(),
             pr_number: 123,
             opened_at: chrono::Utc::now(),
             layer: 2,
@@ -475,7 +475,7 @@ mod tests {
 
         let pr = PullRequest {
             id: 0,
-            repo_name: "BTCDecoded/bllvm-consensus".to_string(),
+            repo_name: "BTCDecoded/blvm-consensus".to_string(),
             pr_number: 123,
             opened_at: chrono::Utc::now(),
             layer: 2,
@@ -536,7 +536,7 @@ mod tests {
 
     #[test]
     fn test_requires_verification() {
-        let result = requires_verification("bllvm-consensus").unwrap();
+        let result = requires_verification("blvm-consensus").unwrap();
         assert!(result);
 
         let result = requires_verification("other-repo").unwrap();
@@ -545,8 +545,8 @@ mod tests {
 
     #[test]
     fn test_can_override_verification() {
-        let result = can_override_verification("bllvm-consensus").unwrap();
-        assert!(!result); // bllvm-consensus should not allow override
+        let result = can_override_verification("blvm-consensus").unwrap();
+        assert!(!result); // blvm-consensus should not allow override
 
         let result = can_override_verification("other-repo").unwrap();
         assert!(!result); // default should be false
@@ -554,8 +554,8 @@ mod tests {
 
     #[test]
     fn test_is_verification_blocking() {
-        let result = is_verification_blocking("bllvm-consensus").unwrap();
-        assert!(result); // bllvm-consensus should be blocking
+        let result = is_verification_blocking("blvm-consensus").unwrap();
+        assert!(result); // blvm-consensus should be blocking
 
         let result = is_verification_blocking("other-repo").unwrap();
         assert!(!result); // default should be false
@@ -563,7 +563,7 @@ mod tests {
 
     #[test]
     fn test_get_verification_tools() {
-        let tools = get_verification_tools("bllvm-consensus").unwrap();
+        let tools = get_verification_tools("blvm-consensus").unwrap();
         assert_eq!(tools.len(), 2);
         assert_eq!(tools[0].name, "Kani");
         assert_eq!(tools[1].name, "Proptest");

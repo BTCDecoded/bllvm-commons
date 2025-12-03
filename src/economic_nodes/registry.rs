@@ -233,8 +233,7 @@ impl EconomicNodeRegistry {
         // Check marketplace sales threshold (BTC via BIP70 payments)
         if thresholds_config.marketplace.enabled {
             if let Some(marketplace_proof) = &proof.marketplace_sales_proof {
-                let min_btc = thresholds_config.marketplace.minimum_sales_btc
-                    .unwrap_or(0.0);
+                let min_btc = thresholds_config.marketplace.minimum_contribution_btc;
                 if marketplace_proof.total_sales_btc >= min_btc
                     && marketplace_proof.period_days >= thresholds_config.measurement_period_days
                 {
@@ -424,39 +423,9 @@ impl EconomicNodeRegistry {
             total_contribution_btc += zap_proof.total_zaps_btc;
         }
 
-        // Convert USD revenue to BTC using moving average price (smooths volatility)
-        // This prevents contributors from being penalized by sudden price movements
-        let btc_price_ma = match &self.btc_price_service {
-            Some(service) => service.get_moving_average(),
-            None => {
-                warn!("BTC price service not available, using default price");
-                50000.0 // Fallback default
-            }
-        };
-
         // Marketplace sales are already in BTC (BIP70 payments)
         if let Some(marketplace_proof) = &proof.marketplace_sales_proof {
             total_contribution_btc += marketplace_proof.total_sales_btc;
-        }
-
-        if let Some(treasury_proof) = &proof.treasury_sales_proof {
-            // Convert USD to BTC using moving average (prevents volatility penalty)
-            let treasury_btc = treasury_proof.total_sales_usd / btc_price_ma;
-            total_contribution_btc += treasury_btc;
-            info!(
-                "Converted treasury sales: ${:.2} USD -> {:.8} BTC (using ${:.2} MA price)",
-                treasury_proof.total_sales_usd, treasury_btc, btc_price_ma
-            );
-        }
-
-        if let Some(service_proof) = &proof.service_sales_proof {
-            // Convert USD to BTC using moving average (prevents volatility penalty)
-            let service_btc = service_proof.total_sales_usd / btc_price_ma;
-            total_contribution_btc += service_btc;
-            info!(
-                "Converted service sales: ${:.2} USD -> {:.8} BTC (using ${:.2} MA price)",
-                service_proof.total_sales_usd, service_btc, btc_price_ma
-            );
         }
 
         // Apply quadratic formula: sqrt(total_contribution_btc / normalization_factor)
@@ -554,16 +523,16 @@ impl EconomicNodeRegistry {
 
         let node_type =
             NodeType::from_str(&row.get::<String, _>("node_type")).ok_or_else(|| {
-                GovernanceError::CryptoError(format!(
-                    "Invalid node type: {}",
-                    row.get::<String, _>("node_type")
+                    GovernanceError::CryptoError(format!(
+                        "Invalid node type: {}",
+                        row.get::<String, _>("node_type")
                 ))
             })?;
 
         let status = NodeStatus::from_str(&row.get::<String, _>("status")).ok_or_else(|| {
-            GovernanceError::CryptoError(format!(
-                "Invalid status: {}",
-                row.get::<String, _>("status")
+                GovernanceError::CryptoError(format!(
+                    "Invalid status: {}",
+                    row.get::<String, _>("status")
             ))
         })?;
 

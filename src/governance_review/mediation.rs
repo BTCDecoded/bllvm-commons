@@ -6,7 +6,7 @@
 //! - Conflict resolution before escalation
 
 use chrono::{DateTime, Duration, Utc};
-use sqlx::SqlitePool;
+use sqlx::{Row, SqlitePool};
 use crate::governance_review::models::{Mediation, policy};
 
 pub struct MediationManager {

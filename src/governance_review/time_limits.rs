@@ -7,7 +7,7 @@
 //! - Extensions require approval
 
 use chrono::{DateTime, Duration, Utc};
-use sqlx::SqlitePool;
+use sqlx::{Row, SqlitePool};
 use crate::governance_review::models::{TimeLimit, policy};
 use crate::governance_review::case::GovernanceReviewCaseManager;
 
@@ -129,7 +129,9 @@ impl TimeLimitManager {
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(expired.iter().map(|row| (row.get::<i32, _>(0), row.get::<String, _>(1))).collect())
+        Ok(expired.iter().map(|row| {
+            (row.get::<i32, _>(0), row.get::<String, _>(1))
+        }).collect())
     }
 }
 

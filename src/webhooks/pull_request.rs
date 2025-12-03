@@ -36,7 +36,7 @@ pub async fn handle_pull_request_event(
     // Check more specific patterns first to avoid false matches
     let layer = match repo_name {
         repo if repo.contains("bllvm-spec") || repo.contains("orange-paper") => 1,
-        repo if repo.contains("bllvm-consensus") || repo.contains("consensus-proof") => 2,
+        repo if repo.contains("blvm-consensus") || repo.contains("consensus-proof") => 2,
         repo if repo.contains("bllvm-protocol") || repo.contains("protocol-engine") => 3,
         repo if repo.contains("bllvm-sdk") || repo.contains("developer-sdk") => 5,
         repo if repo.contains("bllvm-commons") || repo.contains("governance-app") => 6,
@@ -196,7 +196,7 @@ pub fn determine_layer(repo_name: &str) -> Option<i32> {
     // Check more specific patterns first to avoid false matches
     if repo_name.contains("bllvm-spec") || repo_name.contains("orange-paper") {
         Some(1)
-    } else if repo_name.contains("bllvm-consensus") || repo_name.contains("consensus-proof") {
+    } else if repo_name.contains("blvm-consensus") || repo_name.contains("consensus-proof") {
         Some(2)
     } else if repo_name.contains("bllvm-protocol") || repo_name.contains("protocol-engine") {
         Some(3)
@@ -226,7 +226,7 @@ mod tests {
 
     #[test]
     fn test_determine_layer_consensus() {
-        assert_eq!(determine_layer("BTCDecoded/bllvm-consensus"), Some(2));
+        assert_eq!(determine_layer("BTCDecoded/blvm-consensus"), Some(2));
         assert_eq!(determine_layer("BTCDecoded/consensus-proof"), Some(2));
     }
 

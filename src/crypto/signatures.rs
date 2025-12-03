@@ -1,5 +1,5 @@
 use crate::error::GovernanceError;
-use bllvm_sdk::governance::{
+use blvm_sdk::governance::{
     signatures::sign_message, verify_signature, GovernanceKeypair,
     PublicKey as GovernancePublicKey, Signature as GovernanceSignature,
 };

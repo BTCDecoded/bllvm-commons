@@ -354,7 +354,7 @@ mod tests {
         let result = publish_merge_action(
             &config,
             &db,
-            "BTCDecoded/bllvm-consensus",
+            "BTCDecoded/blvm-consensus",
             1,
             "abc123",
             2,
@@ -372,7 +372,7 @@ mod tests {
         // Should return Ok immediately when Nostr is disabled
         let result = publish_review_period_notification(
             &config,
-            "BTCDecoded/bllvm-consensus",
+            "BTCDecoded/blvm-consensus",
             1,
             2,
             3,

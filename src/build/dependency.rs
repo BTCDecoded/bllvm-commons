@@ -19,16 +19,16 @@ impl DependencyGraph {
 
         // Define build dependencies
         // Format: (repo_name, vec![dependencies])
-        dependencies.insert("bllvm-consensus".to_string(), vec![]);
+        dependencies.insert("blvm-consensus".to_string(), vec![]);
         dependencies.insert(
             "bllvm-protocol".to_string(),
-            vec!["bllvm-consensus".to_string()],
+            vec!["blvm-consensus".to_string()],
         );
         dependencies.insert(
             "bllvm-node".to_string(),
-            vec!["bllvm-protocol".to_string(), "bllvm-consensus".to_string()],
+            vec!["bllvm-protocol".to_string(), "blvm-consensus".to_string()],
         );
-        dependencies.insert("bllvm-sdk".to_string(), vec![]); // Independent, can build in parallel with bllvm-consensus
+        dependencies.insert("bllvm-sdk".to_string(), vec![]); // Independent, can build in parallel with blvm-consensus
         dependencies.insert("bllvm".to_string(), vec!["bllvm-node".to_string()]);
         dependencies.insert("bllvm-commons".to_string(), vec!["bllvm-sdk".to_string()]);
 
@@ -86,17 +86,17 @@ impl DependencyGraph {
         let mut result = Vec::new();
 
         // Add all nodes with no dependencies
-        // Sort to ensure deterministic order (bllvm-consensus should come first)
+        // Sort to ensure deterministic order (blvm-consensus should come first)
         let mut zero_degree_repos: Vec<String> = in_degree
             .iter()
             .filter(|(_, degree)| **degree == 0)
             .map(|(repo, _)| repo.clone())
             .collect();
         zero_degree_repos.sort();
-        // Ensure bllvm-consensus comes first if it has no dependencies
-        if zero_degree_repos.contains(&"bllvm-consensus".to_string()) {
-            zero_degree_repos.retain(|r| r != "bllvm-consensus");
-            zero_degree_repos.insert(0, "bllvm-consensus".to_string());
+        // Ensure blvm-consensus comes first if it has no dependencies
+        if zero_degree_repos.contains(&"blvm-consensus".to_string()) {
+            zero_degree_repos.retain(|r| r != "blvm-consensus");
+            zero_degree_repos.insert(0, "blvm-consensus".to_string());
         }
         for repo in zero_degree_repos {
             queue.push_back(repo);
@@ -182,9 +182,9 @@ mod tests {
         let graph = DependencyGraph::new("BTCDecoded".to_string());
         let order = graph.get_build_order().unwrap();
 
-        // bllvm-consensus should come first (no dependencies)
+        // blvm-consensus should come first (no dependencies)
         assert!(
-            order.iter().position(|r| r == "bllvm-consensus").unwrap()
+            order.iter().position(|r| r == "blvm-consensus").unwrap()
                 < order.iter().position(|r| r == "bllvm-protocol").unwrap()
         );
 
@@ -201,13 +201,13 @@ mod tests {
         let deps = graph.get_dependencies("bllvm-node");
 
         assert!(deps.contains(&"bllvm-protocol".to_string()));
-        assert!(deps.contains(&"bllvm-consensus".to_string()));
+        assert!(deps.contains(&"blvm-consensus".to_string()));
     }
 
     #[test]
     fn test_dependents() {
         let graph = DependencyGraph::new("BTCDecoded".to_string());
-        let dependents = graph.get_dependents("bllvm-consensus");
+        let dependents = graph.get_dependents("blvm-consensus");
 
         assert!(dependents.contains(&"bllvm-protocol".to_string()));
     }

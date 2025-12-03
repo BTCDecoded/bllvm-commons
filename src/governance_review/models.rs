@@ -135,6 +135,7 @@ pub mod policy {
     pub const IMPROVEMENT_PERIOD_DAYS: i64 = 90;
     pub const MEDIATION_PERIOD_DAYS: i64 = 30;
     pub const IMPROVEMENT_EXTENSION_DAYS: i64 = 30;
+    pub const MAX_EXTENSION_DAYS: i64 = 90; // Maximum extension beyond original deadline
 
     // Thresholds (from policy)
     pub const PRIVATE_WARNING_THRESHOLD: i32 = 4; // 4-of-7 team

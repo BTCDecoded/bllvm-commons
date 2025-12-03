@@ -4,7 +4,7 @@
 //! and counter-evidence
 
 use chrono::{DateTime, Utc};
-use sqlx::SqlitePool;
+use sqlx::{Row, SqlitePool};
 use crate::governance_review::models::GovernanceReviewResponse;
 
 pub struct ResponseManager {

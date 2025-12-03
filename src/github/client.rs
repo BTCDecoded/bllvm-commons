@@ -480,11 +480,11 @@ impl GitHubClient {
                 GovernanceError::GitHubError("Missing head SHA in PR response".to_string())
             })?;
 
-        // octocrab 0.38 API - use actions().list_workflow_runs()
+        // octocrab 0.38 API - use actions API directly
         let workflow_runs = self
             .client
-            .actions(owner, repo)
-            .list_workflow_runs()
+            .actions()
+            .list_workflow_runs_for_repo(owner, repo)
             .workflow_file(workflow_file)
             .head_sha(head_sha)
             .per_page(1)
@@ -533,7 +533,7 @@ impl GitHubClient {
             .await
         {
             Ok(_) => Ok(true),
-            Err(octocrab::Error::GitHub { ref source, .. }) if source.status == 404 => Ok(false),
+            Err(octocrab::Error::GitHub { ref source, .. }) if source.status.as_u16() == 404 => Ok(false),
             Err(e) => {
                 warn!("Failed to check workflow existence: {}", e);
                 // Default to true to avoid blocking
@@ -613,11 +613,11 @@ impl GitHubClient {
             owner, repo, run_id
         );
 
-        // octocrab 0.38 API - use actions().get_workflow_run()
+        // octocrab 0.38 API - use actions API directly
         let run = self
             .client
-            .actions(owner, repo)
-            .get_workflow_run(run_id)
+            .actions()
+            .get_workflow_run(owner, repo, run_id)
             .await
             .map_err(|e| {
                 error!("Failed to get workflow run: {}", e);
@@ -647,8 +647,8 @@ impl GitHubClient {
     ) -> Result<Vec<serde_json::Value>, GovernanceError> {
         info!("Listing workflow runs for {}/{}", owner, repo);
 
-        // octocrab 0.38 API - use actions().list_workflow_runs()
-        let mut builder = self.client.actions(owner, repo).list_workflow_runs();
+        // octocrab 0.38 API - use actions API directly
+        let mut builder = self.client.actions().list_workflow_runs_for_repo(owner, repo);
         
         if let Some(workflow_file) = workflow_file {
             builder = builder.workflow_file(workflow_file);
@@ -752,11 +752,12 @@ impl GitHubClient {
             owner, repo, run_id
         );
 
-        // octocrab 0.38 API - use actions().list_workflow_run_artifacts()
+        // octocrab 0.38 API - use actions API directly
         let artifacts = self
             .client
-            .actions(owner, repo)
-            .list_workflow_run_artifacts(run_id)
+            .actions()
+            .list_workflow_run_artifacts(owner, repo, run_id)
+            .send()
             .await
             .map_err(|e| {
                 warn!("Failed to list artifacts: {}", e);
