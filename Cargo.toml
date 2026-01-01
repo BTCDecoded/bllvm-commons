@@ -1,15 +1,15 @@
 [package]
-name = "bllvm-commons"
+name = "blvm-commons"
 version = "0.1.0"
 edition = "2021"
 authors = ["BTCDecoded Contributors"]
 license = "MIT"
 description = "Bitcoin Commons governance enforcement - GitHub App for cryptographic governance across Bitcoin Commons repositories"
-repository = "https://github.com/BTCDecoded/bllvm-commons"
+repository = "https://github.com/BTCDecoded/blvm-commons"
 
 [dependencies]
 # Protocol layer for Block and Transaction types
-bllvm-protocol = { path = "../../bllvm-protocol", package = "bllvm-protocol" }
+blvm-protocol = { path = "../../blvm-protocol", package = "blvm-protocol" }
 # Web framework
 axum = "0.7"
 tokio = { version = "1", features = ["full"] }
@@ -31,7 +31,7 @@ sha2 = "0.10"
 hex = "0.4"
 
 # Governance crypto primitives
-bllvm-sdk = { path = "../../bllvm-sdk", package = "bllvm-sdk" }
+blvm-sdk = { path = "../../blvm-sdk", package = "blvm-sdk" }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
@@ -112,7 +112,7 @@ ots = ["opentimestamps"]
 audit = []
 
 [[bin]]
-name = "bllvm-commons"
+name = "blvm-commons"
 path = "src/main.rs"
 
 [[bin]]

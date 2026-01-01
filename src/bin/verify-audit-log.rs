@@ -3,7 +3,7 @@ use clap::{Arg, Command};
 use std::path::Path;
 use tracing::{error, info};
 
-use bllvm_commons::audit::{build_merkle_tree, verify_audit_log, verify_merkle_root, AuditLogger};
+use blvm_commons::audit::{build_merkle_tree, verify_audit_log, verify_merkle_root, AuditLogger};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -148,7 +148,7 @@ async fn verify_audit_log_file(
 }
 
 fn check_audit_log_health(
-    entries: &[bllvm_commons::audit::entry::AuditLogEntry],
+    entries: &[blvm_commons::audit::entry::AuditLogEntry],
     verbose: bool,
 ) -> Result<()> {
     info!("Checking audit log health");

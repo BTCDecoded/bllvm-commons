@@ -1,6 +1,6 @@
 //! Tests for governance review system
 
-use bllvm_commons::governance_review::{
+use blvm_commons::governance_review::{
     AppealManager, GovernanceReviewCaseManager, MediationManager, RemovalManager,
     SanctionManager, TimeLimitManager, get_database_url, get_github_token, get_governance_repo,
     is_github_actions,

@@ -2,8 +2,8 @@
 //!
 //! These tests verify mathematical properties of signature and multisig operations.
 
-use bllvm_commons::crypto::signatures::SignatureManager;
-use bllvm_commons::crypto::multisig::MultisigManager;
+use blvm_commons::crypto::signatures::SignatureManager;
+use blvm_commons::crypto::multisig::MultisigManager;
 use proptest::prelude::*;
 use secp256k1::{PublicKey, SecretKey, Secp256k1};
 use std::collections::HashMap;

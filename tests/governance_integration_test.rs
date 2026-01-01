@@ -2,10 +2,10 @@
 //!
 //! Tests the complete flow from contributions to voting.
 
-use bllvm_commons::governance::{
+use blvm_commons::governance::{
     ContributionAggregator, ContributionTracker, VoteAggregator, WeightCalculator,
 };
-use bllvm_commons::nostr::ZapVotingProcessor;
+use blvm_commons::nostr::ZapVotingProcessor;
 use chrono::{DateTime, Utc};
 use sqlx::SqlitePool;
 

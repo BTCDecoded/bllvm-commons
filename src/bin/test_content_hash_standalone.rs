@@ -280,8 +280,8 @@ impl ContentHashValidator {
         };
 
         Ok(SyncReport {
-            source_repo: "bllvm-spec".to_string(),
-            target_repo: "bllvm-consensus".to_string(),
+            source_repo: "blvm-spec".to_string(),
+            target_repo: "blvm-consensus".to_string(),
             changed_files: changed_files.to_vec(),
             verification_results,
             sync_status,

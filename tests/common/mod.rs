@@ -1,8 +1,8 @@
-use bllvm_commons::crypto::multisig::MultisigManager;
-use bllvm_commons::crypto::signatures::SignatureManager;
-use bllvm_commons::database::Database;
-use bllvm_commons::enforcement::decision_log::DecisionLogger;
-use bllvm_sdk::governance::GovernanceKeypair;
+use blvm_commons::crypto::multisig::MultisigManager;
+use blvm_commons::crypto::signatures::SignatureManager;
+use blvm_commons::database::Database;
+use blvm_commons::enforcement::decision_log::DecisionLogger;
+use blvm_sdk::governance::GovernanceKeypair;
 use chrono::{DateTime, Duration, Utc};
 use rand::rngs::OsRng;
 use secp256k1::{PublicKey, Secp256k1, SecretKey};
@@ -118,16 +118,16 @@ pub fn create_test_pull_request(
 pub fn create_test_cross_layer_rules() -> Vec<serde_json::Value> {
     vec![
         serde_json::json!({
-            "source_repo": "BTCDecoded/bllvm-consensus",
+            "source_repo": "BTCDecoded/blvm-consensus",
             "source_pattern": "src/consensus/**",
-            "target_repo": "BTCDecoded/bllvm-protocol",
+            "target_repo": "BTCDecoded/blvm-protocol",
             "target_pattern": "src/validation/**",
             "validation_type": "corresponding_file_exists"
         }),
         serde_json::json!({
-            "source_repo": "BTCDecoded/bllvm-protocol",
+            "source_repo": "BTCDecoded/blvm-protocol",
             "source_pattern": "src/network/**",
-            "target_repo": "BTCDecoded/bllvm-node",
+            "target_repo": "BTCDecoded/blvm-node",
             "target_pattern": "src/network/**",
             "validation_type": "references_latest_version"
         }),
@@ -243,8 +243,8 @@ pub mod github_mocks {
 
 /// Mock GitHub client for testing
 pub mod mock_github {
-    use bllvm_commons::error::GovernanceError;
-    use bllvm_commons::github::types::CheckRun;
+    use blvm_commons::error::GovernanceError;
+    use blvm_commons::github::types::CheckRun;
     use serde_json::Value;
     use std::collections::HashMap;
     use std::sync::Arc;

@@ -3,11 +3,11 @@
 //! Tests for economic node registration, qualification verification,
 //! weight calculation, veto signal collection, and threshold calculation
 
-use bllvm_commons::crypto::signatures::SignatureManager;
-use bllvm_commons::database::Database;
-use bllvm_commons::economic_nodes::{registry::EconomicNodeRegistry, types::*, veto::VetoManager};
-use bllvm_commons::error::GovernanceError;
-use bllvm_sdk::governance::GovernanceKeypair;
+use blvm_commons::crypto::signatures::SignatureManager;
+use blvm_commons::database::Database;
+use blvm_commons::economic_nodes::{registry::EconomicNodeRegistry, types::*, veto::VetoManager};
+use blvm_commons::error::GovernanceError;
+use blvm_sdk::governance::GovernanceKeypair;
 use chrono::Utc;
 use sqlx::SqlitePool;
 
@@ -51,7 +51,7 @@ async fn test_economic_node_registration() -> Result<(), Box<dyn std::error::Err
     println!("✅ Mining pool registered with ID: {}", node_id);
 
     // Test exchange registration
-    use bllvm_commons::economic_nodes::types::{HashpowerProof, HoldingsProof, VolumeProof};
+    use blvm_commons::economic_nodes::types::{HashpowerProof, HoldingsProof, VolumeProof};
     let exchange_proof = QualificationProof {
         node_type: NodeType::Exchange,
         hashpower_proof: None,

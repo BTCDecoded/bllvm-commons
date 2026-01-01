@@ -3,13 +3,13 @@
 //! Comprehensive integration tests for the complete governance flow:
 //! - Proposal creation → Voting → Veto checking → Merge blocking
 
-use bllvm_commons::crypto::signatures::SignatureManager;
-use bllvm_commons::economic_nodes::{registry::EconomicNodeRegistry, veto::VetoManager};
-use bllvm_commons::governance::{
+use blvm_commons::crypto::signatures::SignatureManager;
+use blvm_commons::economic_nodes::{registry::EconomicNodeRegistry, veto::VetoManager};
+use blvm_commons::governance::{
     ContributionAggregator, ContributionTracker, VoteAggregator, WeightCalculator,
 };
-use bllvm_commons::nostr::ZapVotingProcessor;
-use bllvm_sdk::governance::GovernanceKeypair;
+use blvm_commons::nostr::ZapVotingProcessor;
+use blvm_sdk::governance::GovernanceKeypair;
 use chrono::{DateTime, Utc};
 use hex;
 use sqlx::SqlitePool;
@@ -244,9 +244,9 @@ async fn test_complete_governance_flow_tier3_veto_blocked() {
     let timestamp = Utc::now();
 
     // Step 1: Create economic node with proper qualification data
-    use bllvm_commons::economic_nodes::types::{ContactInfo, QualificationProof};
+    use blvm_commons::economic_nodes::types::{ContactInfo, QualificationProof};
     let qual_proof = QualificationProof {
-        node_type: bllvm_commons::economic_nodes::types::NodeType::MiningPool,
+        node_type: blvm_commons::economic_nodes::types::NodeType::MiningPool,
         hashpower_proof: None,
         holdings_proof: None,
         volume_proof: None,
@@ -305,7 +305,7 @@ async fn test_complete_governance_flow_tier3_veto_blocked() {
         .collect_veto_signal(
             pr_id,
             node_id,
-            bllvm_commons::economic_nodes::types::SignalType::Veto,
+            blvm_commons::economic_nodes::types::SignalType::Veto,
             &signature,
             "Economic concerns",
         )
@@ -549,9 +549,9 @@ async fn test_complete_governance_flow_combined_veto_systems() {
     let timestamp = Utc::now();
 
     // Step 1: Economic node veto (25% hashpower - below 30% threshold)
-    use bllvm_commons::economic_nodes::types::{ContactInfo, QualificationProof};
+    use blvm_commons::economic_nodes::types::{ContactInfo, QualificationProof};
     let qual_proof = QualificationProof {
-        node_type: bllvm_commons::economic_nodes::types::NodeType::MiningPool,
+        node_type: blvm_commons::economic_nodes::types::NodeType::MiningPool,
         hashpower_proof: None,
         holdings_proof: None,
         volume_proof: None,
@@ -609,7 +609,7 @@ async fn test_complete_governance_flow_combined_veto_systems() {
         .collect_veto_signal(
             pr_id,
             node_id,
-            bllvm_commons::economic_nodes::types::SignalType::Veto,
+            blvm_commons::economic_nodes::types::SignalType::Veto,
             &signature,
             "Concerns",
         )

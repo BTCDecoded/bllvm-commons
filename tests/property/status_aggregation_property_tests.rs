@@ -2,11 +2,11 @@
 //!
 //! These tests verify mathematical properties of status determination and aggregation.
 
-use bllvm_commons::github::cross_layer_status::CrossLayerStatusChecker;
+use blvm_commons::github::cross_layer_status::CrossLayerStatusChecker;
 use proptest::prelude::*;
 
 // Import the internal function for testing
-use bllvm_commons::github::cross_layer_status::CrossLayerStatusChecker as Checker;
+use blvm_commons::github::cross_layer_status::CrossLayerStatusChecker as Checker;
 
 proptest! {
     /// Property: Status aggregation is commutative

@@ -1,7 +1,7 @@
 //! Test binary for content hash verification system
 //! This tests Track 1 of the cryptographic layer synchronization implementation
 
-use bllvm_commons::validation::content_hash::{
+use blvm_commons::validation::content_hash::{
     ContentHashValidator, CorrespondenceType, FileCorrespondence,
 };
 use std::collections::HashMap;

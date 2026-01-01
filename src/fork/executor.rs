@@ -359,7 +359,7 @@ impl ForkExecutor {
             event_id: uuid::Uuid::new_v4().to_string(),
             event_type: ForkEventType::GovernanceFork,
             ruleset_id: target_ruleset_id.to_string(),
-            node_id: "bllvm-commons".to_string(),
+            node_id: "blvm-commons".to_string(),
             details: serde_json::json!({
                 "from_ruleset": current_ruleset_id,
                 "to_ruleset": target_ruleset_id,

@@ -3,7 +3,7 @@
 //! Uses BIP32 key derivation to create separate voting keys from registration keys,
 //! enabling privacy-preserving veto signals where votes cannot be linked to registration.
 
-use bllvm_sdk::governance::bip32::{derive_child_private, ExtendedPrivateKey, ExtendedPublicKey};
+use blvm_sdk::governance::bip32::{derive_child_private, ExtendedPrivateKey, ExtendedPublicKey};
 use secp256k1::{PublicKey, SecretKey, Secp256k1};
 use std::str::FromStr;
 
@@ -23,7 +23,7 @@ pub fn derive_voting_key(
     pr_id: i32,
     signal_index: u32,
 ) -> Result<(ExtendedPrivateKey, ExtendedPublicKey), GovernanceError> {
-    use bllvm_sdk::governance::bip32::ExtendedPrivateKey;
+    use blvm_sdk::governance::bip32::ExtendedPrivateKey;
 
     // Create extended private key from registration key
     // We treat the registration key as the master key for voting derivation

@@ -1,7 +1,7 @@
 //! Internal API Authentication
 //!
 //! Provides authentication middleware for internal API endpoints used by
-//! bllvm-node to forward P2P governance messages to bllvm-commons.
+//! blvm-node to forward P2P governance messages to blvm-commons.
 
 use axum::{
     extract::Request,

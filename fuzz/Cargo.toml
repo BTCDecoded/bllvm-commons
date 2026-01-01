@@ -1,5 +1,5 @@
 [package]
-name = "bllvm-commons-fuzz"
+name = "blvm-commons-fuzz"
 version = "0.0.0"
 authors = ["AutoFuzz <fuzz@example.com>"]
 edition = "2021"
@@ -8,7 +8,7 @@ edition = "2021"
 cargo-fuzz = true
 
 [dependencies]
-bllvm-commons = { path = ".." }
+blvm-commons = { path = ".." }
 libfuzzer-sys = "0.4"
 
 [dependencies.arbitrary]

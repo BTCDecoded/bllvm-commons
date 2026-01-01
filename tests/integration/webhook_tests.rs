@@ -1,5 +1,5 @@
-use bllvm_commons::webhooks::github;
-use bllvm_commons::database::Database;
+use blvm_commons::webhooks::github;
+use blvm_commons::database::Database;
 use serde_json::Value;
 use axum::http::StatusCode;
 
@@ -9,58 +9,58 @@ use common::*;
 #[tokio::test]
 async fn test_pull_request_opened_webhook() {
     let db = setup_test_db().await;
-    let payload = github_mocks::pull_request_opened_payload("BTCDecoded/bllvm-consensus", 123);
+    let payload = github_mocks::pull_request_opened_payload("BTCDecoded/blvm-consensus", 123);
     
     // Test webhook processing
-    let result = bllvm_commons::webhooks::pull_request::handle_pull_request_event(&db, &payload).await;
+    let result = blvm_commons::webhooks::pull_request::handle_pull_request_event(&db, &payload).await;
     assert!(result.is_ok());
     
     // Verify PR was stored in database
-    let pr = db.get_pull_request("BTCDecoded/bllvm-consensus", 123).await;
+    let pr = db.get_pull_request("BTCDecoded/blvm-consensus", 123).await;
     assert!(pr.is_ok());
     if let Ok(Some(pull_request)) = pr {
-        assert_eq!(pull_request.repo_name, "BTCDecoded/bllvm-consensus");
+        assert_eq!(pull_request.repo_name, "BTCDecoded/blvm-consensus");
         assert_eq!(pull_request.pr_number, 123);
-        assert_eq!(pull_request.layer, 2); // bllvm-consensus is layer 2
+        assert_eq!(pull_request.layer, 2); // blvm-consensus is layer 2
     }
 }
 
 #[tokio::test]
 async fn test_pull_request_synchronize_webhook() {
     let db = setup_test_db().await;
-    let payload = github_mocks::pull_request_synchronize_payload("BTCDecoded/bllvm-protocol", 456);
+    let payload = github_mocks::pull_request_synchronize_payload("BTCDecoded/blvm-protocol", 456);
     
     // Test webhook processing
-    let result = bllvm_commons::webhooks::pull_request::handle_pull_request_event(&db, &payload).await;
+    let result = blvm_commons::webhooks::pull_request::handle_pull_request_event(&db, &payload).await;
     assert!(result.is_ok());
     
     // Verify PR was updated in database
-    let pr = db.get_pull_request("BTCDecoded/bllvm-protocol", 456).await;
+    let pr = db.get_pull_request("BTCDecoded/blvm-protocol", 456).await;
     assert!(pr.is_ok());
     if let Ok(Some(pull_request)) = pr {
-        assert_eq!(pull_request.repo_name, "BTCDecoded/bllvm-protocol");
+        assert_eq!(pull_request.repo_name, "BTCDecoded/blvm-protocol");
         assert_eq!(pull_request.pr_number, 456);
-        assert_eq!(pull_request.layer, 3); // bllvm-protocol is layer 3
+        assert_eq!(pull_request.layer, 3); // blvm-protocol is layer 3
     }
 }
 
 #[tokio::test]
 async fn test_review_submitted_webhook() {
     let db = setup_test_db().await;
-    let payload = github_mocks::review_submitted_payload("BTCDecoded/bllvm-node", 789, "alice", "approved");
+    let payload = github_mocks::review_submitted_payload("BTCDecoded/blvm-node", 789, "alice", "approved");
     
     // Test webhook processing
-    let result = bllvm_commons::webhooks::review::handle_review_event(&db, &payload).await;
+    let result = blvm_commons::webhooks::review::handle_review_event(&db, &payload).await;
     assert!(result.is_ok());
 }
 
 #[tokio::test]
 async fn test_review_dismissed_webhook() {
     let db = setup_test_db().await;
-    let payload = github_mocks::review_submitted_payload("BTCDecoded/bllvm-sdk", 101, "bob", "dismissed");
+    let payload = github_mocks::review_submitted_payload("BTCDecoded/blvm-sdk", 101, "bob", "dismissed");
     
     // Test webhook processing
-    let result = bllvm_commons::webhooks::review::handle_review_event(&db, &payload).await;
+    let result = blvm_commons::webhooks::review::handle_review_event(&db, &payload).await;
     assert!(result.is_ok());
 }
 
@@ -68,14 +68,14 @@ async fn test_review_dismissed_webhook() {
 async fn test_comment_governance_signature() {
     let db = setup_test_db().await;
     let signature_body = "/governance-sign signature_abc123def456";
-    let payload = github_mocks::comment_created_payload("BTCDecoded/bllvm-consensus", 123, "alice", signature_body);
+    let payload = github_mocks::comment_created_payload("BTCDecoded/blvm-consensus", 123, "alice", signature_body);
     
     // Test webhook processing
-    let result = bllvm_commons::webhooks::comment::handle_comment_event(&db, &payload).await;
+    let result = blvm_commons::webhooks::comment::handle_comment_event(&db, &payload).await;
     assert!(result.is_ok());
     
     // Verify signature was added to database
-    let pr = db.get_pull_request("BTCDecoded/bllvm-consensus", 123).await;
+    let pr = db.get_pull_request("BTCDecoded/blvm-consensus", 123).await;
     assert!(pr.is_ok());
     if let Ok(Some(pull_request)) = pr {
         assert!(!pull_request.signatures.is_empty());
@@ -87,14 +87,14 @@ async fn test_comment_governance_signature() {
 async fn test_comment_empty_signature() {
     let db = setup_test_db().await;
     let empty_signature_body = "/governance-sign";
-    let payload = github_mocks::comment_created_payload("BTCDecoded/bllvm-consensus", 123, "alice", empty_signature_body);
+    let payload = github_mocks::comment_created_payload("BTCDecoded/blvm-consensus", 123, "alice", empty_signature_body);
     
     // Test webhook processing
-    let result = bllvm_commons::webhooks::comment::handle_comment_event(&db, &payload).await;
+    let result = blvm_commons::webhooks::comment::handle_comment_event(&db, &payload).await;
     assert!(result.is_ok());
     
     // Verify no signature was added
-    let pr = db.get_pull_request("BTCDecoded/bllvm-consensus", 123).await;
+    let pr = db.get_pull_request("BTCDecoded/blvm-consensus", 123).await;
     assert!(pr.is_ok());
     if let Ok(Some(pull_request)) = pr {
         assert!(pull_request.signatures.is_empty());
@@ -105,14 +105,14 @@ async fn test_comment_empty_signature() {
 async fn test_comment_non_governance() {
     let db = setup_test_db().await;
     let regular_comment = "This looks good to me!";
-    let payload = github_mocks::comment_created_payload("BTCDecoded/bllvm-consensus", 123, "alice", regular_comment);
+    let payload = github_mocks::comment_created_payload("BTCDecoded/blvm-consensus", 123, "alice", regular_comment);
     
     // Test webhook processing
-    let result = bllvm_commons::webhooks::comment::handle_comment_event(&db, &payload).await;
+    let result = blvm_commons::webhooks::comment::handle_comment_event(&db, &payload).await;
     assert!(result.is_ok());
     
     // Verify no signature was added
-    let pr = db.get_pull_request("BTCDecoded/bllvm-consensus", 123).await;
+    let pr = db.get_pull_request("BTCDecoded/blvm-consensus", 123).await;
     assert!(pr.is_ok());
     if let Ok(Some(pull_request)) = pr {
         assert!(pull_request.signatures.is_empty());
@@ -122,10 +122,10 @@ async fn test_comment_non_governance() {
 #[tokio::test]
 async fn test_push_to_main_detection() {
     let db = setup_test_db().await;
-    let payload = github_mocks::push_payload("BTCDecoded/bllvm-consensus", "alice", "refs/heads/main");
+    let payload = github_mocks::push_payload("BTCDecoded/blvm-consensus", "alice", "refs/heads/main");
     
     // Test webhook processing
-    let result = bllvm_commons::webhooks::push::handle_push_event(&db, &payload).await;
+    let result = blvm_commons::webhooks::push::handle_push_event(&db, &payload).await;
     assert!(result.is_ok());
     
     // Verify bypass attempt was logged
@@ -140,10 +140,10 @@ async fn test_push_to_main_detection() {
 #[tokio::test]
 async fn test_push_to_feature_branch() {
     let db = setup_test_db().await;
-    let payload = github_mocks::push_payload("BTCDecoded/bllvm-consensus", "alice", "refs/heads/feature/new-feature");
+    let payload = github_mocks::push_payload("BTCDecoded/blvm-consensus", "alice", "refs/heads/feature/new-feature");
     
     // Test webhook processing
-    let result = bllvm_commons::webhooks::push::handle_push_event(&db, &payload).await;
+    let result = blvm_commons::webhooks::push::handle_push_event(&db, &payload).await;
     assert!(result.is_ok());
     
     // Verify no bypass attempt was logged
@@ -158,7 +158,7 @@ async fn test_push_to_feature_branch() {
 async fn test_webhook_hmac_verification() {
     // Test HMAC signature verification
     let webhook_secret = "test_secret";
-    let payload = r#"{"action":"opened","repository":{"full_name":"BTCDecoded/bllvm-consensus"}}"#;
+    let payload = r#"{"action":"opened","repository":{"full_name":"BTCDecoded/blvm-consensus"}}"#;
     let signature = "sha256=test_signature";
     
     // This would test HMAC verification in a real implementation
@@ -174,7 +174,7 @@ async fn test_webhook_invalid_payload() {
     });
     
     // Test webhook processing with invalid payload
-    let result = bllvm_commons::webhooks::pull_request::handle_pull_request_event(&db, &invalid_payload).await;
+    let result = blvm_commons::webhooks::pull_request::handle_pull_request_event(&db, &invalid_payload).await;
     // Should handle gracefully
     assert!(result.is_ok() || result.is_err());
 }
@@ -193,7 +193,7 @@ async fn test_webhook_malformed_json() {
     });
     
     // Test webhook processing with malformed payload
-    let result = bllvm_commons::webhooks::pull_request::handle_pull_request_event(&db, &malformed_payload).await;
+    let result = blvm_commons::webhooks::pull_request::handle_pull_request_event(&db, &malformed_payload).await;
     // Should handle gracefully
     assert!(result.is_ok() || result.is_err());
 }
@@ -204,7 +204,7 @@ async fn test_webhook_unknown_repository() {
     let payload = github_mocks::pull_request_opened_payload("Unknown/Repository", 123);
     
     // Test webhook processing with unknown repository
-    let result = bllvm_commons::webhooks::pull_request::handle_pull_request_event(&db, &payload).await;
+    let result = blvm_commons::webhooks::pull_request::handle_pull_request_event(&db, &payload).await;
     assert!(result.is_ok());
     
     // Should return unknown_repo status
@@ -220,10 +220,10 @@ async fn test_webhook_concurrent_processing() {
     // Test concurrent webhook processing
     let handles: Vec<_> = (0..10).map(|i| {
         let db = &db;
-        let payload = github_mocks::pull_request_opened_payload("BTCDecoded/bllvm-consensus", i as u64);
+        let payload = github_mocks::pull_request_opened_payload("BTCDecoded/blvm-consensus", i as u64);
         
         tokio::spawn(async move {
-            bllvm_commons::webhooks::pull_request::handle_pull_request_event(db, &payload).await
+            blvm_commons::webhooks::pull_request::handle_pull_request_event(db, &payload).await
         })
     }).collect();
     
@@ -239,17 +239,17 @@ async fn test_webhook_database_transaction_rollback() {
     let db = setup_test_db().await;
     
     // Test that database transactions are properly handled
-    let payload = github_mocks::pull_request_opened_payload("BTCDecoded/bllvm-consensus", 999);
+    let payload = github_mocks::pull_request_opened_payload("BTCDecoded/blvm-consensus", 999);
     
     // Process webhook
-    let result = bllvm_commons::webhooks::pull_request::handle_pull_request_event(&db, &payload).await;
+    let result = blvm_commons::webhooks::pull_request::handle_pull_request_event(&db, &payload).await;
     assert!(result.is_ok());
     
     // Verify data consistency
-    let pr = db.get_pull_request("BTCDecoded/bllvm-consensus", 999).await;
+    let pr = db.get_pull_request("BTCDecoded/blvm-consensus", 999).await;
     assert!(pr.is_ok());
     if let Ok(Some(pull_request)) = pr {
-        assert_eq!(pull_request.repo_name, "BTCDecoded/bllvm-consensus");
+        assert_eq!(pull_request.repo_name, "BTCDecoded/blvm-consensus");
         assert_eq!(pull_request.pr_number, 999);
     }
 }

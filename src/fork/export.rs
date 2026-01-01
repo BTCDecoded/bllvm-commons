@@ -301,7 +301,7 @@ impl GovernanceExporter {
             .export_governance_config(
                 &ruleset.id,
                 &ruleset.version,
-                "bllvm-commons",
+                "blvm-commons",
                 "BTCDecoded/governance",
                 "unknown",
             )

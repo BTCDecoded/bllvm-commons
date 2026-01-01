@@ -4,7 +4,7 @@
 //! including economic node veto scenarios, emergency activation,
 //! and governance changes with fork capability
 
-use bllvm_commons::{
+use blvm_commons::{
     crypto::signatures::SignatureManager,
     database::Database,
     economic_nodes::{registry::EconomicNodeRegistry, types::*, veto::VetoManager},
@@ -16,7 +16,7 @@ use bllvm_commons::{
     },
     validation::tier_classification,
 };
-use bllvm_sdk::governance::GovernanceKeypair;
+use blvm_sdk::governance::GovernanceKeypair;
 use hex;
 use serde_json::json;
 use sqlx;
@@ -108,7 +108,7 @@ async fn test_tier_3_economic_node_veto_scenario() -> Result<(), Box<dyn std::er
     let veto_manager = VetoManager::new(pool);
 
     // 1. Register economic nodes
-    use bllvm_commons::economic_nodes::types::{HashpowerProof, HoldingsProof, VolumeProof};
+    use blvm_commons::economic_nodes::types::{HashpowerProof, HoldingsProof, VolumeProof};
 
     let mining_pool_proof = QualificationProof {
         node_type: NodeType::MiningPool,
@@ -200,8 +200,8 @@ async fn test_tier_3_economic_node_veto_scenario() -> Result<(), Box<dyn std::er
     // Since we registered nodes with "mining_pool_key" and "exchange_key" as public keys,
     // we need to either update those keys or create signatures that match
     // Simplest: Update the nodes' public keys to match generated keypairs
-    use bllvm_commons::crypto::signatures::SignatureManager;
-    use bllvm_sdk::governance::GovernanceKeypair;
+    use blvm_commons::crypto::signatures::SignatureManager;
+    use blvm_sdk::governance::GovernanceKeypair;
     let sig_manager = SignatureManager::new();
 
     let mining_keypair = GovernanceKeypair::generate().expect("Failed to generate keypair");
@@ -346,7 +346,7 @@ async fn test_tier_4_emergency_activation() -> Result<(), Box<dyn std::error::Er
     println!("✅ Emergency PR can be merged immediately when signatures met");
 
     // 4. Generate emergency status
-    use bllvm_commons::validation::emergency::{ActiveEmergency, EmergencyTier};
+    use blvm_commons::validation::emergency::{ActiveEmergency, EmergencyTier};
     use chrono::{Duration, Utc};
     let emergency = ActiveEmergency {
         id: 1,
@@ -601,7 +601,7 @@ tiers:
     .map_err(|e| GovernanceError::DatabaseError(format!("Failed to save ruleset v1.1.0: {}", e)))?;
 
     // 4. Simulate adoption decisions
-    use bllvm_commons::fork::types::ForkDecision;
+    use blvm_commons::fork::types::ForkDecision;
     use chrono::Utc;
 
     let decision1 = ForkDecision {
@@ -1000,7 +1000,7 @@ async fn test_complete_governance_lifecycle() -> Result<(), Box<dyn std::error::
     .map_err(|e| GovernanceError::DatabaseError(format!("Failed to save ruleset: {}", e)))?;
 
     // Record adoption decisions
-    use bllvm_commons::fork::types::ForkDecision;
+    use blvm_commons::fork::types::ForkDecision;
     use chrono::Utc;
 
     let decision1 = ForkDecision {

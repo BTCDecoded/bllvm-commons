@@ -4,8 +4,8 @@
 //! Update snapshots: cargo insta review
 
 mod validation_snapshot_tests {
-    use bllvm_commons::validation::content_hash::ContentHashValidator;
-    use bllvm_commons::validation::version_pinning::VersionPinningValidator;
+    use blvm_commons::validation::content_hash::ContentHashValidator;
+    use blvm_commons::validation::version_pinning::VersionPinningValidator;
     use insta::assert_snapshot;
 
     #[test]
@@ -65,7 +65,7 @@ mod validation_snapshot_tests {
 }
 
 mod github_snapshot_tests {
-    use bllvm_commons::github::cross_layer_status::CrossLayerStatusChecker;
+    use blvm_commons::github::cross_layer_status::CrossLayerStatusChecker;
     use insta::assert_snapshot;
 
     #[test]

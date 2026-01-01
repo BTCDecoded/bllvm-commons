@@ -1,6 +1,6 @@
 //! Block webhook handler for fee forwarding integration
 //!
-//! Receives block notifications from bllvm-node and processes them for fee forwarding
+//! Receives block notifications from blvm-node and processes them for fee forwarding
 
 use axum::{extract::State, response::Json};
 use serde::{Deserialize, Serialize};
@@ -12,12 +12,12 @@ use crate::database::Database;
 use crate::governance::FeeForwardingTracker;
 
 /// Block notification payload
-/// Block should be provided as JSON object that can be deserialized to bllvm_protocol::Block
+/// Block should be provided as JSON object that can be deserialized to blvm_protocol::Block
 #[derive(Debug, Deserialize)]
 pub struct BlockNotification {
     pub block_hash: String,
     pub block_height: i32,
-    pub block: Value, // Block data as JSON - will be converted to bllvm_protocol::Block
+    pub block: Value, // Block data as JSON - will be converted to blvm_protocol::Block
     pub contributor_id: Option<String>, // Optional: node/miner identifier
 }
 
@@ -56,7 +56,7 @@ pub async fn handle_block_notification(
 
     // Parse block from JSON payload
     // The block field contains the block data as JSON
-    let block: bllvm_protocol::Block = match serde_json::from_value(payload.block.clone()) {
+    let block: blvm_protocol::Block = match serde_json::from_value(payload.block.clone()) {
         Ok(parsed) => parsed,
         Err(e) => {
             error!("Failed to parse block from JSON: {}", e);

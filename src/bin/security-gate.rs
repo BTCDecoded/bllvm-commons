@@ -9,7 +9,7 @@ use std::fs;
 use std::path::Path;
 use tracing::info;
 
-use bllvm_commons::validation::security_controls::SecurityControlValidator;
+use blvm_commons::validation::security_controls::SecurityControlValidator;
 
 #[derive(Parser)]
 #[command(name = "security-gate")]
@@ -237,19 +237,19 @@ async fn check_pr_impact(pr_number: u32, format: &str) -> Result<()> {
             println!();
 
             match impact.impact_level {
-                bllvm_commons::validation::security_controls::ImpactLevel::Critical => {
+                blvm_commons::validation::security_controls::ImpactLevel::Critical => {
                     println!("🚨 CRITICAL IMPACT - Multiple P0 security controls affected");
                 }
-                bllvm_commons::validation::security_controls::ImpactLevel::High => {
+                blvm_commons::validation::security_controls::ImpactLevel::High => {
                     println!("🔴 HIGH IMPACT - P0 security controls affected");
                 }
-                bllvm_commons::validation::security_controls::ImpactLevel::Medium => {
+                blvm_commons::validation::security_controls::ImpactLevel::Medium => {
                     println!("🟡 MEDIUM IMPACT - P1 security controls affected");
                 }
-                bllvm_commons::validation::security_controls::ImpactLevel::Low => {
+                blvm_commons::validation::security_controls::ImpactLevel::Low => {
                     println!("🟢 LOW IMPACT - P2 security controls affected");
                 }
-                bllvm_commons::validation::security_controls::ImpactLevel::None => {
+                blvm_commons::validation::security_controls::ImpactLevel::None => {
                     println!("✅ NO IMPACT - No security controls affected");
                 }
             }
@@ -534,16 +534,16 @@ async fn get_pr_changed_files(pr_number: u32) -> Result<Vec<String>> {
     // Simplified implementation - in reality would use GitHub API
     // For now, return some example files
     Ok(vec![
-        "bllvm-protocol/src/lib.rs".to_string(),
-        "bllvm-commons/src/validation/emergency.rs".to_string(),
+        "blvm-protocol/src/lib.rs".to_string(),
+        "blvm-commons/src/validation/emergency.rs".to_string(),
     ])
 }
 
 async fn get_git_changed_files() -> Result<Vec<String>> {
     // Simplified implementation - in reality would use git diff
     Ok(vec![
-        "bllvm-protocol/src/lib.rs".to_string(),
-        "bllvm-commons/src/database/queries.rs".to_string(),
+        "blvm-protocol/src/lib.rs".to_string(),
+        "blvm-commons/src/database/queries.rs".to_string(),
     ])
 }
 

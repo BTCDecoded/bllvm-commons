@@ -3,9 +3,9 @@
 //! Tests for governance configuration export, ruleset versioning,
 //! adoption tracking, and multiple ruleset support
 
-use bllvm_commons::database::Database;
-use bllvm_commons::error::GovernanceError;
-use bllvm_commons::fork::{
+use blvm_commons::database::Database;
+use blvm_commons::error::GovernanceError;
+use blvm_commons::fork::{
     adoption::AdoptionTracker,
     export::GovernanceExporter,
     types::*,
@@ -325,7 +325,7 @@ async fn test_adoption_tracking() -> Result<(), Box<dyn std::error::Error>> {
     let tracker = AdoptionTracker::new(pool);
 
     // Record fork decisions
-    use bllvm_commons::fork::types::ForkDecision;
+    use blvm_commons::fork::types::ForkDecision;
     use chrono::Utc;
 
     let decision1 = ForkDecision {
@@ -589,7 +589,7 @@ async fn test_adoption_history() -> Result<(), Box<dyn std::error::Error>> {
     let tracker = AdoptionTracker::new(pool);
 
     // Record multiple fork decisions over time
-    use bllvm_commons::fork::types::ForkDecision;
+    use blvm_commons::fork::types::ForkDecision;
     use chrono::Utc;
 
     let decision1 = ForkDecision {

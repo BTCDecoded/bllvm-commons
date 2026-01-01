@@ -49,12 +49,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "bllvm_commons=debug,tower_http=debug".into()),
+                .unwrap_or_else(|_| "blvm_commons=debug,tower_http=debug".into()),
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    info!("Starting Bitcoin Commons (bllvm-commons)");
+    info!("Starting Bitcoin Commons (blvm-commons)");
 
     // Load configuration
     let config = AppConfig::load()?;
@@ -71,7 +71,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Start automated backup task
     let database_for_backup = database.clone();
     let backup_config = backup::BackupConfig {
-        directory: std::path::PathBuf::from("/opt/bllvm-commons/backups"),
+        directory: std::path::PathBuf::from("/opt/blvm-commons/backups"),
         retention_days: 30,
         compression: true,
         interval: std::time::Duration::from_secs(86400), // Daily
@@ -182,7 +182,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             config.server_id.clone(),
             std::env::current_exe()
                 .map(|p| p.to_string_lossy().to_string())
-                .unwrap_or_else(|_| "bllvm-commons".to_string()),
+                .unwrap_or_else(|_| "blvm-commons".to_string()),
             "config.toml".to_string(),
             if config.audit.enabled {
                 Some(config.audit.log_path.clone())
@@ -487,7 +487,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 async fn health_check() -> Json<serde_json::Value> {
     Json(serde_json::json!({
         "status": "healthy",
-        "service": "bllvm-commons",
+        "service": "blvm-commons",
         "timestamp": chrono::Utc::now()
     }))
 }
@@ -581,7 +581,7 @@ async fn status_endpoint(
 
     let mut status = serde_json::json!({
         "status": "healthy",
-        "service": "bllvm-commons",
+        "service": "blvm-commons",
         "timestamp": chrono::Utc::now(),
         "server_id": config.server_id,
         "features": {

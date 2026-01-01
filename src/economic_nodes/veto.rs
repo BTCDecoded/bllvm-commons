@@ -738,7 +738,7 @@ mod tests {
     use super::*;
     use crate::database::Database;
     use crate::economic_nodes::registry::EconomicNodeRegistry;
-    use bllvm_sdk::governance::GovernanceKeypair;
+    use blvm_sdk::governance::GovernanceKeypair;
 
     async fn setup_test_veto_manager() -> (VetoManager, EconomicNodeRegistry, i32) {
         let db = Database::new_in_memory().await.unwrap();

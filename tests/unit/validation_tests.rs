@@ -1,7 +1,7 @@
-use bllvm_commons::validation::*;
-use bllvm_commons::validation::signatures::SignatureValidator;
-use bllvm_commons::validation::cross_layer::CrossLayerValidator;
-use bllvm_commons::validation::emergency::*;
+use blvm_commons::validation::*;
+use blvm_commons::validation::signatures::SignatureValidator;
+use blvm_commons::validation::cross_layer::CrossLayerValidator;
+use blvm_commons::validation::emergency::*;
 use chrono::{DateTime, Utc, Duration};
 use secp256k1::{SecretKey, Secp256k1, PublicKey};
 use rand::rngs::OsRng;
@@ -212,7 +212,7 @@ async fn test_cross_layer_validation() {
     
     // Test matching pattern
     let result = CrossLayerValidator::validate_cross_layer_dependencies(
-        "BTCDecoded/bllvm-consensus",
+        "BTCDecoded/blvm-consensus",
         &changed_files,
         &cross_layer_rules,
         None, // No GitHub token for test
@@ -222,7 +222,7 @@ async fn test_cross_layer_validation() {
     // Test non-matching pattern
     let non_matching_files = vec!["src/other/file.rs".to_string()];
     let result = CrossLayerValidator::validate_cross_layer_dependencies(
-        "BTCDecoded/bllvm-consensus",
+        "BTCDecoded/blvm-consensus",
         &non_matching_files,
         &cross_layer_rules,
         None, // No GitHub token for test

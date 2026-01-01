@@ -1,6 +1,6 @@
 //! Testnet Integration Test Scenarios
 //! 
-//! Comprehensive test scenarios for the bllvm-commons testnet environment.
+//! Comprehensive test scenarios for the blvm-commons testnet environment.
 
 use std::time::Duration;
 use tokio::time::sleep;

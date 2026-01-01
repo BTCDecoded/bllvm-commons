@@ -2,8 +2,8 @@
 //!
 //! Basic tests to verify the governance system components work correctly
 
-use bllvm_commons::database::Database;
-use bllvm_commons::validation::tier_classification;
+use blvm_commons::database::Database;
+use blvm_commons::validation::tier_classification;
 use serde_json::json;
 
 mod common;
@@ -99,7 +99,7 @@ async fn test_tier_classification() -> Result<(), Box<dyn std::error::Error>> {
 async fn test_status_check_generation() -> Result<(), Box<dyn std::error::Error>> {
     println!("🧪 Testing status check generation...");
 
-    use bllvm_commons::enforcement::status_checks::StatusCheckGenerator;
+    use blvm_commons::enforcement::status_checks::StatusCheckGenerator;
 
     // Test review period status
     let opened_at = chrono::Utc::now() - chrono::Duration::try_days(10).unwrap_or_default();
@@ -145,7 +145,7 @@ async fn test_status_check_generation() -> Result<(), Box<dyn std::error::Error>
 async fn test_merge_blocking_logic() -> Result<(), Box<dyn std::error::Error>> {
     println!("🧪 Testing merge blocking logic...");
 
-    use bllvm_commons::enforcement::merge_block::MergeBlocker;
+    use blvm_commons::enforcement::merge_block::MergeBlocker;
     use common::create_test_decision_logger;
     let blocker = MergeBlocker::new(None, create_test_decision_logger());
 
@@ -204,7 +204,7 @@ async fn test_merge_blocking_logic() -> Result<(), Box<dyn std::error::Error>> {
 async fn test_threshold_validation() -> Result<(), Box<dyn std::error::Error>> {
     println!("🧪 Testing threshold validation...");
 
-    use bllvm_commons::validation::threshold::ThresholdValidator;
+    use blvm_commons::validation::threshold::ThresholdValidator;
 
     // Test tier-specific thresholds (using static methods for backward compatibility)
     let (required, total) = ThresholdValidator::get_tier_threshold_static(1);
@@ -238,7 +238,7 @@ async fn test_threshold_validation() -> Result<(), Box<dyn std::error::Error>> {
 async fn test_governance_fork_export() -> Result<(), Box<dyn std::error::Error>> {
     println!("🧪 Testing governance fork export...");
 
-    use bllvm_commons::fork::export::GovernanceExporter;
+    use blvm_commons::fork::export::GovernanceExporter;
 
     // Create a temporary config directory for testing
     let temp_dir = tempfile::tempdir()?;
@@ -310,7 +310,7 @@ fork:
     let export = exporter
         .export_governance_config(
             "test-ruleset-v1.0.0",
-            &bllvm_commons::fork::types::RulesetVersion::new(1, 0, 0),
+            &blvm_commons::fork::types::RulesetVersion::new(1, 0, 0),
             "test_exporter",
             "test-repo",
             "abc123def456",
@@ -358,7 +358,7 @@ async fn test_complete_governance_workflow() -> Result<(), Box<dyn std::error::E
     println!("✅ PR classified as Tier 2 (Feature)");
 
     // 3. Test status check generation
-    use bllvm_commons::enforcement::status_checks::StatusCheckGenerator;
+    use blvm_commons::enforcement::status_checks::StatusCheckGenerator;
 
     let opened_at = chrono::Utc::now() - chrono::Duration::try_days(5).unwrap_or_default();
     let review_status = StatusCheckGenerator::generate_review_period_status(opened_at, 30, false);
@@ -388,7 +388,7 @@ async fn test_complete_governance_workflow() -> Result<(), Box<dyn std::error::E
     println!("✅ Status checks generated");
 
     // 4. Test merge blocking
-    use bllvm_commons::enforcement::merge_block::MergeBlocker;
+    use blvm_commons::enforcement::merge_block::MergeBlocker;
 
     let should_block = MergeBlocker::should_block_merge(
         true,  // review period met

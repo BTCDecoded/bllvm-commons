@@ -188,7 +188,7 @@ fn register_node(
         println!("📄 Loaded proof data from: {}", proof_path);
     }
 
-    // Save registration to file (in real implementation, this would be sent to bllvm-commons)
+    // Save registration to file (in real implementation, this would be sent to blvm-commons)
     let registration_file = format!("economic-registrations/{}.json", name);
     fs::create_dir_all("economic-registrations")?;
     fs::write(&registration_file, serde_json::to_string_pretty(&payload)?)?;
@@ -337,7 +337,7 @@ fn submit_proof(
 fn check_status(name: &str) -> Result<(), Box<dyn std::error::Error>> {
     println!("🔍 Checking registration status for: {}", name);
 
-    // In a real implementation, this would query the bllvm-commons database
+    // In a real implementation, this would query the blvm-commons database
     // For now, we'll check if registration files exist
 
     let registration_file = format!("economic-registrations/{}.json", name);

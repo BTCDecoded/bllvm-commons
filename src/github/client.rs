@@ -35,7 +35,7 @@ impl GitHubClient {
             })?;
 
         let http_client = ReqwestClient::builder()
-            .user_agent("bllvm-commons/0.1.0")
+            .user_agent("blvm-commons/0.1.0")
             .build()
             .map_err(|e| {
                 GovernanceError::GitHubError(format!("Failed to create HTTP client: {}", e))

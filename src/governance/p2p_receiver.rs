@@ -1,6 +1,6 @@
 //! P2P Governance Message Receiver
 //!
-//! Receives governance messages from bllvm-node (via internal API) that were
+//! Receives governance messages from blvm-node (via internal API) that were
 //! originally broadcast over the Bitcoin P2P network by economic actors.
 
 use crate::crypto::signatures::SignatureManager;

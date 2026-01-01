@@ -1,7 +1,7 @@
 //! Tests for fee forwarding transaction hash calculation
 
-use bllvm_commons::governance::FeeForwardingTracker;
-use bllvm_protocol::{Block, Transaction, TransactionInput, TransactionOutput, OutPoint};
+use blvm_commons::governance::FeeForwardingTracker;
+use blvm_protocol::{Block, Transaction, TransactionInput, TransactionOutput, OutPoint};
 use bitcoin::Network;
 use sqlx::SqlitePool;
 
@@ -109,11 +109,11 @@ async fn test_calculate_tx_hash_matches_bitcoin_core() {
     assert!(hash.chars().all(|c| c.is_ascii_hexdigit()), "Hash should be hex string");
     assert_eq!(hash.len(), 64, "Hash should be 64 characters");
     
-    // The hash should match what bllvm-consensus's calculate_tx_id produces
+    // The hash should match what blvm-consensus's calculate_tx_id produces
     // (which we're now using internally)
-    use bllvm_protocol::block::calculate_tx_id;
+    use blvm_protocol::block::calculate_tx_id;
     let expected_hash = hex::encode(calculate_tx_id(&tx));
-    assert_eq!(hash, expected_hash, "Hash should match bllvm-consensus calculate_tx_id");
+    assert_eq!(hash, expected_hash, "Hash should match blvm-consensus calculate_tx_id");
 }
 
 #[tokio::test]
@@ -127,7 +127,7 @@ async fn test_fee_forwarding_duplicate_detection() {
     
     let tx = create_test_transaction();
     let block = Block {
-        header: bllvm_protocol::BlockHeader {
+        header: blvm_protocol::BlockHeader {
             version: 0x20000000,
             prev_block_hash: [0u8; 32],
             merkle_root: [0u8; 32],

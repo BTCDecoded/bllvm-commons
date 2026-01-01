@@ -1,7 +1,7 @@
 //! Internal API Handlers for P2P Governance Messages
 //!
-//! Handles HTTP endpoints for bllvm-node to forward P2P governance messages
-//! to bllvm-commons.
+//! Handles HTTP endpoints for blvm-node to forward P2P governance messages
+//! to blvm-commons.
 
 use axum::{
     extract::State,
@@ -26,7 +26,7 @@ use crate::Database;
 async fn handle_health() -> Json<serde_json::Value> {
     Json(serde_json::json!({
         "status": "ok",
-        "service": "bllvm-commons",
+        "service": "blvm-commons",
         "governance_enabled": true,
         "timestamp": chrono::Utc::now()
     }))

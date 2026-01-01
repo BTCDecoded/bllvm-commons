@@ -2,7 +2,7 @@
 //!
 //! This binary is designed to be run by GitHub Actions workflows on a schedule
 
-use bllvm_commons::governance_review::{
+use blvm_commons::governance_review::{
     AppealManager, DeadlineNotificationManager, GovernanceReviewCaseManager, MediationManager,
     TimeLimitManager, get_database_url, get_github_token, get_governance_repo,
 };

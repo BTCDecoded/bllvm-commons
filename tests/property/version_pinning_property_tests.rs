@@ -2,7 +2,7 @@
 //!
 //! These tests verify mathematical properties of version parsing and validation.
 
-use bllvm_commons::validation::version_pinning::VersionPinningValidator;
+use blvm_commons::validation::version_pinning::VersionPinningValidator;
 use proptest::prelude::*;
 
 proptest! {

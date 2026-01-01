@@ -381,7 +381,7 @@ impl EmergencyValidator {
             })?;
 
         let public_key =
-            bllvm_sdk::governance::PublicKey::from_bytes(&public_key_bytes).map_err(|e| {
+            blvm_sdk::governance::PublicKey::from_bytes(&public_key_bytes).map_err(|e| {
                 GovernanceAppError::InvalidSignature(format!("Invalid public key format: {}", e))
             })?;
 
@@ -391,7 +391,7 @@ impl EmergencyValidator {
         })?;
 
         let signature =
-            bllvm_sdk::governance::Signature::from_bytes(&signature_bytes).map_err(|e| {
+            blvm_sdk::governance::Signature::from_bytes(&signature_bytes).map_err(|e| {
                 GovernanceAppError::InvalidSignature(format!("Invalid signature format: {}", e))
             })?;
 
@@ -411,8 +411,8 @@ impl EmergencyValidator {
             ))
         })?;
 
-        // Verify signature using bllvm-sdk
-        let verified = bllvm_sdk::governance::verify_signature(&signature, &message, &public_key)
+        // Verify signature using blvm-sdk
+        let verified = blvm_sdk::governance::verify_signature(&signature, &message, &public_key)
             .map_err(|e| {
             GovernanceAppError::InvalidSignature(format!("Signature verification error: {}", e))
         })?;

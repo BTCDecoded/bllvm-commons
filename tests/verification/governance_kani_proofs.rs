@@ -6,7 +6,7 @@
 #[cfg(kani)]
 mod kani_governance {
     use kani::*;
-    use bllvm_commons::governance::WeightCalculator;
+    use blvm_commons::governance::WeightCalculator;
     
     /// Verify quadratic weight calculation matches specification
     /// 

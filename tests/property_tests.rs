@@ -2,7 +2,7 @@
 //!
 //! Run with: cargo test --test property_tests
 
-use bllvm_commons::validation::content_hash::ContentHashValidator;
+use blvm_commons::validation::content_hash::ContentHashValidator;
 use proptest::prelude::*;
 
 proptest! {
@@ -40,7 +40,7 @@ fn test_empty_hash() {
     assert_eq!(hash, expected, "Empty content must produce known hash");
 }
 
-use bllvm_commons::validation::version_pinning::VersionPinningValidator;
+use blvm_commons::validation::version_pinning::VersionPinningValidator;
 
 proptest! {
     /// Property: Version parsing is deterministic
@@ -78,7 +78,7 @@ proptest! {
     }
 }
 
-use bllvm_commons::github::cross_layer_status::CrossLayerStatusChecker;
+use blvm_commons::github::cross_layer_status::CrossLayerStatusChecker;
 
 proptest! {
     /// Property: Test count extraction handles various formats
@@ -118,7 +118,7 @@ proptest! {
     }
 }
 
-use bllvm_commons::crypto::signatures::SignatureManager;
+use blvm_commons::crypto::signatures::SignatureManager;
 use secp256k1::{PublicKey, Secp256k1, SecretKey};
 
 proptest! {

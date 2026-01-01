@@ -2,11 +2,11 @@
 //!
 //! Tests for contribution tracking, weight calculation, and voting aggregation.
 
-use bllvm_commons::governance::{
+use blvm_commons::governance::{
     ContributionAggregator, ContributionTracker, FeeForwardingTracker, VoteAggregator,
     WeightCalculator,
 };
-use bllvm_commons::nostr::{ZapTracker, ZapVotingProcessor};
+use blvm_commons::nostr::{ZapTracker, ZapVotingProcessor};
 use chrono::{DateTime, Utc};
 use sqlx::SqlitePool;
 use std::time::Duration;
@@ -366,7 +366,7 @@ async fn test_zap_voting_processor() {
     let processor = ZapVotingProcessor::new(pool.clone());
 
     // This test would require actual zap events, so we'll test the vote type parsing
-    use bllvm_commons::nostr::VoteType;
+    use blvm_commons::nostr::VoteType;
 
     assert_eq!(VoteType::from_str("support"), VoteType::Support);
     assert_eq!(VoteType::from_str("veto"), VoteType::Veto);

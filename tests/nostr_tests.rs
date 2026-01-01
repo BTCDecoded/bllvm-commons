@@ -2,7 +2,7 @@
 //!
 //! Tests for zap tracking and voting functionality.
 
-use bllvm_commons::nostr::{VoteType, ZapVotingProcessor};
+use blvm_commons::nostr::{VoteType, ZapVotingProcessor};
 use chrono::Utc;
 use sqlx::SqlitePool;
 
@@ -83,7 +83,7 @@ async fn test_vote_type_to_string() {
 
 #[tokio::test]
 async fn test_zap_voting_processor_vote_type_parsing() {
-    use bllvm_commons::nostr::zap_voting::ZapVotingProcessor;
+    use blvm_commons::nostr::zap_voting::ZapVotingProcessor;
 
     // Test message parsing
     let processor = ZapVotingProcessor::new(setup_test_db().await);

@@ -3,8 +3,8 @@
 //! Tests for GitHub API client, status check posting,
 //! merge blocking/unblocking, and webhook event handling
 
-use bllvm_commons::database::Database;
-use bllvm_commons::github::{client::GitHubClient, webhooks::WebhookProcessor};
+use blvm_commons::database::Database;
+use blvm_commons::github::{client::GitHubClient, webhooks::WebhookProcessor};
 use serde_json::json;
 
 mod common;
@@ -60,7 +60,7 @@ async fn test_webhook_event_processing() -> Result<(), Box<dyn std::error::Error
     let event = WebhookProcessor::process_webhook(&pr_opened_payload)?;
     assert!(matches!(
         event.event_type,
-        bllvm_commons::github::webhooks::WebhookEventType::PullRequest
+        blvm_commons::github::webhooks::WebhookEventType::PullRequest
     ));
     println!("✅ PR opened webhook processed successfully");
 
@@ -88,7 +88,7 @@ async fn test_webhook_event_processing() -> Result<(), Box<dyn std::error::Error
     let event = WebhookProcessor::process_webhook(&pr_comment_payload)?;
     assert!(matches!(
         event.event_type,
-        bllvm_commons::github::webhooks::WebhookEventType::Comment
+        blvm_commons::github::webhooks::WebhookEventType::Comment
     ));
     println!("✅ PR comment webhook processed successfully");
 
@@ -117,7 +117,7 @@ async fn test_webhook_event_processing() -> Result<(), Box<dyn std::error::Error
     let event = WebhookProcessor::process_webhook(&pr_updated_payload)?;
     assert!(matches!(
         event.event_type,
-        bllvm_commons::github::webhooks::WebhookEventType::PullRequest
+        blvm_commons::github::webhooks::WebhookEventType::PullRequest
     ));
     println!("✅ PR updated webhook processed successfully");
 
@@ -240,7 +240,7 @@ async fn test_governance_signature_parsing() -> Result<(), Box<dyn std::error::E
 
 #[tokio::test]
 async fn test_tier_classification() -> Result<(), Box<dyn std::error::Error>> {
-    use bllvm_commons::validation::tier_classification;
+    use blvm_commons::validation::tier_classification;
 
     // Test different PR payloads for tier classification
     let routine_pr = json!({
@@ -303,7 +303,7 @@ async fn test_tier_classification() -> Result<(), Box<dyn std::error::Error>> {
 
 #[tokio::test]
 async fn test_status_check_generation() -> Result<(), Box<dyn std::error::Error>> {
-    use bllvm_commons::enforcement::status_checks::StatusCheckGenerator;
+    use blvm_commons::enforcement::status_checks::StatusCheckGenerator;
 
     // Test review period status generation
     let opened_at = chrono::Utc::now() - chrono::Duration::try_days(10).unwrap_or_default();
@@ -352,7 +352,7 @@ async fn test_status_check_generation() -> Result<(), Box<dyn std::error::Error>
 
 #[tokio::test]
 async fn test_merge_blocking_logic() -> Result<(), Box<dyn std::error::Error>> {
-    use bllvm_commons::enforcement::merge_block::MergeBlocker;
+    use blvm_commons::enforcement::merge_block::MergeBlocker;
     use common::create_test_decision_logger;
 
     // Test merge blocking conditions
@@ -411,7 +411,7 @@ async fn test_merge_blocking_logic() -> Result<(), Box<dyn std::error::Error>> {
 
 #[tokio::test]
 async fn test_webhook_event_types() -> Result<(), Box<dyn std::error::Error>> {
-    use bllvm_commons::github::webhooks::{WebhookEventType, WebhookProcessor};
+    use blvm_commons::github::webhooks::{WebhookEventType, WebhookProcessor};
     use serde_json::json;
 
     // Test webhook event type detection from payloads

@@ -75,7 +75,7 @@ impl FeeForwardingTracker {
     /// If contributor_id is None, will try to look up from node registry based on transaction inputs
     pub async fn process_block(
         &self,
-        block: &bllvm_protocol::Block,
+        block: &blvm_protocol::Block,
         block_height: i32,
         contributor_id: Option<&str>, // Optional miner/node identifier (will lookup if None)
     ) -> Result<Vec<FeeForwardingContribution>> {
@@ -196,22 +196,22 @@ impl FeeForwardingTracker {
     }
 
     /// Calculate transaction hash using proper Bitcoin transaction ID calculation
-    /// Uses bllvm-consensus's calculate_tx_id which properly serializes and hashes transactions
+    /// Uses blvm-consensus's calculate_tx_id which properly serializes and hashes transactions
     /// This ensures we match Bitcoin Core's txid calculation exactly
     #[cfg(test)]
-    pub(crate) fn calculate_tx_hash(&self, tx: &bllvm_protocol::Transaction) -> String {
+    pub(crate) fn calculate_tx_hash(&self, tx: &blvm_protocol::Transaction) -> String {
         self.calculate_tx_hash_internal(tx)
     }
 
     #[cfg(not(test))]
-    fn calculate_tx_hash(&self, tx: &bllvm_protocol::Transaction) -> String {
+    fn calculate_tx_hash(&self, tx: &blvm_protocol::Transaction) -> String {
         self.calculate_tx_hash_internal(tx)
     }
 
-    fn calculate_tx_hash_internal(&self, tx: &bllvm_protocol::Transaction) -> String {
-        use bllvm_protocol::block::calculate_tx_id;
+    fn calculate_tx_hash_internal(&self, tx: &blvm_protocol::Transaction) -> String {
+        use blvm_protocol::block::calculate_tx_id;
 
-        // Use the proper transaction ID calculation from bllvm-consensus
+        // Use the proper transaction ID calculation from blvm-consensus
         // This function properly serializes the transaction to Bitcoin wire format
         // and computes the double SHA256 hash, matching Bitcoin Core exactly
         let txid = calculate_tx_id(tx);
