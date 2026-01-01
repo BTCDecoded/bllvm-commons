@@ -326,7 +326,7 @@ impl BuildOrchestrator {
             release_body.push('\n');
         }
 
-        // Create release in bllvm repository
+        // Create release in blvm repository
         let release = self
             .github_client
             .client
