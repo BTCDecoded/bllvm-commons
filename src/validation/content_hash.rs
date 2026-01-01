@@ -286,7 +286,7 @@ impl ContentHashValidator {
         };
 
         Ok(SyncReport {
-            source_repo: "bllvm-spec".to_string(),
+            source_repo: "blvm-spec".to_string(),
             target_repo: "blvm-consensus".to_string(),
             changed_files: changed_files.to_vec(),
             correspondence_mappings: self.correspondence_mappings.values().cloned().collect(),

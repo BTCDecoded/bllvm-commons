@@ -17,7 +17,7 @@ async fn test_complete_pr_lifecycle() {
     let multisig_manager = create_test_multisig_manager();
     
     // Step 1: Create a pull request
-    let repo_name = "BTCDecoded/bllvm-consensus";
+    let repo_name = "BTCDecoded/blvm-consensus";
     let pr_number = 123;
     let head_sha = "abc123def456";
     let layer = 2;
@@ -69,7 +69,7 @@ async fn test_emergency_mode_activation() {
     let db = setup_test_db().await;
     
     // Step 1: Create a pull request
-    let repo_name = "BTCDecoded/bllvm-consensus";
+    let repo_name = "BTCDecoded/blvm-consensus";
     let pr_number = 456;
     let head_sha = "def456ghi789";
     let layer = 2;
@@ -128,8 +128,8 @@ async fn test_cross_layer_synchronization() {
     let db = setup_test_db().await;
     
     // Step 1: Create PRs in different layers
-    let consensus_pr = (123, "BTCDecoded/bllvm-consensus", 2);
-    let protocol_pr = (456, "BTCDecoded/bllvm-protocol", 3);
+    let consensus_pr = (123, "BTCDecoded/blvm-consensus", 2);
+    let protocol_pr = (456, "BTCDecoded/blvm-protocol", 3);
     
     db.create_pull_request(consensus_pr.1, consensus_pr.0, "sha1", consensus_pr.2).await.unwrap();
     db.create_pull_request(protocol_pr.1, protocol_pr.0, "sha2", protocol_pr.2).await.unwrap();
@@ -214,7 +214,7 @@ async fn test_review_period_with_emergency_tier_override() {
     let db = setup_test_db().await;
     
     // Step 1: Create a pull request
-    let repo_name = "BTCDecoded/bllvm-consensus";
+    let repo_name = "BTCDecoded/blvm-consensus";
     let pr_number = 789;
     let head_sha = "ghi789jkl012";
     let layer = 2;
@@ -260,10 +260,10 @@ async fn test_multi_pr_tracking_across_repos() {
     
     // Create PRs in multiple repositories
     let repos = vec![
-        ("BTCDecoded/bllvm-consensus", 2),
-        ("BTCDecoded/bllvm-protocol", 3),
-        ("BTCDecoded/bllvm-node", 4),
-        ("BTCDecoded/bllvm-sdk", 5),
+        ("BTCDecoded/blvm-consensus", 2),
+        ("BTCDecoded/blvm-protocol", 3),
+        ("BTCDecoded/blvm-node", 4),
+        ("BTCDecoded/blvm-sdk", 5),
     ];
     
     for (repo_name, layer) in &repos {
@@ -298,7 +298,7 @@ async fn test_concurrent_signature_additions() {
     let db = setup_test_db().await;
     
     // Create a pull request
-    let repo_name = "BTCDecoded/bllvm-consensus";
+    let repo_name = "BTCDecoded/blvm-consensus";
     let pr_number = 999;
     let head_sha = "concurrent_test_sha";
     let layer = 2;
@@ -337,7 +337,7 @@ async fn test_event_log_consistency() {
     let db = setup_test_db().await;
     
     // Create a pull request
-    let repo_name = "BTCDecoded/bllvm-consensus";
+    let repo_name = "BTCDecoded/blvm-consensus";
     let pr_number = 888;
     let head_sha = "event_log_sha";
     let layer = 2;

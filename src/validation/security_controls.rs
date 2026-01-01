@@ -199,7 +199,7 @@ impl SecurityControlValidator {
         // Handle ** glob patterns (recursive directory matching)
         if pattern.contains("**") {
             // Convert ** pattern to proper matching
-            // e.g., "bllvm-protocol/**/*.rs" should match "bllvm-protocol/src/lib.rs"
+            // e.g., "blvm-protocol/**/*.rs" should match "blvm-protocol/src/lib.rs"
             let parts: Vec<&str> = pattern.split("**").collect();
             if parts.len() == 2 {
                 let prefix = parts[0].trim_end_matches('/');
@@ -241,7 +241,7 @@ impl SecurityControlValidator {
                 };
 
                 // For suffix like "/*.rs", we need to match any path ending with .rs
-                // The pattern "bllvm-protocol/**/*.rs" means: prefix + any dirs + / + *.rs
+                // The pattern "blvm-protocol/**/*.rs" means: prefix + any dirs + / + *.rs
                 if suffix.starts_with("/*") {
                     // Pattern like "/*.rs" - match any file ending with .rs
                     let file_extension = suffix.strip_prefix("/*").unwrap_or(suffix);
@@ -565,17 +565,17 @@ mod tests {
 
         // Test exact match
         assert!(validator
-            .matches_pattern("bllvm-protocol/src/lib.rs", "bllvm-protocol/src/lib.rs")
+            .matches_pattern("blvm-protocol/src/lib.rs", "blvm-protocol/src/lib.rs")
             .unwrap());
 
         // Test wildcard match
         assert!(validator
-            .matches_pattern("bllvm-protocol/src/lib.rs", "bllvm-protocol/**/*.rs")
+            .matches_pattern("blvm-protocol/src/lib.rs", "blvm-protocol/**/*.rs")
             .unwrap());
 
         // Test no match
         assert!(!validator
-            .matches_pattern("other/file.rs", "bllvm-protocol/**/*.rs")
+            .matches_pattern("other/file.rs", "blvm-protocol/**/*.rs")
             .unwrap());
     }
 
@@ -584,7 +584,7 @@ mod tests {
         let validator = create_test_validator();
 
         // Test P0 control impact
-        let changed_files = vec!["bllvm-protocol/src/lib.rs".to_string()];
+        let changed_files = vec!["blvm-protocol/src/lib.rs".to_string()];
         let impact = validator.analyze_security_impact(&changed_files).unwrap();
 
         assert!(matches!(impact.impact_level, ImpactLevel::High));
@@ -598,9 +598,9 @@ mod tests {
         let validator = create_test_validator();
 
         // Create a temporary file with placeholder that matches the security control pattern
-        // Use a relative path that matches the pattern "bllvm-protocol/**/*.rs"
+        // Use a relative path that matches the pattern "blvm-protocol/**/*.rs"
         let temp_dir = tempfile::tempdir().unwrap();
-        let test_dir = temp_dir.path().join("bllvm-protocol").join("src");
+        let test_dir = temp_dir.path().join("blvm-protocol").join("src");
         std::fs::create_dir_all(&test_dir).unwrap();
         let temp_file = test_dir.join("test_security.rs");
         std::fs::write(&temp_file, "// TODO: Implement actual cryptographic verification\nlet key = 0x02[PLACEHOLDER_64_CHAR_HEX];").unwrap();
@@ -622,7 +622,7 @@ mod tests {
                 category: "consensus_integrity".to_string(),
                 priority: "P0".to_string(),
                 description: "Proper genesis blocks".to_string(),
-                files: vec!["bllvm-protocol/**/*.rs".to_string()],
+                files: vec!["blvm-protocol/**/*.rs".to_string()],
                 required_signatures: "7-of-7".to_string(),
                 review_period_days: 180,
                 requires_security_audit: true,

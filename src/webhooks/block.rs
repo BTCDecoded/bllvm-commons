@@ -1,6 +1,6 @@
 //! Block webhook handler for fee forwarding integration
 //!
-//! Receives block notifications from bllvm-node and processes them for fee forwarding
+//! Receives block notifications from blvm-node and processes them for fee forwarding
 
 use axum::{extract::State, response::Json};
 use serde::{Deserialize, Serialize};

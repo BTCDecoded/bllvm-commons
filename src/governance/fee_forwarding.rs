@@ -172,7 +172,7 @@ impl FeeForwardingTracker {
     }
 
     /// Calculate transaction hash using proper Bitcoin transaction ID calculation
-    /// Uses bllvm-consensus's calculate_tx_id which properly serializes and hashes transactions
+    /// Uses blvm-consensus's calculate_tx_id which properly serializes and hashes transactions
     /// This ensures we match Bitcoin Core's txid calculation exactly
     pub fn calculate_tx_hash(&self, tx: &blvm_protocol::Transaction) -> String {
         self.calculate_tx_hash_impl(tx)
@@ -181,7 +181,7 @@ impl FeeForwardingTracker {
     fn calculate_tx_hash_impl(&self, tx: &blvm_protocol::Transaction) -> String {
         use blvm_protocol::block::calculate_tx_id;
 
-        // Use the proper transaction ID calculation from bllvm-consensus
+        // Use the proper transaction ID calculation from blvm-consensus
         // This function properly serializes the transaction to Bitcoin wire format
         // and computes the double SHA256 hash, matching Bitcoin Core exactly
         let txid = calculate_tx_id(tx);

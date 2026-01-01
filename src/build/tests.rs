@@ -16,18 +16,18 @@ mod tests {
         let consensus_pos = order.iter().position(|r| r == "blvm-consensus").unwrap();
         assert_eq!(consensus_pos, 0, "blvm-consensus should be first");
 
-        // Verify bllvm-protocol comes after blvm-consensus
-        let protocol_pos = order.iter().position(|r| r == "bllvm-protocol").unwrap();
+        // Verify blvm-protocol comes after blvm-consensus
+        let protocol_pos = order.iter().position(|r| r == "blvm-protocol").unwrap();
         assert!(
             protocol_pos > consensus_pos,
-            "bllvm-protocol should come after blvm-consensus"
+            "blvm-protocol should come after blvm-consensus"
         );
 
-        // Verify bllvm-node comes after bllvm-protocol
-        let node_pos = order.iter().position(|r| r == "bllvm-node").unwrap();
+        // Verify blvm-node comes after blvm-protocol
+        let node_pos = order.iter().position(|r| r == "blvm-node").unwrap();
         assert!(
             node_pos > protocol_pos,
-            "bllvm-node should come after bllvm-protocol"
+            "blvm-node should come after blvm-protocol"
         );
     }
 
@@ -70,10 +70,10 @@ mod tests {
 
         // Check that dependencies come before dependents
         for (repo, deps) in [
-            ("bllvm-protocol", vec!["blvm-consensus"]),
-            ("bllvm-node", vec!["bllvm-protocol", "blvm-consensus"]),
-            ("bllvm-commons", vec!["bllvm-sdk"]),
-            ("bllvm", vec!["bllvm-node"]),
+            ("blvm-protocol", vec!["blvm-consensus"]),
+            ("blvm-node", vec!["blvm-protocol", "blvm-consensus"]),
+            ("blvm-commons", vec!["blvm-sdk"]),
+            ("blvm", vec!["blvm-node"]),
         ] {
             let repo_pos = order.iter().position(|r| r == repo).unwrap();
             for dep in deps {
@@ -99,11 +99,11 @@ mod tests {
             "Should have at least one parallel group"
         );
 
-        // blvm-consensus and bllvm-sdk can be built in parallel (no dependencies)
+        // blvm-consensus and blvm-sdk can be built in parallel (no dependencies)
         let first_group = &groups[0];
         assert!(
             first_group.contains(&"blvm-consensus".to_string())
-                || first_group.contains(&"bllvm-sdk".to_string()),
+                || first_group.contains(&"blvm-sdk".to_string()),
             "First group should contain repos with no dependencies"
         );
     }

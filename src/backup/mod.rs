@@ -29,7 +29,7 @@ pub struct BackupConfig {
 impl Default for BackupConfig {
     fn default() -> Self {
         Self {
-            directory: PathBuf::from("/opt/bllvm-commons/backups"),
+            directory: PathBuf::from("/opt/blvm-commons/backups"),
             retention_days: 30,
             compression: true,
             interval: Duration::from_secs(86400), // Daily

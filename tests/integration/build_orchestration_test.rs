@@ -32,18 +32,18 @@ async fn test_build_orchestration_happy_path() {
     let build_order = graph.get_build_order().unwrap();
     
     // Verify build order is correct
-    assert_eq!(build_order[0], "bllvm-consensus");
-    assert!(build_order.iter().position(|r| r == "bllvm-protocol").unwrap() 
-            > build_order.iter().position(|r| r == "bllvm-consensus").unwrap());
+    assert_eq!(build_order[0], "blvm-consensus");
+    assert!(build_order.iter().position(|r| r == "blvm-protocol").unwrap() 
+            > build_order.iter().position(|r| r == "blvm-consensus").unwrap());
     
     // 2. Test parallel group detection
     let parallel_groups = graph.get_parallel_groups().unwrap();
     assert!(!parallel_groups.is_empty());
     
     // 3. Test dependency resolution
-    let deps = graph.get_dependencies("bllvm-node");
-    assert!(deps.contains(&"bllvm-protocol".to_string()));
-    assert!(deps.contains(&"bllvm-consensus".to_string()));
+    let deps = graph.get_dependencies("blvm-node");
+    assert!(deps.contains(&"blvm-protocol".to_string()));
+    assert!(deps.contains(&"blvm-consensus".to_string()));
 }
 
 #[tokio::test]
@@ -52,9 +52,9 @@ async fn test_build_order_respects_dependencies() {
     let order = graph.get_build_order().unwrap();
     
     // Verify all dependencies come before dependents
-    let node_pos = order.iter().position(|r| r == "bllvm-node").unwrap();
-    let protocol_pos = order.iter().position(|r| r == "bllvm-protocol").unwrap();
-    let consensus_pos = order.iter().position(|r| r == "bllvm-consensus").unwrap();
+    let node_pos = order.iter().position(|r| r == "blvm-node").unwrap();
+    let protocol_pos = order.iter().position(|r| r == "blvm-protocol").unwrap();
+    let consensus_pos = order.iter().position(|r| r == "blvm-consensus").unwrap();
     
     assert!(consensus_pos < protocol_pos);
     assert!(protocol_pos < node_pos);
@@ -83,11 +83,11 @@ async fn test_parallel_build_groups() {
     // First group should contain repos with no dependencies
     assert!(!groups.is_empty());
     
-    // bllvm-consensus and bllvm-sdk can be built in parallel
+    // blvm-consensus and blvm-sdk can be built in parallel
     let first_group = &groups[0];
     assert!(
-        first_group.contains(&"bllvm-consensus".to_string()) || 
-        first_group.contains(&"bllvm-sdk".to_string()),
+        first_group.contains(&"blvm-consensus".to_string()) || 
+        first_group.contains(&"blvm-sdk".to_string()),
         "First group should contain repos with no dependencies"
     );
 }

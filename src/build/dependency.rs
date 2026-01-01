@@ -21,16 +21,16 @@ impl DependencyGraph {
         // Format: (repo_name, vec![dependencies])
         dependencies.insert("blvm-consensus".to_string(), vec![]);
         dependencies.insert(
-            "bllvm-protocol".to_string(),
+            "blvm-protocol".to_string(),
             vec!["blvm-consensus".to_string()],
         );
         dependencies.insert(
-            "bllvm-node".to_string(),
-            vec!["bllvm-protocol".to_string(), "blvm-consensus".to_string()],
+            "blvm-node".to_string(),
+            vec!["blvm-protocol".to_string(), "blvm-consensus".to_string()],
         );
-        dependencies.insert("bllvm-sdk".to_string(), vec![]); // Independent, can build in parallel with blvm-consensus
-        dependencies.insert("bllvm".to_string(), vec!["bllvm-node".to_string()]);
-        dependencies.insert("bllvm-commons".to_string(), vec!["bllvm-sdk".to_string()]);
+        dependencies.insert("blvm-sdk".to_string(), vec![]); // Independent, can build in parallel with blvm-consensus
+        dependencies.insert("blvm".to_string(), vec!["blvm-node".to_string()]);
+        dependencies.insert("blvm-commons".to_string(), vec!["blvm-sdk".to_string()]);
 
         Self {
             dependencies,
@@ -185,22 +185,22 @@ mod tests {
         // blvm-consensus should come first (no dependencies)
         assert!(
             order.iter().position(|r| r == "blvm-consensus").unwrap()
-                < order.iter().position(|r| r == "bllvm-protocol").unwrap()
+                < order.iter().position(|r| r == "blvm-protocol").unwrap()
         );
 
-        // bllvm-protocol should come before bllvm-node
+        // blvm-protocol should come before blvm-node
         assert!(
-            order.iter().position(|r| r == "bllvm-protocol").unwrap()
-                < order.iter().position(|r| r == "bllvm-node").unwrap()
+            order.iter().position(|r| r == "blvm-protocol").unwrap()
+                < order.iter().position(|r| r == "blvm-node").unwrap()
         );
     }
 
     #[test]
     fn test_dependencies() {
         let graph = DependencyGraph::new("BTCDecoded".to_string());
-        let deps = graph.get_dependencies("bllvm-node");
+        let deps = graph.get_dependencies("blvm-node");
 
-        assert!(deps.contains(&"bllvm-protocol".to_string()));
+        assert!(deps.contains(&"blvm-protocol".to_string()));
         assert!(deps.contains(&"blvm-consensus".to_string()));
     }
 
@@ -209,6 +209,6 @@ mod tests {
         let graph = DependencyGraph::new("BTCDecoded".to_string());
         let dependents = graph.get_dependents("blvm-consensus");
 
-        assert!(dependents.contains(&"bllvm-protocol".to_string()));
+        assert!(dependents.contains(&"blvm-protocol".to_string()));
     }
 }

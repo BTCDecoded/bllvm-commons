@@ -111,13 +111,13 @@ async fn test_calculate_tx_hash_matches_bitcoin_core() {
     );
     assert_eq!(hash.len(), 64, "Hash should be 64 characters");
 
-    // The hash should match what bllvm-consensus's calculate_tx_id produces
+    // The hash should match what blvm-consensus's calculate_tx_id produces
     // (which we're now using internally)
     use blvm_protocol::block::calculate_tx_id;
     let expected_hash = hex::encode(calculate_tx_id(&tx));
     assert_eq!(
         hash, expected_hash,
-        "Hash should match bllvm-consensus calculate_tx_id"
+        "Hash should match blvm-consensus calculate_tx_id"
     );
 }
 

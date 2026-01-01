@@ -246,13 +246,13 @@ impl BuildOrchestrator {
         // Create repository_dispatch event payload
         let client_payload = json!({
             "version": version,
-            "triggered_by": "bllvm-commons",
+            "triggered_by": "blvm-commons",
             "timestamp": chrono::Utc::now().to_rfc3339(),
         });
 
         // Trigger workflow via repository_dispatch
         // Use "build-chain" to match existing workflows, fallback to "build-request" for new repos
-        let event_type = if repo == "bllvm-commons" {
+        let event_type = if repo == "blvm-commons" {
             "build-request"
         } else {
             "build-chain"
@@ -314,7 +314,7 @@ impl BuildOrchestrator {
 
         // Build release body with artifact list
         let mut release_body = format!(
-            "Bitcoin Commons Release {}\n\nThis release was orchestrated by bllvm-commons.\n\n## Artifacts\n\n",
+            "Bitcoin Commons Release {}\n\nThis release was orchestrated by blvm-commons.\n\n## Artifacts\n\n",
             version
         );
 
@@ -330,7 +330,7 @@ impl BuildOrchestrator {
         let release = self
             .github_client
             .client
-            .repos(&self.organization, "bllvm")
+            .repos(&self.organization, "blvm")
             .releases()
             .create(version)
             .name(&format!("Bitcoin Commons {}", version))
@@ -365,7 +365,7 @@ impl BuildOrchestrator {
                         .github_client
                         .upload_release_asset(
                             &self.organization,
-                            "bllvm",
+                            "blvm",
                             release.id.0,
                             &asset_name,
                             data,
@@ -412,7 +412,7 @@ impl BuildOrchestrator {
                 .github_client
                 .upload_release_asset(
                     &self.organization,
-                    "bllvm",
+                    "blvm",
                     release.id.0,
                     "SHA256SUMS",
                     sha256sums_bytes,

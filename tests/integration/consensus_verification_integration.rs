@@ -34,7 +34,7 @@ async fn test_consensus_pattern_matching() {
     
     // Create a rule that checks for consensus modifications
     let rule = json!({
-        "target_repo": "BTCDecoded/bllvm-consensus",
+        "target_repo": "BTCDecoded/blvm-consensus",
         "validation_type": "no_consensus_modifications",
         "allowed_imports_only": false,
         "check_files": consensus_files.clone(),
@@ -42,7 +42,7 @@ async fn test_consensus_pattern_matching() {
     
     // Should fail because consensus files are in the list
     let result = validator.validate_dependency(
-        "BTCDecoded/bllvm-consensus",
+        "BTCDecoded/blvm-consensus",
         "no_consensus_modifications",
         &rule,
         None,
@@ -52,14 +52,14 @@ async fn test_consensus_pattern_matching() {
     
     // Test with non-consensus files
     let rule2 = json!({
-        "target_repo": "BTCDecoded/bllvm-consensus",
+        "target_repo": "BTCDecoded/blvm-consensus",
         "validation_type": "no_consensus_modifications",
         "allowed_imports_only": false,
         "check_files": non_consensus_files,
     });
     
     let result2 = validator.validate_dependency(
-        "BTCDecoded/bllvm-consensus",
+        "BTCDecoded/blvm-consensus",
         "no_consensus_modifications",
         &rule2,
         None,
@@ -86,13 +86,13 @@ async fn test_consensus_verification_with_file_patterns() {
     
     for (files, should_fail) in test_cases {
         let rule = json!({
-            "target_repo": "BTCDecoded/bllvm-consensus",
+            "target_repo": "BTCDecoded/blvm-consensus",
             "validation_type": "no_consensus_modifications",
             "check_files": files,
         });
         
         let result = validator.validate_dependency(
-            "BTCDecoded/bllvm-consensus",
+            "BTCDecoded/blvm-consensus",
             "no_consensus_modifications",
             &rule,
             None,
@@ -112,13 +112,13 @@ async fn test_consensus_verification_backward_compatibility() {
     
     // Test that validation passes when no file info is provided (backward compatibility)
     let rule = json!({
-        "target_repo": "BTCDecoded/bllvm-consensus",
+        "target_repo": "BTCDecoded/blvm-consensus",
         "validation_type": "no_consensus_modifications",
         "allowed_imports_only": false,
     });
     
     let result = validator.validate_dependency(
-        "BTCDecoded/bllvm-consensus",
+        "BTCDecoded/blvm-consensus",
         "no_consensus_modifications",
         &rule,
         None,
@@ -134,14 +134,14 @@ async fn test_consensus_verification_allowed_imports_only() {
     
     // Test with allowed_imports_only flag
     let rule = json!({
-        "target_repo": "BTCDecoded/bllvm-consensus",
+        "target_repo": "BTCDecoded/blvm-consensus",
         "validation_type": "no_consensus_modifications",
         "allowed_imports_only": true,
         "check_files": vec!["src/block.rs"],
     });
     
     let result = validator.validate_dependency(
-        "BTCDecoded/bllvm-consensus",
+        "BTCDecoded/blvm-consensus",
         "no_consensus_modifications",
         &rule,
         None,
@@ -164,13 +164,13 @@ async fn test_consensus_verification_multiple_files() {
     ];
     
     let rule = json!({
-        "target_repo": "BTCDecoded/bllvm-consensus",
+        "target_repo": "BTCDecoded/blvm-consensus",
         "validation_type": "no_consensus_modifications",
         "check_files": mixed_files,
     });
     
     let result = validator.validate_dependency(
-        "BTCDecoded/bllvm-consensus",
+        "BTCDecoded/blvm-consensus",
         "no_consensus_modifications",
         &rule,
         None,
@@ -208,13 +208,13 @@ async fn test_consensus_pattern_matching_edge_cases() {
     
     for (file, should_match) in test_cases {
         let rule = json!({
-            "target_repo": "BTCDecoded/bllvm-consensus",
+            "target_repo": "BTCDecoded/blvm-consensus",
             "validation_type": "no_consensus_modifications",
             "check_files": vec![file],
         });
         
         let result = validator.validate_dependency(
-            "BTCDecoded/bllvm-consensus",
+            "BTCDecoded/blvm-consensus",
             "no_consensus_modifications",
             &rule,
             None,

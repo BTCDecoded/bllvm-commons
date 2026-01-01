@@ -212,7 +212,7 @@ async fn test_cross_layer_validation() {
     
     // Test matching pattern
     let result = CrossLayerValidator::validate_cross_layer_dependencies(
-        "BTCDecoded/bllvm-consensus",
+        "BTCDecoded/blvm-consensus",
         &changed_files,
         &cross_layer_rules,
         None, // No GitHub token for test
@@ -222,7 +222,7 @@ async fn test_cross_layer_validation() {
     // Test non-matching pattern
     let non_matching_files = vec!["src/other/file.rs".to_string()];
     let result = CrossLayerValidator::validate_cross_layer_dependencies(
-        "BTCDecoded/bllvm-consensus",
+        "BTCDecoded/blvm-consensus",
         &non_matching_files,
         &cross_layer_rules,
         None, // No GitHub token for test

@@ -1,4 +1,4 @@
-//! Integration tests for bllvm-commons
+//! Integration tests for blvm-commons
 //! Tests the core functionality with test data
 
 use blvm_commons::database::Database;

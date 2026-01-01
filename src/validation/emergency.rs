@@ -319,7 +319,7 @@ impl EmergencyValidator {
             ))
         })?;
 
-        // Verify signature using bllvm-sdk
+        // Verify signature using blvm-sdk
         let verified = blvm_sdk::governance::verify_signature(&signature, &message, &public_key)
             .map_err(|e| {
                 GovernanceAppError::InvalidSignature(format!("Signature verification error: {}", e))
