@@ -1,6 +1,7 @@
 //! Zap Tracker Service
 //!
-//! Tracks Lightning zaps (NIP-57) for governance contributions.
+//! Tracks Lightning zaps (NIP-57) for transparency/reporting purposes only.
+//! Zaps do NOT affect governance decisions (governance is maintainer-only multisig).
 //! Subscribes to zap receipt events from Nostr relays and records them in the database.
 
 use crate::governance::ContributionTracker;

@@ -1,6 +1,6 @@
-//! Block webhook handler for fee forwarding integration
+//! Block webhook handler
 //!
-//! Receives block notifications from blvm-node and processes them for fee forwarding
+//! Receives block notifications from blvm-node (fee forwarding removed)
 
 use axum::{extract::State, response::Json};
 use serde::{Deserialize, Serialize};
@@ -9,7 +9,6 @@ use tracing::{error, info};
 
 use crate::config::AppConfig;
 use crate::database::Database;
-use crate::governance::FeeForwardingTracker;
 
 /// Block notification payload
 /// Block should be provided as JSON object that can be deserialized to blvm_protocol::Block
@@ -30,81 +29,15 @@ pub struct BlockNotificationResponse {
 }
 
 /// Handle block notification webhook
+/// Fee forwarding removed - this is now a placeholder
 pub async fn handle_block_notification(
-    State((config, database)): State<(AppConfig, Database)>,
-    Json(payload): Json<BlockNotification>,
+    State((_config, _database)): State<(AppConfig, Database)>,
+    Json(_payload): Json<BlockNotification>,
 ) -> Json<BlockNotificationResponse> {
-    // Check if fee forwarding is enabled
-    if config.governance.commons_addresses.is_empty() {
-        return Json(BlockNotificationResponse {
-            success: false,
-            message: "Fee forwarding not configured (no Commons addresses)".to_string(),
-            contributions_found: 0,
-        });
-    }
-
-    let pool = match database.get_sqlite_pool() {
-        Some(pool) => pool,
-        None => {
-            return Json(BlockNotificationResponse {
-                success: false,
-                message: "Database pool not available".to_string(),
-                contributions_found: 0,
-            });
-        }
-    };
-
-    // Parse block from JSON payload
-    // The block field contains the block data as JSON
-    let block: blvm_protocol::Block = match serde_json::from_value(payload.block.clone()) {
-        Ok(parsed) => parsed,
-        Err(e) => {
-            error!("Failed to parse block from JSON: {}", e);
-            return Json(BlockNotificationResponse {
-                success: false,
-                message: format!("Failed to parse block: {}", e),
-                contributions_found: 0,
-            });
-        }
-    };
-
-    // Initialize fee forwarding tracker
-    let tracker = FeeForwardingTracker::from_network_string(
-        pool.clone(),
-        config.governance.commons_addresses.clone(),
-        &config.governance.network,
-    );
-
-    // Process block
-    match tracker
-        .process_block(
-            &block,
-            payload.block_height,
-            payload.contributor_id.as_deref(),
-        )
-        .await
-    {
-        Ok(contributions) => {
-            info!(
-                "Processed block {} at height {}: found {} fee forwarding contributions",
-                payload.block_hash,
-                payload.block_height,
-                contributions.len()
-            );
-
-            Json(BlockNotificationResponse {
-                success: true,
-                message: "Block processed successfully".to_string(),
-                contributions_found: contributions.len(),
-            })
-        }
-        Err(e) => {
-            error!("Failed to process block {}: {}", payload.block_hash, e);
-            Json(BlockNotificationResponse {
-                success: false,
-                message: format!("Failed to process block: {}", e),
-                contributions_found: 0,
-            })
-        }
-    }
+    // Fee forwarding removed - no longer processing blocks
+    Json(BlockNotificationResponse {
+        success: true,
+        message: "Fee forwarding removed - block notification received but not processed".to_string(),
+        contributions_found: 0,
+    })
 }

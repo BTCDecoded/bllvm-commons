@@ -68,7 +68,8 @@ pub struct AuditConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GovernanceConfig {
-    /// Commons addresses to monitor for fee forwarding
+    /// Commons addresses (deprecated - fee forwarding removed)
+    /// Kept for backward compatibility but no longer used
     #[serde(default)]
     pub commons_addresses: Vec<String>,
 

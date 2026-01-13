@@ -1,13 +1,23 @@
 # Monetization System User Guide
 
-## How to Participate in Governance
+## Important: Governance Model
 
-### 1. Zap to Vote
+**Bitcoin Commons uses maintainer-only multisig governance.**
 
-**What is Zap Voting?**
+- **Zaps**: Tracked for transparency/reporting only - they do NOT affect governance decisions
+- **Merge Mining**: Available as optional module - revenue does NOT affect governance
+- **Fee Forwarding**: Removed from system
+- **Governance**: Only maintainers can vote on proposals
+
+## How to Participate (Transparency/Reporting)
+
+### 1. Zap to Show Support (Transparency Only)
+
+**What is Zap Tracking?**
 - Send Lightning payments (zaps) to governance proposals
-- Your zap amount determines your vote weight (quadratic: √amount)
-- Zaps can be "support", "veto", or "abstain" (via message)
+- Zaps are tracked for transparency and reporting
+- **Important**: Zaps do NOT affect governance decisions (maintainer-only multisig)
+- Zaps can include messages: "support", "veto", or "abstain" (for reporting)
 
 **How to Zap a Proposal**:
 
@@ -18,118 +28,88 @@
 
 2. **Send a Zap**:
    - Use a Nostr client that supports zaps (e.g., Damus, Amethyst)
-   - Zap the proposal event with your vote amount
-   - Include message: "support", "veto", or "abstain" (optional)
+   - Zap the proposal event with any amount
+   - Include message: "support", "veto", or "abstain" (optional, for reporting)
 
-3. **Vote Weight**:
-   - Your vote weight = √(zap_amount_btc)
-   - Example: 1 BTC zap = 1.0 weight, 4 BTC zap = 2.0 weight
-   - Maximum: 5% of total system weight (prevents whale dominance)
+3. **Tracking Only**:
+   - Zaps are tracked for transparency and reporting
+   - **Zaps do NOT affect governance decisions** (maintainer-only multisig)
+   - All zap amounts are recorded for public transparency
 
 **Example**:
 ```
-Zap 0.01 BTC to proposal → Vote weight = √0.01 = 0.1
-Zap 1.0 BTC to proposal → Vote weight = √1.0 = 1.0
-Zap 4.0 BTC to proposal → Vote weight = √4.0 = 2.0
+Zap 0.01 BTC to proposal → Tracked for transparency
+Zap 1.0 BTC to proposal → Tracked for transparency
+Zap 4.0 BTC to proposal → Tracked for transparency
 ```
 
-### 2. Merge Mining
+### 2. Merge Mining (Optional Module)
 
 **What is Merge Mining?**
 - Mine secondary chains (e.g., RSK, Namecoin) alongside Bitcoin
-- 1% of secondary chain rewards go to Commons
-- Your contribution = 1% of rewards you generate
+- Available as optional module: `blvm-merge-mining`
+- Requires one-time activation fee
+- Module developer receives hardcoded revenue share
 
 **How to Participate**:
-1. Set up merge mining with Stratum V2
-2. Configure secondary chains
-3. Contributions tracked automatically (30-day rolling)
+1. Load `blvm-stratum-v2` module (required dependency)
+2. Load `blvm-merge-mining` module
+3. Pay one-time activation fee
+4. Configure secondary chains
 
-**Vote Weight**:
-- Your participation weight = √(total_contributions_btc)
-- Updated monthly (30-day rolling window)
+**Important**:
+- Merge mining revenue does NOT affect governance (maintainer-only multisig)
+- Revenue is collected by module developer (not governance contribution)
+- See `blvm-merge-mining/README.md` for details
 
 ### 3. Fee Forwarding
 
-**What is Fee Forwarding?**
-- Forward transaction fees to Commons address
-- Tracked on-chain (verified)
-- Your contribution = fees you forward
+**Status: ❌ Removed**
 
-**How to Participate**:
-1. Configure Commons address in node config:
-   ```toml
-   [fee_forwarding]
-   enabled = true
-   commons_address = "bc1qcommons..."
-   forwarding_percentage = 10  # 10% of fees
-   contributor_id = "your_node_id"
-   ```
-
-2. Fees automatically forwarded when mining blocks
-3. Contributions tracked automatically (30-day rolling)
-
-**Vote Weight**:
-- Your participation weight = √(total_contributions_btc)
-- Updated monthly (30-day rolling window)
+Fee forwarding has been removed from Bitcoin Commons. It is no longer part of the monetization model.
 
 ### 4. General Zaps
 
 **What are General Zaps?**
 - Zap the Commons bot directly (not tied to a proposal)
-- Cumulative contribution (all-time)
-- Builds your participation weight over time
+- Tracked for transparency/reporting
+- **Important**: Do NOT affect governance (maintainer-only multisig)
 
 **How to Zap**:
 1. Find the Commons bot on Nostr
 2. Zap the bot with any amount
-3. Your cumulative zaps count toward participation weight
+3. Your zaps are tracked for transparency
 
-**Vote Weight**:
-- Your participation weight = √(cumulative_zaps_btc)
-- No time limit (cumulative, all-time)
+**Tracking**:
+- All zaps are recorded for public transparency
+- No governance weight (maintainer-only multisig)
 
-## Voting Rules
+## Governance Model
 
-### Vote Weight Calculation
+### Current System
 
-**For Proposals**:
-- Use the higher of:
-  - Proposal zap weight: √(proposal_zap_btc)
-  - 10% of participation weight: participation_weight × 0.1
+**Maintainer-Only Multisig**:
+- Only maintainers can vote on proposals
+- Zaps are tracked for transparency/reporting only
+- No contribution-based voting
+- No economic node veto
 
-**For Participation**:
-- Total contribution = merge_mining + fee_forwarding + cumulative_zaps
-- Weight = √(total_contribution_btc)
-- Capped at 5% of total system weight
+### Transparency/Reporting
 
-### Cooling-Off Period
+All contributions (zaps, merge mining, etc.) are tracked for:
+- **Public transparency**: See who contributed what
+- **Reporting**: Public dashboards and reports
+- **Historical record**: Track community engagement
 
-**Large Contributions** (≥0.1 BTC):
-- Must wait 30 days before counting toward votes
-- Prevents vote buying and timing attacks
-
-**Small Contributions** (<0.1 BTC):
-- Count immediately
-- No cooling-off period
-
-### Weight Caps
-
-**Per Contributor**:
-- Maximum: 5% of total system weight
-- Prevents whale dominance
-- Ensures fair distribution
+**Important**: These do NOT affect governance decisions.
 
 ## Veto Mechanisms
 
-### Economic Node Veto (Tier 3+)
-- **Mining Veto**: 30%+ of network hashpower
-- **Economic Veto**: 40%+ of economic activity
-- Either threshold blocks the proposal
+**Status: ❌ Removed**
 
-### Zap Vote Veto (All Tiers)
-- **Threshold**: 40% of total zap vote weight
-- If 40%+ of zap votes are "veto", proposal is blocked
+- **Economic Node Veto**: Removed (economic nodes removed)
+- **Zap Vote Veto**: Removed (zaps don't affect governance)
+- **Governance**: Maintainer-only multisig (no veto system)
 
 ## Checking Your Status
 

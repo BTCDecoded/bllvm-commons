@@ -1,7 +1,8 @@
-//! Zap-to-Vote Logic
+//! Zap Tracking for Transparency
 //!
-//! Processes zaps to governance events and converts them into votes.
-//! Calculates vote weights using quadratic formula and records votes in database.
+//! Tracks zaps to governance events for transparency/reporting purposes only.
+//! Zaps do NOT affect governance decisions (governance is maintainer-only multisig).
+//! This module tracks zap amounts and types for public reporting/dashboards.
 
 use crate::nostr::zap_tracker::ZapContribution;
 use anyhow::Result;
@@ -59,7 +60,8 @@ impl ZapVotingProcessor {
         Self { pool }
     }
 
-    /// Process a zap contribution and convert it to a vote if it's a proposal zap
+    /// Process a zap contribution and record it for transparency (not governance)
+    /// Zaps are tracked for reporting purposes only - they do not affect governance decisions
     pub async fn process_proposal_zap(
         &self,
         zap: &ZapContribution,
@@ -82,7 +84,8 @@ impl ZapVotingProcessor {
             .as_ref()
             .ok_or_else(|| anyhow::anyhow!("Proposal zap missing sender pubkey"))?;
 
-        // Calculate vote weight using quadratic formula
+        // Calculate "vote weight" for reporting purposes only (not used in governance)
+        // Governance is maintainer-only, this is just for transparency/reporting
         let vote_weight = (zap.amount_btc).sqrt();
 
         // Determine vote type from zap message (default to support)

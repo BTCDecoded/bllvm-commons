@@ -3,7 +3,7 @@
 //! Tests for contribution tracking, weight calculation, and voting aggregation.
 
 use blvm_commons::governance::{
-    ContributionAggregator, ContributionTracker, FeeForwardingTracker, VoteAggregator,
+    ContributionAggregator, ContributionTracker, VoteAggregator,
     WeightCalculator,
 };
 use blvm_commons::nostr::{ZapTracker, ZapVotingProcessor};

@@ -1,7 +1,8 @@
-//! Contribution Aggregator
+//! Contribution Aggregator (Reporting/Transparency Only)
 //!
-//! Aggregates contributions over time windows (30-day rolling for mining, cumulative for zaps)
-//! and updates participation weights.
+//! Aggregates contributions for reporting/transparency purposes only.
+//! NOTE: Governance is maintainer-only multisig - contributions do NOT affect governance.
+//! This aggregator is kept for public reporting/dashboards.
 
 use crate::governance::{ContributionTracker, WeightCalculator};
 use anyhow::Result;
@@ -26,54 +27,10 @@ impl ContributionAggregator {
         }
     }
 
-    /// Aggregate merge mining contributions (30-day rolling)
-    /// Returns total BTC contributed in the last 30 days
-    pub async fn aggregate_merge_mining_monthly(&self, contributor_id: &str) -> Result<f64> {
-        let now = Utc::now();
-        let thirty_days_ago = now - chrono::Duration::days(30);
 
-        let total: Option<f64> = sqlx::query_scalar(
-            r#"
-            SELECT COALESCE(SUM(amount_btc), 0.0) as total
-            FROM unified_contributions
-            WHERE contributor_id = ?
-              AND contribution_type LIKE 'merge_mining:%'
-              AND timestamp >= ?
-            "#,
-        )
-        .bind(contributor_id)
-        .bind(thirty_days_ago)
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok(total.unwrap_or(0.0))
-    }
-
-    /// Aggregate fee forwarding contributions (30-day rolling)
-    /// Returns total BTC forwarded in the last 30 days
-    pub async fn aggregate_fee_forwarding_monthly(&self, contributor_id: &str) -> Result<f64> {
-        let now = Utc::now();
-        let thirty_days_ago = now - chrono::Duration::days(30);
-
-        let total: Option<f64> = sqlx::query_scalar(
-            r#"
-            SELECT COALESCE(SUM(amount_btc), 0.0) as total
-            FROM unified_contributions
-            WHERE contributor_id = ?
-              AND contribution_type = 'fee_forwarding'
-              AND timestamp >= ?
-            "#,
-        )
-        .bind(contributor_id)
-        .bind(thirty_days_ago)
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok(total.unwrap_or(0.0))
-    }
-
-    /// Aggregate cumulative zap contributions (all-time)
-    /// Returns total BTC zapped (cumulative)
+    /// Aggregate cumulative zap contributions (all-time) - for reporting only
+    /// NOTE: Zaps do NOT affect governance (maintainer-only multisig)
+    /// Returns total BTC zapped (cumulative) for transparency/reporting
     pub async fn aggregate_zaps_cumulative(&self, contributor_id: &str) -> Result<f64> {
         let total: Option<f64> = sqlx::query_scalar(
             r#"
@@ -90,36 +47,32 @@ impl ContributionAggregator {
         Ok(total.unwrap_or(0.0))
     }
 
-    /// Update all participation weights (called periodically, e.g., daily)
+    /// Update all participation weights (for reporting only)
+    /// NOTE: Governance is maintainer-only - weights are 0.0 and don't affect governance
+    /// This is kept for reporting/transparency purposes
     pub async fn update_all_weights(&self) -> Result<()> {
-        info!("Starting participation weight update for all contributors");
+        info!("Starting participation weight update (for reporting only)");
 
-        // Update contribution ages first (for cooling-off calculation)
+        // Update contribution ages first (for reporting)
         self.contribution_tracker.update_contribution_ages().await?;
 
-        // Update all participation weights
+        // Update all participation weights (all will be 0.0 since governance is maintainer-only)
         self.weight_calculator
             .update_participation_weights()
             .await?;
 
-        info!("Completed participation weight update");
+        info!("Completed participation weight update (all weights are 0.0 - maintainer-only governance)");
         Ok(())
     }
 
-    /// Get aggregated contributions for a contributor
+    /// Get aggregated contributions for a contributor (zaps only)
     pub async fn get_contributor_aggregates(
         &self,
         contributor_id: &str,
     ) -> Result<ContributorAggregates> {
-        let merge_mining = self.aggregate_merge_mining_monthly(contributor_id).await?;
-        let fee_forwarding = self
-            .aggregate_fee_forwarding_monthly(contributor_id)
-            .await?;
         let zaps = self.aggregate_zaps_cumulative(contributor_id).await?;
 
-        let total = merge_mining + fee_forwarding + zaps;
-
-        // Get participation weight
+        // Get participation weight (always 0.0 for maintainer-only governance)
         let participation_weight = self
             .weight_calculator
             .get_participation_weight(contributor_id)
@@ -127,21 +80,18 @@ impl ContributionAggregator {
             .unwrap_or(0.0);
 
         Ok(ContributorAggregates {
-            merge_mining_btc: merge_mining,
-            fee_forwarding_btc: fee_forwarding,
             cumulative_zaps_btc: zaps,
-            total_contribution_btc: total,
+            total_contribution_btc: zaps,
             participation_weight,
         })
     }
 }
 
-/// Aggregated contributions for a contributor
+/// Aggregated contributions for a contributor (for reporting/transparency only)
+/// NOTE: Governance is maintainer-only - these values do NOT affect governance decisions
 #[derive(Debug, Clone)]
 pub struct ContributorAggregates {
-    pub merge_mining_btc: f64,
-    pub fee_forwarding_btc: f64,
     pub cumulative_zaps_btc: f64,
     pub total_contribution_btc: f64,
-    pub participation_weight: f64,
+    pub participation_weight: f64, // Always 0.0 (maintainer-only governance)
 }

@@ -105,13 +105,12 @@ impl StatusCheckGenerator {
         }
     }
 
-    /// Generate status check with tier classification and economic node veto status
+    /// Generate status check with tier classification
     pub fn generate_tier_status(
         tier: u32,
         tier_name: &str,
         review_period_met: bool,
         signatures_met: bool,
-        economic_veto_active: bool,
         review_period_status: &str,
         signature_status: &str,
     ) -> String {
@@ -126,11 +125,7 @@ impl StatusCheckGenerator {
 
         let mut status = format!("{} Tier {}: {}\n", tier_emoji, tier, tier_name);
 
-        if economic_veto_active && tier >= 3 {
-            status.push_str("⚠️ Economic Node Veto Active\n");
-        }
-
-        if review_period_met && signatures_met && !economic_veto_active {
+        if review_period_met && signatures_met {
             status.push_str("✅ Governance: All Requirements Met - Ready to Merge");
         } else {
             status.push_str("❌ Governance: Requirements Not Met\n");
@@ -138,41 +133,11 @@ impl StatusCheckGenerator {
                 "\n{}\n\n{}",
                 review_period_status, signature_status
             ));
-
-            if economic_veto_active && tier >= 3 {
-                status.push_str("\n\n⚠️ Economic Node Veto: 30%+ hashpower AND 40%+ economic activity has vetoed this change");
-            }
         }
 
         status
     }
 
-    /// Generate economic node veto status
-    pub fn generate_economic_veto_status(
-        veto_active: bool,
-        mining_veto_percent: f64,
-        economic_veto_percent: f64,
-        total_nodes: u32,
-        veto_count: u32,
-    ) -> String {
-        if veto_active {
-            format!(
-                "⚠️ Economic Node Veto Active\n\
-                Mining Veto: {:.1}% (threshold: 30%)\n\
-                Economic Veto: {:.1}% (threshold: 40%)\n\
-                Total Nodes: {} | Veto Count: {}",
-                mining_veto_percent, economic_veto_percent, total_nodes, veto_count
-            )
-        } else {
-            format!(
-                "✅ Economic Node Veto: Not Active\n\
-                Mining Veto: {:.1}% (threshold: 30%)\n\
-                Economic Veto: {:.1}% (threshold: 40%)\n\
-                Total Nodes: {} | Veto Count: {}",
-                mining_veto_percent, economic_veto_percent, total_nodes, veto_count
-            )
-        }
-    }
 }
 
 #[cfg(test)]
@@ -309,7 +274,6 @@ mod tests {
             "Routine Maintenance",
             true,
             true,
-            false,
             "Review period met",
             "Signatures complete",
         );
@@ -325,7 +289,6 @@ mod tests {
             "Emergency",
             true,
             true,
-            false,
             "Review period met",
             "Signatures complete",
         );
@@ -334,53 +297,6 @@ mod tests {
         assert!(status.contains("Tier 4"), "Should show tier number");
     }
 
-    #[test]
-    fn test_generate_tier_status_with_veto() {
-        let status = StatusCheckGenerator::generate_tier_status(
-            3, // tier
-            "Consensus-Adjacent",
-            true,
-            true,
-            true, // economic_veto_active
-            "Review period met",
-            "Signatures complete",
-        );
-
-        assert!(
-            status.contains("⚠️ Economic Node Veto Active"),
-            "Should show veto active"
-        );
-    }
-
-    #[test]
-    fn test_generate_economic_veto_status_active() {
-        let status = StatusCheckGenerator::generate_economic_veto_status(
-            true, // veto_active
-            35.0, // mining_veto_percent
-            45.0, // economic_veto_percent
-            10,   // total_nodes
-            4,    // veto_count
-        );
-
-        assert!(status.contains("⚠️"), "Should show veto active");
-        assert!(status.contains("35.0%"), "Should show mining veto percent");
-        assert!(
-            status.contains("45.0%"),
-            "Should show economic veto percent"
-        );
-    }
-
-    #[test]
-    fn test_generate_economic_veto_status_not_active() {
-        let status = StatusCheckGenerator::generate_economic_veto_status(
-            false, // veto_active
-            20.0,  // mining_veto_percent
-            30.0,  // economic_veto_percent
-            10,    // total_nodes
-            2,     // veto_count
-        );
-
-        assert!(status.contains("✅"), "Should show veto not active");
         assert!(status.contains("20.0%"), "Should show mining veto percent");
     }
 }

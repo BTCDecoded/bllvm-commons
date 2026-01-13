@@ -20,7 +20,6 @@ mod build;
 mod config;
 mod crypto;
 mod database;
-mod economic_nodes;
 mod enforcement;
 mod error;
 mod github;
@@ -37,7 +36,7 @@ mod webhooks;
 use audit::AuditLogger;
 use config::AppConfig;
 use database::Database;
-use governance::{ContributionAggregator, FeeForwardingTracker};
+use governance::ContributionAggregator;
 use nostr::{NostrClient, StatusPublisher, ZapTracker};
 #[cfg(feature = "opentimestamps")]
 use ots::{OtsClient, RegistryAnchorer};
@@ -311,24 +310,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    // Initialize fee forwarding tracker (if Commons addresses configured)
-    let fee_forwarding_tracker = if !config.governance.commons_addresses.is_empty() {
-        Some(FeeForwardingTracker::from_network_string(
-            pool.clone(),
-            config.governance.commons_addresses.clone(),
-            &config.governance.network,
-        ))
-    } else {
-        None
-    };
-
-    if fee_forwarding_tracker.is_some() {
-        info!(
-            "Fee forwarding tracker initialized for {} Commons addresses on {}",
-            config.governance.commons_addresses.len(),
-            config.governance.network
-        );
-    }
+    // Fee forwarding removed - no longer tracked
 
     // Start periodic weight update task (if enabled)
     if config.governance.weight_updates_enabled {

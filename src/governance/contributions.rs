@@ -1,7 +1,7 @@
 //! Contribution Tracking Service
 //!
-//! Tracks governance contributions (merge mining, fee forwarding, zaps)
-//! and records them in the unified contributions table.
+//! Tracks governance contributions (zaps) for transparency/reporting only.
+//! Note: Contributions no longer affect governance weight (maintainer-only governance).
 
 use anyhow::Result;
 use chrono::{DateTime, Utc};
@@ -19,92 +19,9 @@ impl ContributionTracker {
         Self { pool }
     }
 
-    /// Record a merge mining contribution (1% of secondary chain rewards)
-    pub async fn record_merge_mining_contribution(
-        &self,
-        contributor_id: &str,
-        chain_id: &str,
-        reward_amount_btc: f64,
-        contribution_amount_btc: f64, // 1% of reward
-        timestamp: DateTime<Utc>,
-    ) -> Result<()> {
-        // Record in unified contributions table
-        sqlx::query(
-            r#"
-            INSERT INTO unified_contributions
-            (contributor_id, contributor_type, contribution_type, amount_btc, timestamp, contribution_age_days, period_type, verified)
-            VALUES (?, ?, ?, ?, ?, 0, 'monthly', ?)
-            "#,
-        )
-        .bind(contributor_id)
-        .bind("merge_miner")
-        .bind(format!("merge_mining:{}", chain_id))
-        .bind(contribution_amount_btc)
-        .bind(timestamp)
-        .bind(true)  // Verified (on-chain)
-        .execute(&self.pool)
-        .await?;
+    // Merge mining removed - it's now a module with its own revenue model
+    // Merge mining revenue goes to module developer, not governance
 
-        info!(
-            "Recorded merge mining contribution: {} BTC (from {} BTC reward on {}) for {}",
-            contribution_amount_btc, reward_amount_btc, chain_id, contributor_id
-        );
-
-        Ok(())
-    }
-
-    /// Record a fee forwarding contribution
-    pub async fn record_fee_forwarding_contribution(
-        &self,
-        contributor_id: &str,
-        tx_hash: &str,
-        amount_btc: f64,
-        commons_address: &str,
-        block_height: i32,
-        timestamp: DateTime<Utc>,
-    ) -> Result<()> {
-        // First record in fee_forwarding_contributions table
-        sqlx::query(
-            r#"
-            INSERT INTO fee_forwarding_contributions
-            (contributor_id, tx_hash, block_height, amount_btc, commons_address, timestamp, verified)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            "#,
-        )
-        .bind(contributor_id)
-        .bind(tx_hash)
-        .bind(block_height)
-        .bind(amount_btc)
-        .bind(commons_address)
-        .bind(timestamp)
-        .bind(true)  // Verified (on-chain)
-        .execute(&self.pool)
-        .await?;
-
-        // Also record in unified contributions table
-        sqlx::query(
-            r#"
-            INSERT INTO unified_contributions
-            (contributor_id, contributor_type, contribution_type, amount_btc, timestamp, contribution_age_days, period_type, verified)
-            VALUES (?, ?, ?, ?, ?, 0, 'monthly', ?)
-            "#,
-        )
-        .bind(contributor_id)
-        .bind("fee_forwarder")
-        .bind("fee_forwarding")
-        .bind(amount_btc)
-        .bind(timestamp)
-        .bind(true)  // Verified (on-chain)
-        .execute(&self.pool)
-        .await?;
-
-        info!(
-            "Recorded fee forwarding contribution: {} BTC (tx: {}) for {}",
-            amount_btc, tx_hash, contributor_id
-        );
-
-        Ok(())
-    }
 
     /// Record a zap contribution (called from zap tracker)
     pub async fn record_zap_contribution(
@@ -165,26 +82,18 @@ impl ContributionTracker {
         .fetch_all(&self.pool)
         .await?;
 
-        let mut merge_mining_btc = 0.0;
-        let mut fee_forwarding_btc = 0.0;
         let mut zaps_btc = 0.0;
 
         for (contribution_type, total_btc) in rows {
             let total = total_btc.unwrap_or(0.0);
-            if contribution_type.starts_with("merge_mining:") {
-                merge_mining_btc += total;
-            } else if contribution_type == "fee_forwarding" {
-                fee_forwarding_btc += total;
-            } else if contribution_type.starts_with("zap:") {
+            if contribution_type.starts_with("zap:") {
                 zaps_btc += total;
             }
         }
 
         Ok(ContributorTotal {
-            merge_mining_btc,
-            fee_forwarding_btc,
             zaps_btc,
-            total_btc: merge_mining_btc + fee_forwarding_btc + zaps_btc,
+            total_btc: zaps_btc,
         })
     }
 
@@ -208,11 +117,9 @@ impl ContributionTracker {
     }
 }
 
-/// Contributor total contributions
+/// Contributor total contributions (for reporting/transparency only)
 #[derive(Debug, Clone)]
 pub struct ContributorTotal {
-    pub merge_mining_btc: f64,
-    pub fee_forwarding_btc: f64,
     pub zaps_btc: f64,
     pub total_btc: f64,
 }

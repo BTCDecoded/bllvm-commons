@@ -4,7 +4,6 @@ pub mod build;
 pub mod config;
 pub mod crypto;
 pub mod database;
-pub mod economic_nodes;
 pub mod enforcement;
 pub mod error;
 pub mod fork;

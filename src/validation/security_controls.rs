@@ -30,7 +30,6 @@ pub struct SecurityControl {
     pub requires_security_audit: bool,
     pub requires_formal_verification: bool,
     pub requires_cryptography_expert: bool,
-    pub economic_node_veto_enabled: bool,
     pub additional_requirements: Option<Vec<String>>,
 }
 
@@ -79,7 +78,6 @@ pub struct AffectedControl {
     pub requires_security_audit: bool,
     pub requires_formal_verification: bool,
     pub requires_cryptography_expert: bool,
-    pub economic_node_veto_enabled: bool,
 }
 
 /// Security control validator
@@ -135,7 +133,6 @@ impl SecurityControlValidator {
                         requires_security_audit: control.requires_security_audit,
                         requires_formal_verification: control.requires_formal_verification,
                         requires_cryptography_expert: control.requires_cryptography_expert,
-                        economic_node_veto_enabled: control.economic_node_veto_enabled,
                     };
 
                     affected_controls.push(affected_control);
@@ -628,7 +625,6 @@ mod tests {
                 requires_security_audit: true,
                 requires_formal_verification: true,
                 requires_cryptography_expert: false,
-                economic_node_veto_enabled: true,
                 additional_requirements: None,
             }],
             categories: HashMap::new(),

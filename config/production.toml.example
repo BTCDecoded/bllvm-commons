@@ -43,10 +43,6 @@ rules_config_path = "/opt/governance-app/config/governance-rules"
 # Signature verification
 signature_verification_enabled = true
 signature_timeout_seconds = 300
-# Economic node configuration
-economic_node_veto_enabled = true
-economic_node_veto_threshold = 0.3  # 30% of total weight
-economic_node_veto_timeout_seconds = 3600  # 1 hour
 # Governance fork configuration
 governance_fork_enabled = true
 fork_detection_interval_seconds = 300  # 5 minutes

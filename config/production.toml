@@ -72,10 +72,6 @@ tier_5_signatures_required = 5
 tier_5_signatures_total = 5
 tier_5_review_period_days = 180
 
-# Economic node veto thresholds
-mining_veto_threshold_percent = 30.0
-economic_veto_threshold_percent = 40.0
-
 [repositories]
 # Repository layer mapping
 orange_paper = 1
@@ -129,17 +125,6 @@ emergency = [
     "emergency4@example.com",
     "emergency5@example.com"
 ]
-
-[economic_nodes]
-# Economic node qualification thresholds
-mining_pool_min_hashpower_percent = 1.0
-exchange_min_holdings_btc = 1000.0
-exchange_min_volume_usd = 10000000.0
-custodian_min_holdings_btc = 5000.0
-
-# Veto thresholds
-mining_veto_threshold_percent = 30.0
-economic_veto_threshold_percent = 40.0
 
 [governance_fork]
 # Fork capability settings

@@ -50,12 +50,6 @@ enabled = true
 registry_path = "data/authorized_servers.json"
 verification_required = true
 
-[economic_nodes]
-enabled = true
-veto_threshold_percent = 30.0
-hash_rate_threshold_percent = 30.0
-economic_activity_threshold_percent = 40.0
-
 [governance_fork]
 enabled = true
 export_path = "data/governance-exports"

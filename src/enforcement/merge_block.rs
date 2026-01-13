@@ -17,87 +17,19 @@ impl MergeBlocker {
     }
 
     /// Determine if merge should be blocked based on governance requirements
-    ///
-    /// For sequential veto mechanism:
-    /// - If veto active and review period not expired: Block
-    /// - If veto active and review period expired but not overridden: Block
-    /// - If veto active and review period expired and overridden: Don't block (clean fork expected)
-    /// - If consensus achieved (opposition dropped): Don't block
+    /// Governance is maintainer-only multisig (no economic nodes, no veto system)
     pub fn should_block_merge(
         review_period_met: bool,
         signatures_met: bool,
-        economic_veto_active: bool,
-        tier: u32,
         emergency_mode: bool,
     ) -> Result<bool, GovernanceError> {
         // In emergency mode, only signature threshold matters
         if emergency_mode {
             Ok(!signatures_met)
         } else {
-            // Normal mode: check all requirements
+            // Normal mode: check maintainer signature requirements
             let basic_requirements_met = review_period_met && signatures_met;
-
-            // For Tier 3+ PRs, also check economic node veto
-            // Note: Sequential veto mechanism is handled by veto_active flag
-            // which already accounts for review period and override status
-            if tier >= 3 && economic_veto_active {
-                Ok(true) // Block merge due to economic node veto
-            } else {
-                Ok(!basic_requirements_met)
-            }
-        }
-    }
-
-    /// Determine if merge should be blocked with full veto threshold information
-    /// This version uses VetoThreshold struct for sequential veto mechanism support
-    pub fn should_block_merge_with_veto(
-        review_period_met: bool,
-        signatures_met: bool,
-        veto_threshold: &crate::economic_nodes::VetoThreshold,
-        tier: u32,
-        emergency_mode: bool,
-    ) -> Result<bool, GovernanceError> {
-        // In emergency mode, only signature threshold matters
-        if emergency_mode {
-            Ok(!signatures_met)
-        } else {
-            // Normal mode: check all requirements
-            let basic_requirements_met = review_period_met && signatures_met;
-
-            // For Tier 3+ PRs, check economic node veto with sequential mechanism
-            if tier >= 3 {
-                // Veto is active if threshold met and not overridden
-                // If overridden, don't block (clean fork expected)
-                if veto_threshold.veto_active {
-                    Ok(true) // Block merge due to active veto
-                } else if veto_threshold.maintainer_override {
-                    // Veto was overridden after review period - don't block
-                    // Maintainers can proceed, economic nodes expected to fork
-                    Ok(!basic_requirements_met)
-                } else if let Some(path) = &veto_threshold.resolution_path {
-                    // Check resolution path
-                    match path.as_str() {
-                        "consensus" => {
-                            // Consensus achieved - opposition dropped below threshold
-                            Ok(!basic_requirements_met)
-                        }
-                        "override" => {
-                            // Override occurred - don't block
-                            Ok(!basic_requirements_met)
-                        }
-                        _ => {
-                            // Still in review or other state - block if veto was active
-                            Ok(!basic_requirements_met || veto_threshold.threshold_met)
-                        }
-                    }
-                } else {
-                    // No resolution path set - use basic requirements
-                    Ok(!basic_requirements_met)
-                }
-            } else {
-                // Tier 1-2: No veto mechanism
-                Ok(!basic_requirements_met)
-            }
+            Ok(!basic_requirements_met)
         }
     }
 
@@ -105,8 +37,6 @@ impl MergeBlocker {
     pub fn get_block_reason(
         review_period_met: bool,
         signatures_met: bool,
-        economic_veto_active: bool,
-        tier: u32,
         emergency_mode: bool,
     ) -> String {
         if emergency_mode {
@@ -124,11 +54,6 @@ impl MergeBlocker {
 
             if !signatures_met {
                 reasons.push("Signature threshold requirement not met");
-            }
-
-            if tier >= 3 && economic_veto_active {
-                reasons
-                    .push("Economic node veto active (30%+ hashpower AND 40%+ economic activity)");
             }
 
             if reasons.is_empty() {
@@ -194,8 +119,6 @@ mod tests {
         let result = MergeBlocker::should_block_merge(
             true,  // review_period_met
             true,  // signatures_met
-            false, // economic_veto_active
-            2,     // tier
             false, // emergency_mode
         )
         .unwrap();
@@ -208,8 +131,6 @@ mod tests {
         let result = MergeBlocker::should_block_merge(
             false, // review_period_met
             true,  // signatures_met
-            false, // economic_veto_active
-            2,     // tier
             false, // emergency_mode
         )
         .unwrap();
@@ -222,8 +143,6 @@ mod tests {
         let result = MergeBlocker::should_block_merge(
             true,  // review_period_met
             false, // signatures_met
-            false, // economic_veto_active
-            2,     // tier
             false, // emergency_mode
         )
         .unwrap();
@@ -232,40 +151,10 @@ mod tests {
     }
 
     #[test]
-    fn test_should_block_merge_economic_veto_tier3() {
-        let result = MergeBlocker::should_block_merge(
-            true,  // review_period_met
-            true,  // signatures_met
-            true,  // economic_veto_active
-            3,     // tier (Tier 3+)
-            false, // emergency_mode
-        )
-        .unwrap();
-
-        assert!(result, "Should block when economic veto active for Tier 3+");
-    }
-
-    #[test]
-    fn test_should_block_merge_economic_veto_tier2() {
-        let result = MergeBlocker::should_block_merge(
-            true,  // review_period_met
-            true,  // signatures_met
-            true,  // economic_veto_active
-            2,     // tier (Tier 2, veto doesn't apply)
-            false, // emergency_mode
-        )
-        .unwrap();
-
-        assert!(!result, "Should not block Tier 2 even with economic veto");
-    }
-
-    #[test]
     fn test_should_block_merge_emergency_mode_signatures_met() {
         let result = MergeBlocker::should_block_merge(
             false, // review_period_met (ignored in emergency)
             true,  // signatures_met
-            false, // economic_veto_active (ignored in emergency)
-            4,     // tier (ignored in emergency)
             true,  // emergency_mode
         )
         .unwrap();
@@ -281,8 +170,6 @@ mod tests {
         let result = MergeBlocker::should_block_merge(
             true,  // review_period_met (ignored in emergency)
             false, // signatures_met
-            false, // economic_veto_active (ignored in emergency)
-            4,     // tier (ignored in emergency)
             true,  // emergency_mode
         )
         .unwrap();
@@ -296,47 +183,41 @@ mod tests {
     #[test]
     fn test_get_block_reason_all_met() {
         let reason = MergeBlocker::get_block_reason(
-            true, true, false, 2,
-            false, // All requirements met: review_period_met=true, signatures_met=true
+            true,  // review_period_met
+            true,  // signatures_met
+            false, // emergency_mode
         );
         assert_eq!(reason, "All governance requirements met");
     }
 
     #[test]
     fn test_get_block_reason_review_period() {
-        let reason = MergeBlocker::get_block_reason(false, true, false, 2, false);
+        let reason = MergeBlocker::get_block_reason(false, true, false);
         assert!(reason.contains("Review period requirement not met"));
     }
 
     #[test]
     fn test_get_block_reason_signatures() {
-        let reason = MergeBlocker::get_block_reason(true, false, false, 2, false);
+        let reason = MergeBlocker::get_block_reason(true, false, false);
         assert!(reason.contains("Signature threshold requirement not met"));
-    }
-
-    #[test]
-    fn test_get_block_reason_economic_veto() {
-        let reason = MergeBlocker::get_block_reason(true, true, true, 3, false);
-        assert!(reason.contains("Economic node veto active"));
     }
 
     #[test]
     fn test_get_block_reason_multiple() {
-        let reason = MergeBlocker::get_block_reason(false, false, true, 3, false);
+        let reason = MergeBlocker::get_block_reason(false, false, false);
         assert!(reason.contains("Review period requirement not met"));
         assert!(reason.contains("Signature threshold requirement not met"));
-        assert!(reason.contains("Economic node veto active"));
     }
 
     #[test]
     fn test_get_block_reason_emergency_signatures_met() {
-        let reason = MergeBlocker::get_block_reason(false, true, false, 4, true);
+        let reason = MergeBlocker::get_block_reason(false, true, true);
         assert_eq!(reason, "Emergency mode: All requirements met");
     }
 
     #[test]
     fn test_get_block_reason_emergency_signatures_not_met() {
-        let reason = MergeBlocker::get_block_reason(true, false, false, 4, true);
+        let reason = MergeBlocker::get_block_reason(true, false, true);
         assert_eq!(reason, "Emergency mode: Signature threshold not met");
     }
 
